@@ -1,0 +1,19 @@
+# Nim artifacts
+nimcache/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+tests/test
+
+# IDE
+.idea/
+*.swp
+*.swo
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
