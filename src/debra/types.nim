@@ -37,3 +37,16 @@ type
 
   DebraRegistrationError* = object of CatchableError
     ## Raised when thread registration fails (e.g., max threads reached).
+
+proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
+  ## Initialize a new DEBRA+ manager.
+  ##
+  ## The global epoch starts at 1 (not 0) so that epoch 0 can represent
+  ## "never observed" in thread state.
+  result.globalEpoch.store(1'u64, moRelaxed)
+  result.activeThreadMask.store(0'u64, moRelaxed)
+  for i in 0..<MaxThreads:
+    result.threads[i].epoch.store(0'u64, moRelaxed)
+    result.threads[i].pinned.store(false, moRelaxed)
+    result.threads[i].neutralized.store(false, moRelaxed)
+    result.threads[i].osThreadId.store(Pid(0), moRelaxed)
