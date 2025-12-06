@@ -6,17 +6,20 @@
 when not compileOption("threads"):
   {.error: "nim-debra requires --threads:on".}
 
+import atomics
 import ./debra/types
 import ./debra/signal
 import ./debra/typestates/registration
 import ./debra/typestates/guard
 import ./debra/typestates/reclaim
+import ./debra/typestates/neutralize
 
 export types
 export signal.setGlobalManager, signal.installSignalHandler
 export registration
 export guard
 export reclaim
+export neutralize
 
 proc registerThread*[MaxThreads: static int](
   manager: var DebraManager[MaxThreads]
@@ -43,3 +46,27 @@ proc registerThread*[MaxThreads: static int](
       of sThreadUnregistered:
         op = claimResult.threadunregistered
         continue
+
+
+proc neutralizeStalled*[MaxThreads: static int](
+  manager: var DebraManager[MaxThreads],
+  epochsBeforeNeutralize: uint64 = 2
+): int =
+  ## Signal all stalled threads. Returns number of signals sent.
+  var op = neutralizeStart(manager, epochsBeforeNeutralize)
+  op.scanAndSignal(manager)
+  op.complete().extractSignalCount()
+
+
+proc advance*[MaxThreads: static int](
+  manager: var DebraManager[MaxThreads]
+) {.inline.} =
+  ## Advance the global epoch.
+  discard manager.globalEpoch.fetchAdd(1'u64, moRelease)
+
+
+proc currentEpoch*[MaxThreads: static int](
+  manager: var DebraManager[MaxThreads]
+): uint64 {.inline.} =
+  ## Get current global epoch.
+  manager.globalEpoch.load(moAcquire)
