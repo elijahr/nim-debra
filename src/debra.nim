@@ -10,11 +10,13 @@ import ./debra/types
 import ./debra/signal
 import ./debra/typestates/registration
 import ./debra/typestates/guard
+import ./debra/typestates/reclaim
 
 export types
 export signal.setGlobalManager, signal.installSignalHandler
 export registration
 export guard
+export reclaim
 
 proc registerThread*[MaxThreads: static int](
   manager: var DebraManager[MaxThreads]
