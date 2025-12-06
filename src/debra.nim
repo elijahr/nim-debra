@@ -9,10 +9,12 @@ when not compileOption("threads"):
 import ./debra/types
 import ./debra/signal
 import ./debra/typestates/registration
+import ./debra/typestates/guard
 
 export types
 export signal.setGlobalManager, signal.installSignalHandler
 export registration
+export guard
 
 proc registerThread*[MaxThreads: static int](
   manager: var DebraManager[MaxThreads]
