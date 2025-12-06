@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nim-version: ['latest:2', '2.0.0']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install asdf
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Install asdf-nim plugin
+        run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
+
+      - name: Install Nim ${{ matrix.nim-version }}
+        run: |
+          asdf install nim ${{ matrix.nim-version }}
+          asdf global nim ${{ matrix.nim-version }}
+
+      - name: Cache Nimble packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
+          restore-keys: |
+            ${{ runner.os }}-nimble-${{ matrix.nim-version }}-
+
+      - name: Install dependencies
+        run: nimble install -y
+
+      - name: Clear compilation cache
+        run: rm -rf ~/.cache/nim
+
+      - name: Run tests
+        run: nimble test
