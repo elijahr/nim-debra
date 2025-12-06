@@ -5,6 +5,7 @@ import atomics
 
 import debra/types
 import debra/typestates/registration
+import debra
 
 suite "Thread Registration Typestate":
   var manager: DebraManager[4]
@@ -28,3 +29,25 @@ suite "Thread Registration Typestate":
     let op = start()
     let slotCheck = op.findSlot(manager)
     check slotCheck.kind == sThreadRegistrationFull
+
+suite "registerThread API":
+  var manager: DebraManager[4]
+
+  setup:
+    manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+
+  test "registerThread returns valid handle":
+    let handle = registerThread(manager)
+    check handle.idx >= 0
+    check handle.idx < 4
+
+  test "registerThread raises when full":
+    # Register 4 threads (max)
+    discard registerThread(manager)
+    discard registerThread(manager)
+    discard registerThread(manager)
+    discard registerThread(manager)
+
+    expect DebraRegistrationError:
+      discard registerThread(manager)
