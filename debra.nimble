@@ -17,4 +17,4 @@ requires "typestates >= 0.1.0"
 # Tasks
 
 task test, "Run tests":
-  exec "nim c -r --threads:on -d:testing tests/test.nim"
+  exec "nim c -r --threads:on --path:src -d:testing tests/test.nim"
