@@ -1,0 +1,105 @@
+site_name: nim-debra
+site_description: DEBRA+ safe memory reclamation for lock-free data structures
+site_url: https://elijahr.github.io/nim-debra/
+
+repo_name: elijahr/nim-debra
+repo_url: https://github.com/elijahr/nim-debra
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - toc.follow
+
+exclude_docs: |
+  plans/
+
+plugins:
+  - search
+  - include-markdown:
+      opening_tag: "{%"
+      closing_tag: "%}"
+  - mike:
+      alias_type: symlink
+      canonical_version: latest
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+      exclude:
+        - plans/*
+  - glightbox
+  - mkdocstrings:
+      default_handler: nim
+      handlers:
+        nim:
+          paths: [src]
+          options:
+            docstring_style: rst
+            show_source: true
+            show_signature: true
+            show_attribution: false
+            heading_level: 3
+            source_url: https://github.com/elijahr/nim-debra
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 4
+
+nav:
+  - Home: index.md
+  - Guide:
+    - Getting Started: guide/getting-started.md
+    - Concepts: guide/concepts.md
+    - Thread Registration: guide/thread-registration.md
+    - Pin/Unpin: guide/pin-unpin.md
+    - Retiring Objects: guide/retiring-objects.md
+    - Reclamation: guide/reclamation.md
+    - Neutralization: guide/neutralization.md
+    - Integration: guide/integration.md
+  - API Reference: api.md
+  - Contributing: contributing.md
+
+watch:
+  - docs
+  - docs/guide
+  - docs/api
+  - src
+  - src/debra
+  - src/debra/typestates
+
+extra:
+  version:
+    provider: mike
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/elijahr/nim-debra
