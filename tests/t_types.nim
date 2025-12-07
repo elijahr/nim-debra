@@ -25,3 +25,10 @@ suite "DebraManager":
     var manager = initDebraManager[64]()
     for i in 0..<64:
       check manager.threads[i].pinned.load(moRelaxed) == false
+
+suite "ThreadState limbo bags":
+  test "ThreadState has limbo bag fields":
+    var state: ThreadState[64]
+    check state.currentBag == nil
+    check state.limboBagHead == nil
+    check state.limboBagTail == nil

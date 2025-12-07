@@ -6,6 +6,7 @@ import atomics
 import std/posix
 
 import ./constants
+import ./limbo
 
 type
   ThreadState*[MaxThreads: static int] = object
@@ -18,6 +19,13 @@ type
       ## Whether thread was force-unpinned by signal.
     osThreadId* {.align: 8.}: Atomic[Pid]
       ## OS thread ID for sending signals.
+    # Limbo bag fields
+    currentBag*: ptr LimboBag
+      ## Currently filling limbo bag.
+    limboBagHead*: ptr LimboBag
+      ## Head of limbo bag list (newest).
+    limboBagTail*: ptr LimboBag
+      ## Tail of limbo bag list (oldest).
 
   DebraManager*[MaxThreads: static int] = object
     ## Coordinates epoch-based reclamation across threads.
@@ -50,3 +58,6 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
     result.threads[i].pinned.store(false, moRelaxed)
     result.threads[i].neutralized.store(false, moRelaxed)
     result.threads[i].osThreadId.store(Pid(0), moRelaxed)
+    result.threads[i].currentBag = nil
+    result.threads[i].limboBagHead = nil
+    result.threads[i].limboBagTail = nil
