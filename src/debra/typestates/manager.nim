@@ -47,7 +47,9 @@ proc initialize*[MaxThreads: static int](
     mgr.threads[i].currentBag = nil
     mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil
-  result = ManagerReady[MaxThreads](ctx)
+  # Extract manager to avoid copy issues
+  let manager = ctx.manager
+  result = ManagerReady[MaxThreads](ManagerContext[MaxThreads](manager: manager))
 
 
 proc shutdown*[MaxThreads: static int](
@@ -69,7 +71,9 @@ proc shutdown*[MaxThreads: static int](
     mgr.threads[i].currentBag = nil
     mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil
-  result = ManagerShutdown[MaxThreads](ctx)
+  # Extract manager to avoid copy issues
+  let manager = ctx.manager
+  result = ManagerShutdown[MaxThreads](ManagerContext[MaxThreads](manager: manager))
 
 
 func getManager*[MaxThreads: static int](

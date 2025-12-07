@@ -1,120 +1,85 @@
-# src/debra/typestates/registration.nim
-
-## Thread registration typestate.
+## Registration typestate for thread registration.
 ##
-## Enforces correct sequencing for thread registration:
-## Start -> FindSlot -> TryClaim -> Complete
-##
-## Key invariant: Slot is claimed via CAS BEFORE incrementing any counter.
+## Handles thread registration with the DEBRA manager, ensuring threads
+## properly claim slots in the thread array using lock-free CAS operations.
 
 import atomics
 import std/posix
+import typestates
 
 import ../types
 import ../signal
 
 type
-  ThreadUnregistered* = object
-    ## Thread has not registered with DEBRA manager.
+  RegistrationContext*[MaxThreads: static int] = object
+    manager*: ptr DebraManager[MaxThreads]
+    idx*: int
 
-  ThreadSlotFound*[MaxThreads: static int] = object
-    ## Found available slot in thread array.
-    slotIdx*: int
+  Unregistered*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
+  Registered*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
+  RegistrationFull*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
 
-  ThreadRegistered*[MaxThreads: static int] = object
-    ## Thread successfully registered. Can now use epoch operations.
-    slotIdx*: int
-
-  ThreadRegistrationFull* = object
-    ## No slots available. Cannot register.
-
-  RegistrationSlotCheckKind* = enum
-    sThreadSlotFound
-    sThreadRegistrationFull
-
-  RegistrationSlotCheck*[MaxThreads: static int] = object
-    ## Result of trying to find a registration slot.
-    case kind*: RegistrationSlotCheckKind
-    of sThreadSlotFound:
-      threadslotfound*: ThreadSlotFound[MaxThreads]
-    of sThreadRegistrationFull:
-      threadregistrationfull*: ThreadRegistrationFull
-
-  RegistrationClaimResultKind* = enum
-    sThreadRegistered
-    sThreadUnregistered
-
-  RegistrationClaimResult*[MaxThreads: static int] = object
-    ## Result of trying to claim a slot.
-    case kind*: RegistrationClaimResultKind
-    of sThreadRegistered:
-      threadregistered*: ThreadRegistered[MaxThreads]
-    of sThreadUnregistered:
-      threadunregistered*: ThreadUnregistered
+typestate RegistrationContext[MaxThreads: static int]:
+  states Unregistered[MaxThreads], Registered[MaxThreads], RegistrationFull[MaxThreads]
+  transitions:
+    Unregistered[MaxThreads] -> Registered[MaxThreads] | RegistrationFull[MaxThreads] as RegisterResult[MaxThreads]
 
 
-proc start*(): ThreadUnregistered {.inline.} =
-  ## Begin thread registration.
-  ThreadUnregistered()
+proc unregistered*[MaxThreads: static int](
+  mgr: ptr DebraManager[MaxThreads]
+): Unregistered[MaxThreads] =
+  ## Create unregistered context for a thread.
+  Unregistered[MaxThreads](RegistrationContext[MaxThreads](
+    manager: mgr,
+    idx: -1
+  ))
 
 
-proc findSlot*[MaxThreads: static int](
-  op: ThreadUnregistered,
-  manager: var DebraManager[MaxThreads]
-): RegistrationSlotCheck[MaxThreads] {.inline.} =
-  ## Find first available slot in thread bitmask.
-  let mask = manager.activeThreadMask.load(moAcquire)
+proc register*[MaxThreads: static int](
+  u: Unregistered[MaxThreads]
+): RegisterResult[MaxThreads] {.transition.} =
+  ## Try to register thread by claiming a slot. Returns Registered if successful,
+  ## RegistrationFull if all slots are taken.
+  let ctx = RegistrationContext[MaxThreads](u)
+  let mgr = ctx.manager
 
+  # Try each slot in order
   for i in 0..<MaxThreads:
-    if (mask and (1'u64 shl i)) == 0:
-      return RegistrationSlotCheck[MaxThreads](
-        kind: sThreadSlotFound,
-        threadslotfound: ThreadSlotFound[MaxThreads](slotIdx: i)
-      )
+    let bit = 1'u64 shl i
+    var expected = mgr.activeThreadMask.load(moAcquire)
 
-  RegistrationSlotCheck[MaxThreads](
-    kind: sThreadRegistrationFull,
-    threadregistrationfull: ThreadRegistrationFull()
+    # Keep trying while this slot is free
+    while (expected and bit) == 0:
+      let desired = expected or bit
+      if mgr.activeThreadMask.compareExchangeWeak(expected, desired, moRelease, moAcquire):
+        # Successfully claimed slot i
+        # Store OS thread ID for signaling
+        mgr.threads[i].osThreadId.store(getThreadId().Pid, moRelease)
+        # Set thread-local index for signal handler
+        threadLocalIdx = i
+        # Extract fields to avoid copy issues
+        let manager = ctx.manager
+        return RegisterResult[MaxThreads] -> Registered[MaxThreads](
+          RegistrationContext[MaxThreads](manager: manager, idx: i)
+        )
+      # CAS failed, expected was updated, retry with new value
+
+  # All slots taken
+  # Extract fields to avoid copy issues
+  let manager = ctx.manager
+  RegisterResult[MaxThreads] -> RegistrationFull[MaxThreads](
+    RegistrationContext[MaxThreads](manager: manager, idx: -1)
   )
 
 
-proc tryClaim*[MaxThreads: static int](
-  op: ThreadSlotFound[MaxThreads],
-  manager: var DebraManager[MaxThreads]
-): RegistrationClaimResult[MaxThreads] {.inline.} =
-  ## CAS to claim the slot. Failure = retry from start.
-  let bit = 1'u64 shl op.slotIdx
-  var expected = manager.activeThreadMask.load(moAcquire)
-
-  while (expected and bit) == 0:
-    let desired = expected or bit
-    if manager.activeThreadMask.compareExchangeWeak(expected, desired, moRelease, moAcquire):
-      # Store OS thread ID for signaling
-      manager.threads[op.slotIdx].osThreadId.store(getThreadId().Pid, moRelease)
-      # Set thread-local index for signal handler
-      threadLocalIdx = op.slotIdx
-      return RegistrationClaimResult[MaxThreads](
-        kind: sThreadRegistered,
-        threadregistered: ThreadRegistered[MaxThreads](slotIdx: op.slotIdx)
-      )
-
-  # Slot was taken by another thread, retry from start
-  RegistrationClaimResult[MaxThreads](
-    kind: sThreadUnregistered,
-    threadunregistered: ThreadUnregistered()
-  )
+func idx*[MaxThreads: static int](r: Registered[MaxThreads]): int =
+  ## Get the thread slot index.
+  RegistrationContext[MaxThreads](r).idx
 
 
-proc extractHandle*[MaxThreads: static int](
-  op: ThreadRegistered[MaxThreads],
-  manager: var DebraManager[MaxThreads]
-): ThreadHandle[MaxThreads] {.inline.} =
-  ## Extract the thread handle for use in pin/unpin operations.
-  ThreadHandle[MaxThreads](idx: op.slotIdx, manager: addr manager)
-
-
-proc extractIdx*[MaxThreads: static int](
-  op: ThreadRegistered[MaxThreads]
-): int {.inline.} =
-  ## Extract just the slot index.
-  op.slotIdx
+func getHandle*[MaxThreads: static int](
+  r: Registered[MaxThreads]
+): ThreadHandle[MaxThreads] =
+  ## Extract ThreadHandle for use in pin/unpin operations.
+  let ctx = RegistrationContext[MaxThreads](r)
+  ThreadHandle[MaxThreads](idx: ctx.idx, manager: ctx.manager)

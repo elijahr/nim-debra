@@ -1,53 +1,51 @@
-# tests/t_registration.nim
-
 import unittest2
 import atomics
 
 import debra/types
 import debra/typestates/registration
-import debra
+import debra/typestates/manager
 
-suite "Thread Registration Typestate":
-  var manager: DebraManager[4]
-
-  setup:
-    manager = initDebraManager[4]()
-
-  test "start returns ThreadUnregistered":
-    let op = start()
-    check op is ThreadUnregistered
-
-  test "findSlot finds slot 0 when all empty":
-    let op = start()
-    let slotCheck = op.findSlot(manager)
-    check slotCheck.kind == sThreadSlotFound
-    check slotCheck.threadslotfound.slotIdx == 0
-
-  test "findSlot returns Full when all slots taken":
-    # Mark all slots as taken
-    manager.activeThreadMask.store(0b1111'u64, moRelaxed)
-    let op = start()
-    let slotCheck = op.findSlot(manager)
-    check slotCheck.kind == sThreadRegistrationFull
-
-suite "registerThread API":
-  var manager: DebraManager[4]
+suite "Registration typestate":
+  var mgr: DebraManager[4]
+  var ready: ManagerReady[4]
 
   setup:
-    manager = initDebraManager[4]()
-    setGlobalManager(addr manager)
+    mgr = DebraManager[4]()
+    ready = uninitializedManager(addr mgr).initialize()
 
-  test "registerThread returns valid handle":
-    let handle = registerThread(manager)
+  test "unregistered creates Unregistered state":
+    let u = unregistered(addr mgr)
+    check u is Unregistered[4]
+
+  test "register transitions Unregistered -> Registered | RegistrationFull":
+    let u = unregistered(addr mgr)
+    let result = u.register()
+    check result.kind == rRegistered
+    check result.registered.idx >= 0
+    check result.registered.idx < 4
+
+  test "register returns RegistrationFull when all slots taken":
+    # Fill all slots
+    mgr.activeThreadMask.store(0b1111'u64, moRelaxed)
+    let u = unregistered(addr mgr)
+    let result = u.register()
+    check result.kind == rRegistrationFull
+
+  test "getHandle extracts ThreadHandle from Registered":
+    let u = unregistered(addr mgr)
+    let result = u.register()
+    check result.kind == rRegistered
+    let handle = result.registered.getHandle()
     check handle.idx >= 0
-    check handle.idx < 4
+    check handle.manager == addr mgr
 
-  test "registerThread raises when full":
-    # Register 4 threads (max)
-    discard registerThread(manager)
-    discard registerThread(manager)
-    discard registerThread(manager)
-    discard registerThread(manager)
+  test "multiple threads can register":
+    let u1 = unregistered(addr mgr)
+    let r1 = u1.register()
+    check r1.kind == rRegistered
+    check r1.registered.idx == 0
 
-    expect DebraRegistrationError:
-      discard registerThread(manager)
+    let u2 = unregistered(addr mgr)
+    let r2 = u2.register()
+    check r2.kind == rRegistered
+    check r2.registered.idx == 1
