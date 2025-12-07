@@ -1,83 +1,107 @@
-# src/debra/typestates/neutralize.nim
-
-## Neutralization typestate.
+## Neutralize typestate for DEBRA+ neutralization signaling.
 ##
-## Enforces correct DEBRA+ signal-based neutralization sequence:
-## Start -> Scanning -> Complete
+## Ensures proper sequence: ScanStart -> Scanning -> ScanComplete
 ##
-## Key invariant: Only signal threads that are stalled (behind current epoch).
+## When the epoch needs to advance, scan all threads and send SIGUSR1
+## to pinned threads that are stalled (behind globalEpoch by threshold).
 
 import atomics
 import std/posix
+import typestates
 
 import ../types
 import ../constants
 
 type
-  NeutralizeStart*[MaxThreads: static int] = object
-    ## Begin neutralization of stalled threads.
-
-  NeutralizeScanning*[MaxThreads: static int] = object
-    ## Scanning thread states.
+  NeutralizeContext*[MaxThreads: static int] = object
+    manager*: ptr DebraManager[MaxThreads]
     globalEpoch*: uint64
     threshold*: uint64
-      ## Threads with epoch below this get signaled.
     signalsSent*: int
 
-  NeutralizeComplete*[MaxThreads: static int] = object
-    ## Finished sending signals.
-    signalsSent*: int
+  ScanStart*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
+  Scanning*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
+  ScanComplete*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
+
+typestate NeutralizeContext[MaxThreads: static int]:
+  states ScanStart[MaxThreads], Scanning[MaxThreads], ScanComplete[MaxThreads]
+  transitions:
+    ScanStart[MaxThreads] -> Scanning[MaxThreads]
+    Scanning[MaxThreads] -> ScanComplete[MaxThreads]
 
 
-proc neutralizeStart*[MaxThreads: static int](
-  manager: var DebraManager[MaxThreads],
+proc scanStart*[MaxThreads: static int](
+  mgr: ptr DebraManager[MaxThreads]
+): ScanStart[MaxThreads] =
+  ## Begin neutralization scan.
+  ScanStart[MaxThreads](NeutralizeContext[MaxThreads](
+    manager: mgr,
+    globalEpoch: 0,
+    threshold: 0,
+    signalsSent: 0
+  ))
+
+
+proc loadEpoch*[MaxThreads: static int](
+  s: ScanStart[MaxThreads],
   epochsBeforeNeutralize: uint64 = 2
-): NeutralizeScanning[MaxThreads] {.inline.} =
-  ## Begin neutralization. Threads more than `epochsBeforeNeutralize` behind get signaled.
-  let globalEpoch = manager.globalEpoch.load(moAcquire)
-  let threshold = if globalEpoch > epochsBeforeNeutralize:
-    globalEpoch - epochsBeforeNeutralize
+): Scanning[MaxThreads] {.transition.} =
+  ## Load global epoch and compute threshold for stalled threads.
+  ## Threads with epoch < (globalEpoch - epochsBeforeNeutralize) get signaled.
+  var ctx = NeutralizeContext[MaxThreads](s)
+  ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
+
+  ctx.threshold = if ctx.globalEpoch > epochsBeforeNeutralize:
+    ctx.globalEpoch - epochsBeforeNeutralize
   else:
     0'u64
 
-  NeutralizeScanning[MaxThreads](
-    globalEpoch: globalEpoch,
-    threshold: threshold,
-    signalsSent: 0
-  )
+  result = Scanning[MaxThreads](ctx)
+
+
+func globalEpoch*[MaxThreads: static int](s: Scanning[MaxThreads]): uint64 =
+  ## Get the global epoch loaded during scan start.
+  NeutralizeContext[MaxThreads](s).globalEpoch
+
+
+func threshold*[MaxThreads: static int](s: Scanning[MaxThreads]): uint64 =
+  ## Get the epoch threshold for neutralization.
+  NeutralizeContext[MaxThreads](s).threshold
 
 
 proc scanAndSignal*[MaxThreads: static int](
-  op: var NeutralizeScanning[MaxThreads],
-  manager: var DebraManager[MaxThreads]
-) {.inline.} =
-  ## Scan all threads and signal those that are stalled.
-  ## NOT a transition - modifies op in place.
-  let activeMask = manager.activeThreadMask.load(moAcquire)
+  s: Scanning[MaxThreads]
+): ScanComplete[MaxThreads] {.transition.} =
+  ## Scan all registered threads and send SIGUSR1 to stalled pinned threads.
+  ## Returns count of signals sent.
+  var ctx = NeutralizeContext[MaxThreads](s)
+  let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
   let currentTid = getThreadId().Pid
 
   for i in 0..<MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:
       # Thread is registered
-      if manager.threads[i].pinned.load(moAcquire):
+      if ctx.manager.threads[i].pinned.load(moAcquire):
         # Thread is pinned
-        let threadEpoch = manager.threads[i].epoch.load(moAcquire)
-        if threadEpoch < op.threshold:
+        let threadEpoch = ctx.manager.threads[i].epoch.load(moAcquire)
+        if threadEpoch < ctx.threshold:
           # Thread is stalled - send signal
-          let tid = manager.threads[i].osThreadId.load(moAcquire)
+          let tid = ctx.manager.threads[i].osThreadId.load(moAcquire)
           if tid != Pid(0) and tid != currentTid:
-            # Don't signal ourselves
+            # Don't signal ourselves or unset threads
             discard pthread_kill(tid, QuiescentSignal)
-            inc op.signalsSent
+            inc ctx.signalsSent
+
+  result = ScanComplete[MaxThreads](ctx)
 
 
-proc complete*[MaxThreads: static int](
-  op: NeutralizeScanning[MaxThreads]
-): NeutralizeComplete[MaxThreads] {.inline.} =
-  NeutralizeComplete[MaxThreads](signalsSent: op.signalsSent)
+func signalsSent*[MaxThreads: static int](c: ScanComplete[MaxThreads]): int =
+  ## Get number of signals sent during scan.
+  NeutralizeContext[MaxThreads](c).signalsSent
 
 
-proc extractSignalCount*[MaxThreads: static int](
-  op: NeutralizeComplete[MaxThreads]
-): int {.inline.} =
-  op.signalsSent
+func extractSignalCount*[MaxThreads: static int](
+  c: ScanComplete[MaxThreads]
+): int =
+  ## Extract the count of signals sent. Terminal operation.
+  NeutralizeContext[MaxThreads](c).signalsSent
