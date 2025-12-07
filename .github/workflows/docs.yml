@@ -1,0 +1,84 @@
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install asdf
+        uses: asdf-vm/actions/setup@v3
+
+      - name: Install asdf-nim plugin
+        run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
+
+      - name: Install Nim
+        run: |
+          asdf install nim latest:2
+          asdf global nim latest:2
+
+      - name: Cache Nimble packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nimble
+          key: ${{ runner.os }}-nimble-docs-${{ hashFiles('*.nimble') }}
+          restore-keys: |
+            ${{ runner.os }}-nimble-docs-
+
+      - name: Install Nim compiler source
+        run: |
+          if ! nimble path nim > /dev/null 2>&1; then
+            nimble install nim -y
+          else
+            echo "Nim compiler source already installed (from cache)"
+          fi
+
+      - name: Install Python dependencies
+        run: pip install -r docs-requirements.txt
+
+      - name: Create directories for watch config
+        run: |
+          mkdir -p docs/api
+          mkdir -p docs/guide
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch gh-pages
+        run: |
+          git fetch origin gh-pages --depth=1 || true
+
+      - name: Deploy docs (versioned)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          mike deploy --push --update-aliases $VERSION latest
+          mike set-default --push latest
+
+      - name: Deploy docs (dev)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          mike deploy --push dev
