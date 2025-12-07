@@ -1,120 +1,85 @@
-# src/debra/typestates/guard.nim
-
-## Epoch guard typestate (pin/unpin).
+## EpochGuard typestate for pin/unpin lifecycle.
 ##
-## Enforces correct pin/unpin lifecycle for critical sections:
-## Unpinned -> Pinning -> Pinned -> (Unpinned | Neutralized)
-##
-## Key invariant: Thread must be pinned before accessing shared data.
+## Ensures threads properly enter/exit critical sections.
 
 import atomics
+import typestates
 
 import ../types
 
 type
-  EpochUnpinned*[MaxThreads: static int] = object
-    ## Thread is not in critical section. Safe for epoch advance.
-    handle*: ThreadHandle[MaxThreads]
-
-  EpochPinning*[MaxThreads: static int] = object
-    ## Loading current epoch, about to enter critical section.
+  EpochGuardContext*[MaxThreads: static int] = object
     handle*: ThreadHandle[MaxThreads]
     epoch*: uint64
 
-  EpochPinned*[MaxThreads: static int] = object
-    ## Thread is in critical section. Blocks reclamation of current epoch.
-    handle*: ThreadHandle[MaxThreads]
-    epoch*: uint64
+  Unpinned*[MaxThreads: static int] = distinct EpochGuardContext[MaxThreads]
+  Pinned*[MaxThreads: static int] = distinct EpochGuardContext[MaxThreads]
+  Neutralized*[MaxThreads: static int] = distinct EpochGuardContext[MaxThreads]
 
-  EpochNeutralized*[MaxThreads: static int] = object
-    ## Thread was signaled and force-unpinned. Must acknowledge before re-pinning.
-    handle*: ThreadHandle[MaxThreads]
-
-  # Object variant for unpin result
-  EpochUnpinResultKind* = enum
-    uEpochUnpinned
-    uEpochNeutralized
-
-  EpochUnpinResult*[MaxThreads: static int] = object
-    case kind*: EpochUnpinResultKind
-    of uEpochUnpinned:
-      epochunpinned*: EpochUnpinned[MaxThreads]
-    of uEpochNeutralized:
-      epochneutralized*: EpochNeutralized[MaxThreads]
+typestate EpochGuardContext[MaxThreads: static int]:
+  states Unpinned[MaxThreads], Pinned[MaxThreads], Neutralized[MaxThreads]
+  transitions:
+    Unpinned[MaxThreads] -> Pinned[MaxThreads]
+    Pinned[MaxThreads] -> Unpinned[MaxThreads] | Neutralized[MaxThreads] as UnpinResult[MaxThreads]
+    Neutralized[MaxThreads] -> Unpinned[MaxThreads]
 
 
-proc start*[MaxThreads: static int](
+proc unpinned*[MaxThreads: static int](
   handle: ThreadHandle[MaxThreads]
-): EpochUnpinned[MaxThreads] {.inline.} =
-  ## Begin epoch guard lifecycle.
-  EpochUnpinned[MaxThreads](handle: handle)
-
-
-proc loadEpoch*[MaxThreads: static int](
-  op: EpochUnpinned[MaxThreads]
-): EpochPinning[MaxThreads] {.inline.} =
-  ## Load current global epoch. First step of pinning.
-  let epoch = op.handle.manager.globalEpoch.load(moAcquire)
-  EpochPinning[MaxThreads](handle: op.handle, epoch: epoch)
+): Unpinned[MaxThreads] =
+  ## Create unpinned epoch guard context.
+  Unpinned[MaxThreads](EpochGuardContext[MaxThreads](handle: handle, epoch: 0))
 
 
 proc pin*[MaxThreads: static int](
-  op: EpochPinning[MaxThreads]
-): EpochPinned[MaxThreads] {.inline.} =
+  u: Unpinned[MaxThreads]
+): Pinned[MaxThreads] {.transition.} =
   ## Enter critical section. Blocks reclamation of current epoch.
-  let mgr = op.handle.manager
-  let idx = op.handle.idx
+  var ctx = EpochGuardContext[MaxThreads](u)
+  let mgr = ctx.handle.manager
+  let idx = ctx.handle.idx
 
-  # Clear any previous neutralization flag
+  ctx.epoch = mgr.globalEpoch.load(moAcquire)
   mgr.threads[idx].neutralized.store(false, moRelease)
-
-  # Store observed epoch
-  mgr.threads[idx].epoch.store(op.epoch, moRelease)
-
-  # Mark as pinned (MUST be last - makes us visible to reclaimer)
+  mgr.threads[idx].epoch.store(ctx.epoch, moRelease)
   mgr.threads[idx].pinned.store(true, moRelease)
 
-  EpochPinned[MaxThreads](handle: op.handle, epoch: op.epoch)
+  result = Pinned[MaxThreads](ctx)
 
 
 proc unpin*[MaxThreads: static int](
-  op: EpochPinned[MaxThreads]
-): EpochUnpinResult[MaxThreads] {.inline.} =
-  ## Leave critical section. Check if we were neutralized.
-  let mgr = op.handle.manager
-  let idx = op.handle.idx
+  p: Pinned[MaxThreads]
+): UnpinResult[MaxThreads] {.transition.} =
+  ## Leave critical section. Returns Neutralized if signaled.
+  let ctx = EpochGuardContext[MaxThreads](p)
+  let mgr = ctx.handle.manager
+  let idx = ctx.handle.idx
 
-  # Clear pinned flag
   mgr.threads[idx].pinned.store(false, moRelease)
 
-  # Check if we were neutralized while pinned
   if mgr.threads[idx].neutralized.load(moAcquire):
-    EpochUnpinResult[MaxThreads](
-      kind: uEpochNeutralized,
-      epochneutralized: EpochNeutralized[MaxThreads](handle: op.handle)
-    )
+    # Use the -> operator as shown in DSL reference
+    UnpinResult[MaxThreads] -> Neutralized[MaxThreads](ctx)
   else:
-    EpochUnpinResult[MaxThreads](
-      kind: uEpochUnpinned,
-      epochunpinned: EpochUnpinned[MaxThreads](handle: op.handle)
-    )
+    UnpinResult[MaxThreads] -> Unpinned[MaxThreads](ctx)
 
 
 proc acknowledge*[MaxThreads: static int](
-  op: EpochNeutralized[MaxThreads]
-): EpochUnpinned[MaxThreads] {.inline.} =
+  n: Neutralized[MaxThreads]
+): Unpinned[MaxThreads] {.transition.} =
   ## Acknowledge neutralization. Required before re-pinning.
-  let mgr = op.handle.manager
-  let idx = op.handle.idx
+  # Extract handle data from input directly to avoid copy issues
+  let handle = EpochGuardContext[MaxThreads](n).handle
+  handle.manager.threads[handle.idx].neutralized.store(false, moRelease)
+  # Construct new Unpinned from handle
+  Unpinned[MaxThreads](EpochGuardContext[MaxThreads](handle: handle, epoch: 0))
 
-  mgr.threads[idx].neutralized.store(false, moRelease)
-  EpochUnpinned[MaxThreads](handle: op.handle)
+
+func epoch*[MaxThreads: static int](p: Pinned[MaxThreads]): uint64 =
+  ## Get the epoch this thread is pinned at.
+  EpochGuardContext[MaxThreads](p).epoch
 
 
-# Convenience API
-
-proc pin*[MaxThreads: static int](
-  handle: ThreadHandle[MaxThreads]
-): EpochPinned[MaxThreads] {.inline.} =
-  ## Pin in one call (combines start -> loadEpoch -> pin).
-  start(handle).loadEpoch().pin()
+func handle*[MaxThreads: static int](p: Pinned[MaxThreads]): ThreadHandle[MaxThreads] =
+  ## Get the thread handle.
+  EpochGuardContext[MaxThreads](p).handle

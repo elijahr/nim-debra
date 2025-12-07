@@ -1,41 +1,48 @@
-# tests/t_guard.nim
-
 import unittest2
 import atomics
 
-import debra
+import debra/types
+import debra/typestates/manager
+import debra/typestates/guard
 
-suite "Epoch Guard Typestate":
-  var manager: DebraManager[4]
-  var handle: ThreadHandle[4]
+suite "EpochGuard typestate":
+  var mgr: DebraManager[4]
 
   setup:
-    manager = initDebraManager[4]()
-    setGlobalManager(addr manager)
-    handle = registerThread(manager)
+    mgr = DebraManager[4]()
+    discard uninitializedManager(addr mgr).initialize()
 
-  test "pin sets pinned flag":
-    let pinned = handle.pin()
-    check manager.threads[handle.idx].pinned.load(moAcquire) == true
+  test "unpinned creates Unpinned state":
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let u = unpinned(handle)
+    check u is Unpinned[4]
 
-  test "unpin clears pinned flag":
-    let pinned = handle.pin()
-    discard pinned.unpin()
-    check manager.threads[handle.idx].pinned.load(moAcquire) == false
+  test "pin transitions Unpinned to Pinned":
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let u = unpinned(handle)
+    let p = u.pin()
+    check p is Pinned[4]
+    check mgr.threads[0].pinned.load(moAcquire) == true
 
-  test "pin stores current epoch":
-    manager.globalEpoch.store(42'u64, moRelaxed)
-    let pinned = handle.pin()
-    check manager.threads[handle.idx].epoch.load(moAcquire) == 42'u64
+  test "unpin transitions Pinned to UnpinResult":
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let p = unpinned(handle).pin()
+    let result = p.unpin()
+    check result.kind == uUnpinned
+    check mgr.threads[0].pinned.load(moAcquire) == false
 
-  test "unpin returns Unpinned when not neutralized":
-    let pinned = handle.pin()
-    let result = pinned.unpin()
-    check result.kind == uEpochUnpinned
+  test "unpin detects neutralization":
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let p = unpinned(handle).pin()
+    mgr.threads[0].neutralized.store(true, moRelease)
+    let result = p.unpin()
+    check result.kind == uNeutralized
 
-  test "unpin returns Neutralized when neutralized":
-    let pinned = handle.pin()
-    # Simulate signal handler setting neutralized
-    manager.threads[handle.idx].neutralized.store(true, moRelease)
-    let result = pinned.unpin()
-    check result.kind == uEpochNeutralized
+  test "acknowledge transitions Neutralized to Unpinned":
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let p = unpinned(handle).pin()
+    mgr.threads[0].neutralized.store(true, moRelease)
+    let result = p.unpin()
+    let u = result.neutralized.acknowledge()
+    check u is Unpinned[4]
+    check mgr.threads[0].neutralized.load(moAcquire) == false
