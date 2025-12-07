@@ -17,3 +17,6 @@ tests/test
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude planning documents (ephemeral)
+docs/plans/
