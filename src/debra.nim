@@ -9,17 +9,29 @@ when not compileOption("threads"):
 import atomics
 import ./debra/types
 import ./debra/signal
+import ./debra/limbo
+import ./debra/typestates/signal_handler
+import ./debra/typestates/manager
 import ./debra/typestates/registration
 import ./debra/typestates/guard
+import ./debra/typestates/retire
 import ./debra/typestates/reclaim
 import ./debra/typestates/neutralize
+import ./debra/typestates/advance
+import ./debra/typestates/slot
 
 export types
 export signal.setGlobalManager, signal.installSignalHandler
+export limbo
+export signal_handler
+export manager
 export registration
 export guard
+export retire
 export reclaim
 export neutralize
+export advance
+export slot
 
 proc registerThread*[MaxThreads: static int](
   manager: var DebraManager[MaxThreads]
@@ -30,22 +42,14 @@ proc registerThread*[MaxThreads: static int](
   ## Raises DebraRegistrationError if max threads already registered.
   installSignalHandler()
 
-  var op = start()
-
-  while true:
-    let slotCheck = op.findSlot(manager)
-    case slotCheck.kind:
-    of sThreadRegistrationFull:
-      raise newException(DebraRegistrationError,
-        "Maximum threads (" & $MaxThreads & ") already registered")
-    of sThreadSlotFound:
-      let claimResult = slotCheck.threadslotfound.tryClaim(manager)
-      case claimResult.kind:
-      of sThreadRegistered:
-        return claimResult.threadregistered.extractHandle(manager)
-      of sThreadUnregistered:
-        op = claimResult.threadunregistered
-        continue
+  let u = unregistered(addr manager)
+  let result = u.register()
+  case result.kind:
+  of rRegistered:
+    return result.registered.getHandle()
+  of rRegistrationFull:
+    raise newException(DebraRegistrationError,
+      "Maximum threads (" & $MaxThreads & ") already registered")
 
 
 proc neutralizeStalled*[MaxThreads: static int](
@@ -53,9 +57,10 @@ proc neutralizeStalled*[MaxThreads: static int](
   epochsBeforeNeutralize: uint64 = 2
 ): int =
   ## Signal all stalled threads. Returns number of signals sent.
-  var op = neutralizeStart(manager, epochsBeforeNeutralize)
-  op.scanAndSignal(manager)
-  op.complete().extractSignalCount()
+  let op = scanStart(addr manager)
+  let scanning = op.loadEpoch(epochsBeforeNeutralize)
+  let complete = scanning.scanAndSignal()
+  complete.extractSignalCount()
 
 
 proc advance*[MaxThreads: static int](
