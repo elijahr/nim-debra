@@ -8,7 +8,7 @@ import typestates
 import ../types
 
 type
-  EpochGuardContext*[MaxThreads: static int] = object
+  EpochGuardContext*[MaxThreads: static int] = object of RootObj
     handle*: ThreadHandle[MaxThreads]
     epoch*: uint64
 
@@ -17,6 +17,7 @@ type
   Neutralized*[MaxThreads: static int] = distinct EpochGuardContext[MaxThreads]
 
 typestate EpochGuardContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states Unpinned[MaxThreads], Pinned[MaxThreads], Neutralized[MaxThreads]
   transitions:
     Unpinned[MaxThreads] -> Pinned[MaxThreads]

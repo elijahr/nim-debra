@@ -9,7 +9,7 @@ import ../limbo
 import ./guard
 
 type
-  RetireContext*[MaxThreads: static int] = object
+  RetireContext*[MaxThreads: static int] = object of RootObj
     handle*: ThreadHandle[MaxThreads]
     epoch*: uint64
 
@@ -17,6 +17,7 @@ type
   Retired*[MaxThreads: static int] = distinct RetireContext[MaxThreads]
 
 typestate RetireContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states RetireReady[MaxThreads], Retired[MaxThreads]
   transitions:
     RetireReady[MaxThreads] -> Retired[MaxThreads]

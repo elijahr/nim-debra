@@ -11,7 +11,7 @@ import ../types
 import ../signal
 
 type
-  RegistrationContext*[MaxThreads: static int] = object
+  RegistrationContext*[MaxThreads: static int] = object of RootObj
     manager*: ptr DebraManager[MaxThreads]
     idx*: int
 
@@ -20,6 +20,7 @@ type
   RegistrationFull*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
 
 typestate RegistrationContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states Unregistered[MaxThreads], Registered[MaxThreads], RegistrationFull[MaxThreads]
   transitions:
     Unregistered[MaxThreads] -> Registered[MaxThreads] | RegistrationFull[MaxThreads] as RegisterResult[MaxThreads]

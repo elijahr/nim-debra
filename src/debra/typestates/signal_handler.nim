@@ -8,13 +8,14 @@ import typestates
 import ../constants
 
 type
-  SignalHandlerContext* = object
+  SignalHandlerContext* = object of RootObj
     installed: bool
 
   HandlerUninstalled* = distinct SignalHandlerContext
   HandlerInstalled* = distinct SignalHandlerContext
 
 typestate SignalHandlerContext:
+  inheritsFromRootObj = true
   states HandlerUninstalled, HandlerInstalled
   transitions:
     HandlerUninstalled -> HandlerInstalled

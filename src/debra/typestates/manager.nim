@@ -10,7 +10,7 @@ import ../types
 import ../limbo
 
 type
-  ManagerContext*[MaxThreads: static int] = object
+  ManagerContext*[MaxThreads: static int] = object of RootObj
     manager*: ptr DebraManager[MaxThreads]
 
   ManagerUninitialized*[MaxThreads: static int] = distinct ManagerContext[MaxThreads]
@@ -18,6 +18,7 @@ type
   ManagerShutdown*[MaxThreads: static int] = distinct ManagerContext[MaxThreads]
 
 typestate ManagerContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states ManagerUninitialized[MaxThreads], ManagerReady[MaxThreads], ManagerShutdown[MaxThreads]
   transitions:
     ManagerUninitialized[MaxThreads] -> ManagerReady[MaxThreads]

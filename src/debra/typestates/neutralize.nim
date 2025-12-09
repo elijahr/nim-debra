@@ -13,7 +13,7 @@ import ../types
 import ../constants
 
 type
-  NeutralizeContext*[MaxThreads: static int] = object
+  NeutralizeContext*[MaxThreads: static int] = object of RootObj
     manager*: ptr DebraManager[MaxThreads]
     globalEpoch*: uint64
     threshold*: uint64
@@ -24,6 +24,7 @@ type
   ScanComplete*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
 
 typestate NeutralizeContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states ScanStart[MaxThreads], Scanning[MaxThreads], ScanComplete[MaxThreads]
   transitions:
     ScanStart[MaxThreads] -> Scanning[MaxThreads]

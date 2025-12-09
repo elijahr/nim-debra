@@ -8,7 +8,7 @@ import typestates
 import ../types
 
 type
-  AdvanceContext*[MaxThreads: static int] = object
+  AdvanceContext*[MaxThreads: static int] = object of RootObj
     manager*: ptr DebraManager[MaxThreads]
     oldEpoch*: uint64
     newEpoch*: uint64
@@ -18,6 +18,7 @@ type
   Advanced*[MaxThreads: static int] = distinct AdvanceContext[MaxThreads]
 
 typestate AdvanceContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states Current[MaxThreads], Advancing[MaxThreads], Advanced[MaxThreads]
   transitions:
     Current[MaxThreads] -> Advancing[MaxThreads]

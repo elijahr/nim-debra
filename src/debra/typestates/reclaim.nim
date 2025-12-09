@@ -9,7 +9,7 @@ import ../types
 import ../limbo
 
 type
-  ReclaimContext*[MaxThreads: static int] = object
+  ReclaimContext*[MaxThreads: static int] = object of RootObj
     manager*: ptr DebraManager[MaxThreads]
     globalEpoch*: uint64
     safeEpoch*: uint64
@@ -20,6 +20,7 @@ type
   ReclaimBlocked*[MaxThreads: static int] = distinct ReclaimContext[MaxThreads]
 
 typestate ReclaimContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states ReclaimStart[MaxThreads], EpochsLoaded[MaxThreads], ReclaimReady[MaxThreads], ReclaimBlocked[MaxThreads]
   transitions:
     ReclaimStart[MaxThreads] -> EpochsLoaded[MaxThreads]

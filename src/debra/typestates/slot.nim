@@ -12,7 +12,7 @@ import typestates
 import ../types
 
 type
-  SlotContext*[MaxThreads: static int] = object
+  SlotContext*[MaxThreads: static int] = object of RootObj
     idx*: int
     manager*: ptr DebraManager[MaxThreads]
 
@@ -22,6 +22,7 @@ type
   Draining*[MaxThreads: static int] = distinct SlotContext[MaxThreads]
 
 typestate SlotContext[MaxThreads: static int]:
+  inheritsFromRootObj = true
   states Free[MaxThreads], Claiming[MaxThreads], Active[MaxThreads], Draining[MaxThreads]
   transitions:
     Free[MaxThreads] -> Claiming[MaxThreads]
