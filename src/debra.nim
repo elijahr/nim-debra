@@ -10,6 +10,7 @@ import atomics
 import ./debra/types
 import ./debra/signal
 import ./debra/limbo
+import ./debra/thread_id
 import ./debra/typestates/signal_handler
 import ./debra/typestates/manager
 import ./debra/typestates/registration
@@ -23,6 +24,7 @@ import ./debra/typestates/slot
 export types
 export signal.setGlobalManager, signal.installSignalHandler
 export limbo
+export thread_id
 export signal_handler
 export manager
 export registration

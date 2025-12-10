@@ -4,11 +4,11 @@
 ## properly claim slots in the thread array using lock-free CAS operations.
 
 import atomics
-import std/posix
 import typestates
 
 import ../types
 import ../signal
+import ../thread_id
 
 type
   RegistrationContext*[MaxThreads: static int] = object of RootObj
@@ -54,8 +54,8 @@ proc register*[MaxThreads: static int](
       let desired = expected or bit
       if mgr.activeThreadMask.compareExchangeWeak(expected, desired, moRelease, moAcquire):
         # Successfully claimed slot i
-        # Store OS thread ID for signaling
-        mgr.threads[i].osThreadId.store(getThreadId().Pid, moRelease)
+        # Store thread ID for signaling
+        mgr.threads[i].threadId.store(currentThreadId(), moRelease)
         # Set thread-local index for signal handler
         threadLocalIdx = i
         # Extract fields to avoid copy issues

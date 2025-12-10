@@ -3,11 +3,11 @@
 ## Ensures manager is initialized before use and properly shut down.
 
 import atomics
-import std/posix
 import typestates
 
 import ../types
 import ../limbo
+import ../thread_id
 
 type
   ManagerContext*[MaxThreads: static int] = object of RootObj
@@ -44,7 +44,7 @@ proc initialize*[MaxThreads: static int](
     mgr.threads[i].epoch.store(0'u64, moRelaxed)
     mgr.threads[i].pinned.store(false, moRelaxed)
     mgr.threads[i].neutralized.store(false, moRelaxed)
-    mgr.threads[i].osThreadId.store(Pid(0), moRelaxed)
+    mgr.threads[i].threadId.store(InvalidThreadId, moRelaxed)
     mgr.threads[i].currentBag = nil
     mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil

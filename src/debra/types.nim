@@ -3,10 +3,10 @@
 ## Core types for DEBRA+ implementation.
 
 import atomics
-import std/posix
 
 import ./constants
 import ./limbo
+import ./thread_id
 
 type
   ThreadState*[MaxThreads: static int] = object
@@ -17,8 +17,8 @@ type
       ## Whether thread is currently in a critical section.
     neutralized* {.align: 8.}: Atomic[bool]
       ## Whether thread was force-unpinned by signal.
-    osThreadId* {.align: 8.}: Atomic[Pid]
-      ## OS thread ID for sending signals.
+    threadId* {.align: 8.}: Atomic[ThreadId]
+      ## Thread identifier for sending signals.
     # Limbo bag fields
     currentBag*: ptr LimboBag
       ## Currently filling limbo bag.
@@ -57,7 +57,7 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
     result.threads[i].epoch.store(0'u64, moRelaxed)
     result.threads[i].pinned.store(false, moRelaxed)
     result.threads[i].neutralized.store(false, moRelaxed)
-    result.threads[i].osThreadId.store(Pid(0), moRelaxed)
+    result.threads[i].threadId.store(InvalidThreadId, moRelaxed)
     result.threads[i].currentBag = nil
     result.threads[i].limboBagHead = nil
     result.threads[i].limboBagTail = nil

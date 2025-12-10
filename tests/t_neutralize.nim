@@ -2,9 +2,9 @@
 
 import unittest2
 import atomics
-import std/posix
 
 import debra/types
+import debra/thread_id
 import debra/typestates/neutralize
 
 suite "Neutralize typestate":
@@ -18,7 +18,7 @@ suite "Neutralize typestate":
       mgr.threads[i].epoch.store(0'u64, moRelaxed)
       mgr.threads[i].pinned.store(false, moRelaxed)
       mgr.threads[i].neutralized.store(false, moRelaxed)
-      mgr.threads[i].osThreadId.store(Pid(0), moRelaxed)
+      mgr.threads[i].threadId.store(InvalidThreadId, moRelaxed)
 
   test "scanStart creates ScanStart":
     let s = scanStart(addr mgr)
@@ -37,7 +37,7 @@ suite "Neutralize typestate":
     mgr.activeThreadMask.store(0b0001'u64, moRelaxed)
     mgr.threads[0].pinned.store(true, moRelaxed)
     mgr.threads[0].epoch.store(1'u64, moRelaxed)
-    mgr.threads[0].osThreadId.store(getThreadId().Pid, moRelaxed)
+    mgr.threads[0].threadId.store(currentThreadId(), moRelaxed)
 
     let scanning = scanStart(addr mgr).loadEpoch()
     let complete = scanning.scanAndSignal()
@@ -51,7 +51,7 @@ suite "Neutralize typestate":
     mgr.activeThreadMask.store(0b0001'u64, moRelaxed)
     mgr.threads[0].pinned.store(true, moRelaxed)
     mgr.threads[0].epoch.store(9'u64, moRelaxed)
-    mgr.threads[0].osThreadId.store(Pid(12345), moRelaxed)
+    mgr.threads[0].threadId.store(unsafeThreadIdFromInt(12345), moRelaxed)
 
     let scanning = scanStart(addr mgr).loadEpoch(epochsBeforeNeutralize = 2)
     let complete = scanning.scanAndSignal()
@@ -63,7 +63,7 @@ suite "Neutralize typestate":
     mgr.activeThreadMask.store(0b0001'u64, moRelaxed)
     mgr.threads[0].pinned.store(true, moRelaxed)
     mgr.threads[0].epoch.store(7'u64, moRelaxed)
-    mgr.threads[0].osThreadId.store(Pid(12345), moRelaxed)
+    mgr.threads[0].threadId.store(unsafeThreadIdFromInt(12345), moRelaxed)
 
     let scanning = scanStart(addr mgr).loadEpoch(epochsBeforeNeutralize = 2)
     let complete = scanning.scanAndSignal()
@@ -75,11 +75,11 @@ suite "Neutralize typestate":
     # Thread 0 stalled
     mgr.threads[0].pinned.store(true, moRelaxed)
     mgr.threads[0].epoch.store(1'u64, moRelaxed)
-    mgr.threads[0].osThreadId.store(Pid(12345), moRelaxed)
+    mgr.threads[0].threadId.store(unsafeThreadIdFromInt(12345), moRelaxed)
     # Thread 1 stalled
     mgr.threads[1].pinned.store(true, moRelaxed)
     mgr.threads[1].epoch.store(2'u64, moRelaxed)
-    mgr.threads[1].osThreadId.store(Pid(12346), moRelaxed)
+    mgr.threads[1].threadId.store(unsafeThreadIdFromInt(12346), moRelaxed)
 
     let complete = scanStart(addr mgr).loadEpoch().scanAndSignal()
     let count = complete.extractSignalCount()

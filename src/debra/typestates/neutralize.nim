@@ -6,11 +6,11 @@
 ## to pinned threads that are stalled (behind globalEpoch by threshold).
 
 import atomics
-import std/posix
 import typestates
 
 import ../types
 import ../constants
+import ../thread_id
 
 type
   NeutralizeContext*[MaxThreads: static int] = object of RootObj
@@ -77,7 +77,7 @@ proc scanAndSignal*[MaxThreads: static int](
   ## Returns count of signals sent.
   var ctx = NeutralizeContext[MaxThreads](s)
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
-  let currentTid = getThreadId().Pid
+  let currentTid = currentThreadId()
 
   for i in 0..<MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:
@@ -87,10 +87,10 @@ proc scanAndSignal*[MaxThreads: static int](
         let threadEpoch = ctx.manager.threads[i].epoch.load(moAcquire)
         if threadEpoch < ctx.threshold:
           # Thread is stalled - send signal
-          let tid = ctx.manager.threads[i].osThreadId.load(moAcquire)
-          if tid != Pid(0) and tid != currentTid:
+          let tid = ctx.manager.threads[i].threadId.load(moAcquire)
+          if tid.isValid and tid != currentTid:
             # Don't signal ourselves or unset threads
-            discard pthread_kill(tid, QuiescentSignal)
+            discard tid.sendSignal(QuiescentSignal)
             inc ctx.signalsSent
 
   result = ScanComplete[MaxThreads](ctx)
