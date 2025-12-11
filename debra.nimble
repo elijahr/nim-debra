@@ -19,3 +19,10 @@ requires "unittest2 >= 0.2.0"
 
 task test, "Run tests":
   exec "nim c -r --mm:refc --threads:on --path:src -d:testing tests/test.nim"
+
+task testExamples, "Compile and run all example files":
+  for file in listFiles("examples"):
+    if file.endsWith(".nim"):
+      echo "Testing: ", file
+      exec "nim c -r --hints:off --threads:on --path:src " & file
+  echo "All examples passed!"

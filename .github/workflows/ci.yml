@@ -46,3 +46,6 @@ jobs:
 
       - name: Run tests
         run: nimble test
+
+      - name: Test examples
+        run: nimble testExamples
