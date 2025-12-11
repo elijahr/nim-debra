@@ -91,10 +91,10 @@ nav:
 watch:
   - docs
   - docs/guide
-  - docs/api
   - src
   - src/debra
   - src/debra/typestates
+  - examples
 
 extra:
   version:
