@@ -15,16 +15,16 @@ nim-debra implements the DEBRA+ algorithm (Distributed Epoch-Based Reclamation w
 
 ## Documentation
 
-Full documentation is available at **[elijahr.github.io/nim-debra](https://elijahr.github.io/nim-debra/)**.
+Full documentation is available at **[elijahr.github.io/nim-debra](https://elijahr.github.io/nim-debra/latest/)**.
 
-- [Getting Started](https://elijahr.github.io/nim-debra/guide/getting-started/)
-- [Core Concepts](https://elijahr.github.io/nim-debra/guide/concepts/)
-- [Thread Registration](https://elijahr.github.io/nim-debra/guide/thread-registration/)
-- [Pin/Unpin Operations](https://elijahr.github.io/nim-debra/guide/pin-unpin/)
-- [Retiring Objects](https://elijahr.github.io/nim-debra/guide/retiring-objects/)
-- [Reclamation](https://elijahr.github.io/nim-debra/guide/reclamation/)
-- [Neutralization](https://elijahr.github.io/nim-debra/guide/neutralization/)
-- [Integration Guide](https://elijahr.github.io/nim-debra/guide/integration/)
+- [Getting Started](https://elijahr.github.io/nim-debra/latest/guide/getting-started/)
+- [Core Concepts](https://elijahr.github.io/nim-debra/latest/guide/concepts/)
+- [Thread Registration](https://elijahr.github.io/nim-debra/latest/guide/thread-registration/)
+- [Pin/Unpin Operations](https://elijahr.github.io/nim-debra/latest/guide/pin-unpin/)
+- [Retiring Objects](https://elijahr.github.io/nim-debra/latest/guide/retiring-objects/)
+- [Reclamation](https://elijahr.github.io/nim-debra/latest/guide/reclamation/)
+- [Neutralization](https://elijahr.github.io/nim-debra/latest/guide/neutralization/)
+- [Integration Guide](https://elijahr.github.io/nim-debra/latest/guide/integration/)
 
 ## Installation
 
