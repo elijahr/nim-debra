@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-12-12
+
+### Added
+
+- Typestate composition examples demonstrating integration with custom typestates
+  - `item_processing.nim`: Generic item lifecycle typestate (Unprocessed → Processing → Completed|Failed)
+  - `lockfree_stack_typestates.nim`: Lock-free stack with Empty/NonEmpty states using DEBRA internally
+- Comprehensive test coverage for typestate composition
+  - `t_item_processing.nim`: 8 tests for item processing transitions
+  - `t_lockfree_stack_typestates.nim`: 10 tests for lock-free stack operations
+- Typestate Composition section in integration guide
+- `testExamples` nimble task to compile and run all example files
+- Status badges in README
+
+### Changed
+
+- `pop()` in lock-free stack now returns `Option[Unprocessed[T]]` instead of bare type
+  - Properly handles race condition where another thread pops the last item
+  - Eliminates need for potentially invalid `default(T)` placeholder
+- Improved sink parameter usage in slot transitions for proper move semantics
+- Enhanced documentation for neutralization handling and thread registration
+
+### Fixed
+
+- Example files now wrapped in procs to fix `=dup` lifetime issues with Nim's `when isMainModule`
+- Removed `nim.cfg` from repo (was causing CI failures due to Atlas local paths)
+
 ## [0.1.0] - 2025-12-10
 
 ### Added
@@ -26,5 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/elijahr/nim-debra/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/elijahr/nim-debra/releases/tag/v0.1.0

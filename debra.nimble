@@ -2,7 +2,7 @@
 
 # Package
 
-version       = "0.1.0"
+version       = "0.1.1"
 author        = "elijahr <elijahr+debra@gmail.com>"
 description   = "DEBRA+ safe memory reclamation for lock-free data structures"
 license       = "MIT"
