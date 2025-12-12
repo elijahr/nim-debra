@@ -37,31 +37,29 @@ proc advanceCurrent*[MaxThreads: static int](
 
 
 proc advance*[MaxThreads: static int](
-  c: Current[MaxThreads]
+  c: sink Current[MaxThreads]
 ): Advancing[MaxThreads] {.transition.} =
   ## Begin advancing the global epoch.
-  # Extract manager to avoid copy issues
-  let mgr = AdvanceContext[MaxThreads](c).manager
+  let ctx = AdvanceContext[MaxThreads](c)
   Advancing[MaxThreads](AdvanceContext[MaxThreads](
-    manager: mgr,
+    manager: ctx.manager,
     oldEpoch: 0,
     newEpoch: 0
   ))
 
 
 proc complete*[MaxThreads: static int](
-  a: Advancing[MaxThreads]
+  a: sink Advancing[MaxThreads]
 ): Advanced[MaxThreads] {.transition.} =
   ## Complete epoch advance by atomically incrementing globalEpoch.
-  # Extract manager to avoid copy issues
-  let mgr = AdvanceContext[MaxThreads](a).manager
+  let ctx = AdvanceContext[MaxThreads](a)
 
   # Atomically increment the global epoch using fetchAdd
-  let oldEpoch = mgr.globalEpoch.fetchAdd(1'u64, moRelease)
+  let oldEpoch = ctx.manager.globalEpoch.fetchAdd(1'u64, moRelease)
   let newEpoch = oldEpoch + 1'u64
 
   Advanced[MaxThreads](AdvanceContext[MaxThreads](
-    manager: mgr,
+    manager: ctx.manager,
     oldEpoch: oldEpoch,
     newEpoch: newEpoch
   ))

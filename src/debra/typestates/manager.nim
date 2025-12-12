@@ -33,7 +33,7 @@ proc uninitializedManager*[MaxThreads: static int](
 
 
 proc initialize*[MaxThreads: static int](
-  m: ManagerUninitialized[MaxThreads]
+  m: sink ManagerUninitialized[MaxThreads]
 ): ManagerReady[MaxThreads] {.transition.} =
   ## Initialize the manager. Sets epoch to 1, clears all state.
   let ctx = ManagerContext[MaxThreads](m)
@@ -48,13 +48,11 @@ proc initialize*[MaxThreads: static int](
     mgr.threads[i].currentBag = nil
     mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil
-  # Extract manager to avoid copy issues
-  let manager = ctx.manager
-  result = ManagerReady[MaxThreads](ManagerContext[MaxThreads](manager: manager))
+  ManagerReady[MaxThreads](ManagerContext[MaxThreads](manager: mgr))
 
 
 proc shutdown*[MaxThreads: static int](
-  m: ManagerReady[MaxThreads]
+  m: sink ManagerReady[MaxThreads]
 ): ManagerShutdown[MaxThreads] {.transition.} =
   ## Shutdown manager. Reclaims all remaining limbo bags.
   let ctx = ManagerContext[MaxThreads](m)
@@ -72,9 +70,7 @@ proc shutdown*[MaxThreads: static int](
     mgr.threads[i].currentBag = nil
     mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil
-  # Extract manager to avoid copy issues
-  let manager = ctx.manager
-  result = ManagerShutdown[MaxThreads](ManagerContext[MaxThreads](manager: manager))
+  ManagerShutdown[MaxThreads](ManagerContext[MaxThreads](manager: mgr))
 
 
 func getManager*[MaxThreads: static int](

@@ -34,18 +34,14 @@ proc retireReady*[MaxThreads: static int](
 
 
 proc retireReadyFromRetired*[MaxThreads: static int](
-  r: Retired[MaxThreads]
+  r: sink Retired[MaxThreads]
 ): RetireReady[MaxThreads] =
   ## Get back to RetireReady after retiring (for multiple retires).
-  # Extract fields to avoid copy issues with ORC
-  let ctx = RetireContext[MaxThreads](r)
-  let handle = ctx.handle
-  let epoch = ctx.epoch
-  RetireReady[MaxThreads](RetireContext[MaxThreads](handle: handle, epoch: epoch))
+  RetireReady[MaxThreads](RetireContext[MaxThreads](r))
 
 
 proc retire*[MaxThreads: static int](
-  r: RetireReady[MaxThreads],
+  r: sink RetireReady[MaxThreads],
   data: pointer,
   destructor: Destructor
 ): Retired[MaxThreads] {.transition.} =
@@ -69,7 +65,7 @@ proc retire*[MaxThreads: static int](
   bag.objects[bag.count] = RetiredObject(data: data, destructor: destructor)
   inc bag.count
 
-  result = Retired[MaxThreads](ctx)
+  Retired[MaxThreads](ctx)
 
 
 func handle*[MaxThreads: static int](r: RetireReady[MaxThreads]): ThreadHandle[MaxThreads] =

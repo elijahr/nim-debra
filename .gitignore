@@ -52,3 +52,5 @@ __pycache__/
 # Claude planning documents (ephemeral)
 docs/plans/
 /logs
+deps/
+nimble.paths

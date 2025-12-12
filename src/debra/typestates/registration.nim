@@ -37,7 +37,7 @@ proc unregistered*[MaxThreads: static int](
 
 
 proc register*[MaxThreads: static int](
-  u: Unregistered[MaxThreads]
+  u: sink Unregistered[MaxThreads]
 ): RegisterResult[MaxThreads] {.transition.} =
   ## Try to register thread by claiming a slot. Returns Registered if successful,
   ## RegistrationFull if all slots are taken.
@@ -58,18 +58,14 @@ proc register*[MaxThreads: static int](
         mgr.threads[i].threadId.store(currentThreadId(), moRelease)
         # Set thread-local index for signal handler
         threadLocalIdx = i
-        # Extract fields to avoid copy issues
-        let manager = ctx.manager
         return RegisterResult[MaxThreads] -> Registered[MaxThreads](
-          RegistrationContext[MaxThreads](manager: manager, idx: i)
+          RegistrationContext[MaxThreads](manager: mgr, idx: i)
         )
       # CAS failed, expected was updated, retry with new value
 
   # All slots taken
-  # Extract fields to avoid copy issues
-  let manager = ctx.manager
   RegisterResult[MaxThreads] -> RegistrationFull[MaxThreads](
-    RegistrationContext[MaxThreads](manager: manager, idx: -1)
+    RegistrationContext[MaxThreads](manager: mgr, idx: -1)
   )
 
 

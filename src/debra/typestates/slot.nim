@@ -40,50 +40,34 @@ proc freeSlot*[MaxThreads: static int](
 
 
 proc claim*[MaxThreads: static int](
-  f: Free[MaxThreads]
+  f: sink Free[MaxThreads]
 ): Claiming[MaxThreads] {.transition.} =
   ## Begin claiming this slot. Transition to Claiming state.
-  # Extract fields to avoid copy issues with ORC
-  let ctx = SlotContext[MaxThreads](f)
-  let idx = ctx.idx
-  let manager = ctx.manager
-  Claiming[MaxThreads](SlotContext[MaxThreads](idx: idx, manager: manager))
+  Claiming[MaxThreads](SlotContext[MaxThreads](f))
 
 
 proc activate*[MaxThreads: static int](
-  c: Claiming[MaxThreads]
+  c: sink Claiming[MaxThreads]
 ): Active[MaxThreads] {.transition.} =
   ## Complete slot claim. Transition to Active state.
   ## This is where the slot becomes fully owned by a thread.
-  # Extract fields to avoid copy issues with ORC
-  let ctx = SlotContext[MaxThreads](c)
-  let idx = ctx.idx
-  let manager = ctx.manager
-  Active[MaxThreads](SlotContext[MaxThreads](idx: idx, manager: manager))
+  Active[MaxThreads](SlotContext[MaxThreads](c))
 
 
 proc drain*[MaxThreads: static int](
-  a: Active[MaxThreads]
+  a: sink Active[MaxThreads]
 ): Draining[MaxThreads] {.transition.} =
   ## Begin unregistration. Transition to Draining state.
   ## Thread will drain its limbo bags before releasing the slot.
-  # Extract fields to avoid copy issues with ORC
-  let ctx = SlotContext[MaxThreads](a)
-  let idx = ctx.idx
-  let manager = ctx.manager
-  Draining[MaxThreads](SlotContext[MaxThreads](idx: idx, manager: manager))
+  Draining[MaxThreads](SlotContext[MaxThreads](a))
 
 
 proc release*[MaxThreads: static int](
-  d: Draining[MaxThreads]
+  d: sink Draining[MaxThreads]
 ): Free[MaxThreads] {.transition.} =
   ## Release slot back to free pool. Transition back to Free state.
   ## This completes the lifecycle, making the slot available for reuse.
-  # Extract fields to avoid copy issues with ORC
-  let ctx = SlotContext[MaxThreads](d)
-  let idx = ctx.idx
-  let manager = ctx.manager
-  Free[MaxThreads](SlotContext[MaxThreads](idx: idx, manager: manager))
+  Free[MaxThreads](SlotContext[MaxThreads](d))
 
 
 func idx*[MaxThreads: static int](s: Active[MaxThreads]): int =

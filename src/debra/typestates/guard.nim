@@ -18,6 +18,7 @@ type
 
 typestate EpochGuardContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  consumeOnTransition = false  # Allow values to be passed across typestate boundaries
   states Unpinned[MaxThreads], Pinned[MaxThreads], Neutralized[MaxThreads]
   transitions:
     Unpinned[MaxThreads] -> Pinned[MaxThreads]
@@ -33,7 +34,7 @@ proc unpinned*[MaxThreads: static int](
 
 
 proc pin*[MaxThreads: static int](
-  u: Unpinned[MaxThreads]
+  u: sink Unpinned[MaxThreads]
 ): Pinned[MaxThreads] {.transition.} =
   ## Enter critical section. Blocks reclamation of current epoch.
   var ctx = EpochGuardContext[MaxThreads](u)
@@ -45,11 +46,11 @@ proc pin*[MaxThreads: static int](
   mgr.threads[idx].epoch.store(ctx.epoch, moRelease)
   mgr.threads[idx].pinned.store(true, moRelease)
 
-  result = Pinned[MaxThreads](ctx)
+  Pinned[MaxThreads](ctx)
 
 
 proc unpin*[MaxThreads: static int](
-  p: Pinned[MaxThreads]
+  p: sink Pinned[MaxThreads]
 ): UnpinResult[MaxThreads] {.transition.} =
   ## Leave critical section. Returns Neutralized if signaled.
   let ctx = EpochGuardContext[MaxThreads](p)
@@ -59,21 +60,18 @@ proc unpin*[MaxThreads: static int](
   mgr.threads[idx].pinned.store(false, moRelease)
 
   if mgr.threads[idx].neutralized.load(moAcquire):
-    # Use the -> operator as shown in DSL reference
     UnpinResult[MaxThreads] -> Neutralized[MaxThreads](ctx)
   else:
     UnpinResult[MaxThreads] -> Unpinned[MaxThreads](ctx)
 
 
 proc acknowledge*[MaxThreads: static int](
-  n: Neutralized[MaxThreads]
+  n: sink Neutralized[MaxThreads]
 ): Unpinned[MaxThreads] {.transition.} =
   ## Acknowledge neutralization. Required before re-pinning.
-  # Extract handle data from input directly to avoid copy issues
-  let handle = EpochGuardContext[MaxThreads](n).handle
-  handle.manager.threads[handle.idx].neutralized.store(false, moRelease)
-  # Construct new Unpinned from handle
-  Unpinned[MaxThreads](EpochGuardContext[MaxThreads](handle: handle, epoch: 0))
+  let ctx = EpochGuardContext[MaxThreads](n)
+  ctx.handle.manager.threads[ctx.handle.idx].neutralized.store(false, moRelease)
+  Unpinned[MaxThreads](EpochGuardContext[MaxThreads](handle: ctx.handle, epoch: 0))
 
 
 func epoch*[MaxThreads: static int](p: Pinned[MaxThreads]): uint64 =
