@@ -34,6 +34,53 @@ A complete Michael-Scott queue implementation with DEBRA+ reclamation:
 
 [:material-file-code: View full source](https://github.com/elijahr/nim-debra/blob/main/examples/lockfree_queue.nim)
 
+## Typestate Composition
+
+DEBRA is implemented using [nim-typestates](https://github.com/elijahr/nim-typestates). This means you can compose DEBRA's memory safety guarantees with your own application-level typestates.
+
+This enables "correct by design" algorithms:
+
+1. **Your algorithm's states** - Enforced at compile time (e.g., Empty/NonEmpty stack)
+2. **DEBRA's protocol** - Pin/unpin/retire sequence enforced at compile time
+3. **Bridges** - Connect your states to other typestates (e.g., popped items enter a processing pipeline)
+
+### Library Typestates Are Pluggable
+
+When you `import debra`, you get access to DEBRA's typestates:
+
+- `Unpinned[N]` / `Pinned[N]` / `Neutralized[N]` - Epoch guard states
+- `RetireReady[N]` / `Retired[N]` - Retirement states
+- `ReclaimStart[N]` / `EpochsLoaded[N]` / `ReclaimReady[N]` / `ReclaimBlocked[N]` - Reclamation states
+
+Your code uses these directly. The compiler verifies you follow the protocol.
+
+### Example: Item Processing Pipeline
+
+Define a typestate for processing items after they leave the data structure:
+
+```nim
+{% include-markdown "../../examples/item_processing.nim" %}
+```
+
+[:material-file-code: View source](https://github.com/elijahr/nim-debra/blob/main/examples/item_processing.nim)
+
+### Example: Stack with Typestate Composition
+
+Combine stack states, DEBRA states, and bridges to the item processing pipeline:
+
+```nim
+{% include-markdown "../../examples/lockfree_stack_typestates.nim" %}
+```
+
+[:material-file-code: View source](https://github.com/elijahr/nim-debra/blob/main/examples/lockfree_stack_typestates.nim)
+
+### Key Points
+
+- **Nested enforcement**: DEBRA's `pin()`/`unpin()` happens inside your `push()`/`pop()` - both are type-checked
+- **Bridges connect state machines**: Popped items flow from stack states into processing states
+- **Zero runtime cost**: All validation is compile-time
+- **Module-qualified syntax**: Use `module.Typestate.State` in bridges for clarity
+
 ## Best Practices
 
 ### 1. Minimize Critical Section Duration
@@ -58,7 +105,18 @@ Retire multiple objects in a single critical section when possible.
 
 ### 3. Handle Neutralization
 
-Always handle the `uNeutralized` case from `unpin()`.
+Always handle the `uNeutralized` case from `unpin()`. This is a required pattern - neutralization occurs when the epoch advances during a critical section, and you must acknowledge it before re-pinning.
+
+```nim
+let unpinResult = pinned.unpin()
+case unpinResult.kind:
+of uUnpinned:
+  # Normal unpin - continue
+  discard
+of uNeutralized:
+  # Was neutralized - must acknowledge before re-pinning
+  discard unpinResult.neutralized.acknowledge()
+```
 
 ### 4. Periodic Reclamation
 
