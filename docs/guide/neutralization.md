@@ -25,6 +25,31 @@ If a thread stays pinned at an old epoch:
 5. **Acknowledge**: Thread acknowledges neutralization
 6. **Advance**: Safe epoch can now advance past stalled thread
 
+## Triggering Neutralization
+
+The simple convenience API allows scanning for and signaling stalled threads:
+
+```nim
+let signalsSent = neutralizeStalled(manager)
+```
+
+This returns the number of signals sent to stalled threads.
+
+The `epochsBeforeNeutralize` parameter controls how far behind a thread must be before neutralization (default is 2 epochs):
+
+```nim
+let signalsSent = neutralizeStalled(manager, epochsBeforeNeutralize = 3)
+```
+
+For advanced use cases, the low-level typestate API provides explicit control over each step:
+
+```nim
+let complete = scanStart(addr manager)
+  .loadEpoch(epochsBeforeNeutralize = 2)
+  .scanAndSignal()
+let count = complete.extractSignalCount()
+```
+
 ## Neutralization Handling Example
 
 ```nim

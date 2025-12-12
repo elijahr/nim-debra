@@ -97,10 +97,14 @@ DEBRA+ solves this with **neutralization**:
 # Thread 1: Pinned and working
 let pinned = handle.pin()
 # ... long computation ...
-let result = pinned.unpin()
-if result.kind == uNeutralized:
+let unpinResult = pinned.unpin()
+case unpinResult.kind:
+of uUnpinned:
+  # Normal unpin
+  discard
+of uNeutralized:
   # We were neutralized - acknowledge it
-  let unpinned = result.neutralized.acknowledge()
+  let unpinned = unpinResult.neutralized.acknowledge()
 ```
 
 ## Memory Bounds

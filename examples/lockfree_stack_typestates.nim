@@ -4,19 +4,23 @@
 ## Demonstrates:
 ## 1. Stack states (Empty, NonEmpty) enforced at compile time
 ## 2. DEBRA's pin/unpin/retire typestates used internally
-## 3. Conceptual bridge from stack to item processing typestate
+## 3. Manual bridge from stack to item processing typestate
 ##
 ## This is a "correct by design" lock-free data structure.
 ##
-## Note: Full bridge syntax (NonEmpty -> item_processing.Item.Unprocessed)
-## requires module-qualified bridge support (see plan Tasks 1-5).
-## For now, we demonstrate the composition by directly constructing
-## Unprocessed items from popped values.
+## Note: Formal bridge declaration `NonEmpty[T] -> Item[T].Unprocessed[T]`
+## would require two features not yet in nim-typestates:
+## 1. Module-qualified bridge syntax: module.Typestate.State
+## 2. Generic parameter support in bridge declarations
+##
+## For now, we demonstrate the conceptual bridge by manually constructing
+## Unprocessed[T] items from popped values. The typestate composition
+## pattern works correctly - we just can't declare it formally yet.
 
 import typestates
 import debra
 import ./item_processing
-import std/[atomics]
+import std/[atomics, options]
 
 type
   Node[T] = object
@@ -40,6 +44,9 @@ typestate StackBase[T]:
   transitions:
     Empty[T] -> NonEmpty[T]
     NonEmpty[T] -> Empty[T] | NonEmpty[T] as PopResult[T]
+  # Note: Bridge to Item[T].Unprocessed[T] is conceptual (see file header comment).
+  # Generic bridges not yet supported in typestate DSL, so we manually construct
+  # the Unprocessed[T] item in the pop() proc.
 
 proc destroyNode[T](p: pointer) {.nimcall.} =
   dealloc(p)
@@ -97,42 +104,48 @@ proc push*[T](stack: NonEmpty[T], value: T): NonEmpty[T] {.transition.} =
 
   NonEmpty[T](base)
 
-proc pop*[T](stack: NonEmpty[T]): (PopResult[T], Unprocessed[T]) =
+proc pop*[T](stack: NonEmpty[T]): (PopResult[T], Option[Unprocessed[T]]) =
   ## Pop from non-empty stack.
-  ## Returns (new stack state, item in Unprocessed state).
+  ## Returns (new stack state, optional item in Unprocessed state).
   ##
-  ## The item is bridged to the item_processing typestate,
-  ## ready to flow through Processing -> Completed|Failed.
+  ## The Option[Unprocessed[T]] will be:
+  ## - Some(item): If an item was successfully popped
+  ## - None: If another thread popped the last item first (ABA race)
+  ##
+  ## The popped item is in Unprocessed state, ready to flow through
+  ## the item_processing typestate: Processing -> Completed|Failed.
   var base = StackBase[T](stack)
 
   # Enter DEBRA critical section - typestate enforced
   let pinned = unpinned(base.handle).pin()
 
   var resultStack: PopResult[T]
-  var item: Unprocessed[T]
+  var item: Option[Unprocessed[T]]
 
   block popLoop:
     while true:
       var oldTop = base.top.load(moAcquire)
 
       if oldTop == nil:
-        # Stack is now empty
+        # Stack became empty (another thread popped the last item).
+        # This is a valid race condition in lock-free data structures.
+        # We return Empty state with None item.
         resultStack = PopResult[T](kind: pEmpty, empty: Empty[T](base))
-        # Create dummy item (won't be used in practice)
-        item = Unprocessed[T](Item[T](value: default(T)))
+        item = none(Unprocessed[T])
         break popLoop
 
       let next = oldTop.next.load(moRelaxed)
 
       if base.top.compareExchange(oldTop, next, moRelease, moRelaxed):
-        # Bridge: create item in Unprocessed state
-        item = Unprocessed[T](Item[T](value: oldTop.value))
+        # Successfully popped! Bridge: create item in Unprocessed state
+        item = some(Unprocessed[T](Item[T](value: oldTop.value)))
 
         # Retire the node through DEBRA - typestate enforced
+        # This is the ONLY place we retire this node, preventing double-free
         let ready = retireReady(pinned)
         discard ready.retire(cast[pointer](oldTop), destroyNode[T])
 
-        # Determine new stack state
+        # Determine new stack state based on what's left
         if next == nil:
           resultStack = PopResult[T](kind: pEmpty, empty: Empty[T](base))
         else:
@@ -140,10 +153,30 @@ proc pop*[T](stack: NonEmpty[T]): (PopResult[T], Unprocessed[T]) =
         break popLoop
 
   # Exit DEBRA critical section - must handle neutralization
+  #
+  # Neutralization can occur when another thread wants to reclaim memory.
+  # The neutralization flag is set while we're pinned, but we only detect
+  # it here when we unpin. This is correct behavior:
+  #
+  # 1. During the pop loop, we're pinned (protected from reclamation)
+  # 2. If neutralization is requested, the flag is set atomically
+  # 3. We complete our pop operation (CAS, retire, etc.) normally
+  # 4. At unpin time, we detect neutralization and must acknowledge it
+  # 5. The acknowledge() call resets the flag and returns Unpinned state
+  #
+  # This ensures that:
+  # - Operations complete atomically (no interruption mid-pop)
+  # - Neutralization is properly tracked and acknowledged
+  # - The thread can continue with more operations after acknowledging
   let unpinResult = pinned.unpin()
   case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  of uUnpinned:
+    # Normal case: no neutralization requested
+    discard
+  of uNeutralized:
+    # Neutralization was requested during our pinned section.
+    # We must acknowledge it before the thread can pin again.
+    discard unpinResult.neutralized.acknowledge()
 
   (resultStack, item)
 
@@ -175,17 +208,22 @@ when isMainModule:
   var currentStack = nonEmptyStack
 
   while true:
-    let (popResult, item) = currentStack.pop()
+    let (popResult, itemOpt) = currentStack.pop()
 
-    # Item is in Unprocessed state - process it through the pipeline
-    let processing = item.startProcessing()
-    let processResult = processing.finish(success = true)
+    # Handle the optional item (Some if popped, None if race condition)
+    if itemOpt.isSome:
+      let item = itemOpt.get
+      # Item is in Unprocessed state - process it through the pipeline
+      let processing = item.startProcessing()
+      let processResult = processing.finish(success = true)
 
-    case processResult.kind:
-    of pCompleted:
-      echo "  Popped and completed: ", Item[int](processResult.completed).value
-    of pFailed:
-      echo "  Popped but failed: ", Item[int](processResult.failed).value
+      case processResult.kind:
+      of pCompleted:
+        echo "  Popped and completed: ", Item[int](processResult.completed).value
+      of pFailed:
+        echo "  Popped but failed: ", Item[int](processResult.failed).value
+    else:
+      echo "  Race condition: another thread popped the item first"
 
     # Check stack state
     case popResult.kind:

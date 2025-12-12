@@ -52,6 +52,16 @@ Each thread slot maintains:
 3. **Don't share handles**: Each thread needs its own handle
 4. **Respect limits**: Don't exceed MaxThreads parameter
 
+## Current Limitations
+
+### Thread Slot Lifetime
+
+Thread slots are held for the thread's lifetime. Once a thread registers, its slot remains occupied until the manager is destroyed. There is currently no explicit deregistration API.
+
+If a thread exits after registration, its slot remains allocated and cannot be reused until the entire manager shuts down. This means the effective thread limit is determined by the peak number of threads that register over the manager's lifetime, not the number of concurrent threads.
+
+**Implication**: Plan your `MaxThreads` parameter based on the total number of threads that will register throughout your application's lifetime, not just the concurrent thread count.
+
 ## Troubleshooting
 
 ### "Maximum threads already registered"
@@ -59,8 +69,8 @@ Each thread slot maintains:
 All slots are occupied. Either:
 
 - Increase `MaxThreads` when creating the manager
-- Ensure threads deregister when done
-- Check for thread leaks
+- Reduce the total number of threads that register over the application lifetime
+- Check for thread leaks or unnecessary thread creation
 
 ## Next Steps
 
