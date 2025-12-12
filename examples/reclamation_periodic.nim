@@ -16,8 +16,21 @@ proc allocNode(value: int): ptr Node =
 
 const ReclaimInterval = 10
 
-when isMainModule:
-  var manager = initDebraManager[4]()
+proc doOperation(handle: ThreadHandle[64], i: int) =
+  let u = unpinned(handle)
+  let pinned = u.pin()
+
+  let node = allocNode(i)
+  let ready = retireReady(pinned)
+  discard ready.retire(cast[pointer](node), destroyNode)
+
+  let unpinResult = pinned.unpin()
+  case unpinResult.kind:
+  of uUnpinned: discard
+  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+
+proc periodicReclaimDemo() =
+  var manager = initDebraManager[64]()
   setGlobalManager(addr manager)
 
   let handle = registerThread(manager)
@@ -26,18 +39,7 @@ when isMainModule:
   # Perform operations with periodic reclamation
   for i in 0..<50:
     # Do one operation
-    block operation:
-      let u = unpinned(handle)
-      let pinned = u.pin()
-
-      let node = allocNode(i)
-      let ready = retireReady(pinned)
-      discard ready.retire(cast[pointer](node), destroyNode)
-
-      let unpinResult = pinned.unpin()
-      case unpinResult.kind:
-      of uUnpinned: discard
-      of uNeutralized: discard unpinResult.neutralized.acknowledge()
+    doOperation(handle, i)
 
     # Advance epoch periodically
     if i mod 5 == 0:
@@ -59,3 +61,6 @@ when isMainModule:
 
   echo "Total reclaimed: ", totalReclaimed, " objects"
   echo "Periodic reclamation example completed successfully"
+
+when isMainModule:
+  periodicReclaimDemo()

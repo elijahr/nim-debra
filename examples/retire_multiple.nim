@@ -14,30 +14,29 @@ proc allocNode(value: int): ptr Node =
   result = cast[ptr Node](alloc0(sizeof(Node)))
   result.value = value
 
-when isMainModule:
-  var manager = initDebraManager[4]()
+proc retireMultipleDemo() =
+  var manager = initDebraManager[64]()
   setGlobalManager(addr manager)
 
   let handle = registerThread(manager)
 
   # Retire multiple objects in one critical section
-  block retireMultiple:
-    let u = unpinned(handle)
-    let pinned = u.pin()
+  let u = unpinned(handle)
+  let pinned = u.pin()
 
-    # Simulate batch removal from a data structure
-    var ready = retireReady(pinned)
-    for i in 0..<5:
-      let node = allocNode(i * 10)
-      let retired = ready.retire(cast[pointer](node), destroyNode)
-      # Get ready state back for next retirement
-      ready = retireReadyFromRetired(retired)
-      echo "Retired node ", i
+  # Simulate batch removal from a data structure
+  var ready = retireReady(pinned)
+  for i in 0..<5:
+    let node = allocNode(i * 10)
+    let retired = ready.retire(cast[pointer](node), destroyNode)
+    # Get ready state back for next retirement
+    ready = retireReadyFromRetired(retired)
+    echo "Retired node ", i
 
-    let unpinResult = pinned.unpin()
-    case unpinResult.kind:
-    of uUnpinned: discard
-    of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  let unpinResult = pinned.unpin()
+  case unpinResult.kind:
+  of uUnpinned: discard
+  of uNeutralized: discard unpinResult.neutralized.acknowledge()
 
   # Advance epochs
   for _ in 0..<3:
@@ -56,3 +55,6 @@ when isMainModule:
     echo "Reclamation blocked"
 
   echo "Retire multiple example completed successfully"
+
+when isMainModule:
+  retireMultipleDemo()
