@@ -16,30 +16,29 @@ proc allocNode(value: int): ptr Node =
   result = cast[ptr Node](alloc0(sizeof(Node)))
   result.value = value
 
-when isMainModule:
-  var manager = initDebraManager[4]()
+proc retireSingleDemo() =
+  var manager = initDebraManager[64]()
   setGlobalManager(addr manager)
 
   let handle = registerThread(manager)
 
   # Retire a single object
-  block retireSingle:
-    let u = unpinned(handle)
-    let pinned = u.pin()
+  let u = unpinned(handle)
+  let pinned = u.pin()
 
-    # Simulate removing a node from a data structure
-    let node = allocNode(42)
-    echo "Allocated node with value: ", node.value
+  # Simulate removing a node from a data structure
+  let node = allocNode(42)
+  echo "Allocated node with value: ", node.value
 
-    # Retire the node - it will be reclaimed when safe
-    let ready = retireReady(pinned)
-    let retired = ready.retire(cast[pointer](node), destroyNode)
-    echo "Node retired, waiting for safe reclamation"
+  # Retire the node - it will be reclaimed when safe
+  let ready = retireReady(pinned)
+  discard ready.retire(cast[pointer](node), destroyNode)
+  echo "Node retired, waiting for safe reclamation"
 
-    let unpinResult = pinned.unpin()
-    case unpinResult.kind:
-    of uUnpinned: discard
-    of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  let unpinResult = pinned.unpin()
+  case unpinResult.kind:
+  of uUnpinned: discard
+  of uNeutralized: discard unpinResult.neutralized.acknowledge()
 
   # Advance epochs to make reclamation possible
   manager.advance()
@@ -59,3 +58,6 @@ when isMainModule:
     echo "Reclamation blocked"
 
   echo "Retire single example completed successfully"
+
+when isMainModule:
+  retireSingleDemo()
