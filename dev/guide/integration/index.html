@@ -656,6 +656,67 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#typestate-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typestate Composition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Typestate Composition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#library-typestates-are-pluggable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Library Typestates Are Pluggable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-item-processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Item Processing Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-stack-with-typestate-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Stack with Typestate Composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -925,6 +986,67 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typestate-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Typestate Composition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Typestate Composition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#library-typestates-are-pluggable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Library Typestates Are Pluggable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-item-processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Item Processing Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-stack-with-typestate-composition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: Stack with Typestate Composition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-points" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key Points
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1331,52 +1453,443 @@
 <a id="__codelineno-1-123" name="__codelineno-1-123" href="#__codelineno-1-123"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Lock-free queue example completed successfully"</span>
 </code></pre></div>
 <p><a href="https://github.com/elijahr/nim-debra/blob/main/examples/lockfree_queue.nim">:material-file-code: View full source</a></p>
+<h2 id="typestate-composition">Typestate Composition<a class="headerlink" href="#typestate-composition" title="Permanent link">¶</a></h2>
+<p>DEBRA is implemented using <a href="https://github.com/elijahr/nim-typestates">nim-typestates</a>. This means you can compose DEBRA's memory safety guarantees with your own application-level typestates.</p>
+<p>This enables "correct by design" algorithms:</p>
+<ol>
+<li><strong>Your algorithm's states</strong> - Enforced at compile time (e.g., Empty/NonEmpty stack)</li>
+<li><strong>DEBRA's protocol</strong> - Pin/unpin/retire sequence enforced at compile time</li>
+<li><strong>Bridges</strong> - Connect your states to other typestates (e.g., popped items enter a processing pipeline)</li>
+</ol>
+<h3 id="library-typestates-are-pluggable">Library Typestates Are Pluggable<a class="headerlink" href="#library-typestates-are-pluggable" title="Permanent link">¶</a></h3>
+<p>When you <code>import debra</code>, you get access to DEBRA's typestates:</p>
+<ul>
+<li><code>Unpinned[N]</code> / <code>Pinned[N]</code> / <code>Neutralized[N]</code> - Epoch guard states</li>
+<li><code>RetireReady[N]</code> / <code>Retired[N]</code> - Retirement states</li>
+<li><code>ReclaimStart[N]</code> / <code>EpochsLoaded[N]</code> / <code>ReclaimReady[N]</code> / <code>ReclaimBlocked[N]</code> - Reclamation states</li>
+</ul>
+<p>Your code uses these directly. The compiler verifies you follow the protocol.</p>
+<h3 id="example-item-processing-pipeline">Example: Item Processing Pipeline<a class="headerlink" href="#example-item-processing-pipeline" title="Permanent link">¶</a></h3>
+<p>Define a typestate for processing items after they leave the data structure:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c"># examples/item_processing.nim</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="sd">## Item lifecycle typestate for demonstrating typestate composition.</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="sd">##</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="sd">## This module defines a simple processing pipeline:</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="sd">##   Unprocessed -&gt; Processing -&gt; Completed | Failed</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="sd">##</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="sd">## Use with lockfree_stack_typestates.nim to see how popped items</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="sd">## bridge into this processing pipeline.</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="kn">import</span><span class="w"> </span><span class="n">typestates</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">type</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="n">Item</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="sd">## Base type for items in the processing pipeline.</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="n">value</span><span class="o">*</span><span class="p">:</span><span class="w"> </span><span class="n">T</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">  </span><span class="n">Unprocessed</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">    </span><span class="sd">## Item just received, not yet being processed.</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>
+<a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">  </span><span class="n">Processing</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">    </span><span class="sd">## Item currently being worked on.</span>
+<a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a>
+<a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">  </span><span class="n">Completed</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">    </span><span class="sd">## Item successfully processed (terminal state).</span>
+<a id="__codelineno-2-25" name="__codelineno-2-25" href="#__codelineno-2-25"></a>
+<a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a><span class="w">  </span><span class="n">Failed</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-27" name="__codelineno-2-27" href="#__codelineno-2-27"></a><span class="w">    </span><span class="sd">## Item processing failed (terminal state).</span>
+<a id="__codelineno-2-28" name="__codelineno-2-28" href="#__codelineno-2-28"></a>
+<a id="__codelineno-2-29" name="__codelineno-2-29" href="#__codelineno-2-29"></a><span class="n">typestate</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">:</span>
+<a id="__codelineno-2-30" name="__codelineno-2-30" href="#__codelineno-2-30"></a><span class="w">  </span><span class="n">consumeOnTransition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">false</span>
+<a id="__codelineno-2-31" name="__codelineno-2-31" href="#__codelineno-2-31"></a><span class="w">  </span><span class="n">states</span><span class="w"> </span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">Completed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">Failed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-32" name="__codelineno-2-32" href="#__codelineno-2-32"></a><span class="w">  </span><span class="n">initial</span><span class="w"> </span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-33" name="__codelineno-2-33" href="#__codelineno-2-33"></a><span class="w">  </span><span class="n">terminal</span><span class="w"> </span><span class="n">Completed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">Failed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-34" name="__codelineno-2-34" href="#__codelineno-2-34"></a><span class="w">  </span><span class="n">transitions</span><span class="p">:</span>
+<a id="__codelineno-2-35" name="__codelineno-2-35" href="#__codelineno-2-35"></a><span class="w">    </span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-36" name="__codelineno-2-36" href="#__codelineno-2-36"></a><span class="w">    </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">Completed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">Failed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">ProcessingResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-2-37" name="__codelineno-2-37" href="#__codelineno-2-37"></a>
+<a id="__codelineno-2-38" name="__codelineno-2-38" href="#__codelineno-2-38"></a><span class="c"># Transition: begin processing an item</span>
+<a id="__codelineno-2-39" name="__codelineno-2-39" href="#__codelineno-2-39"></a><span class="k">proc</span><span class="w"> </span><span class="nf">startProcessing</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="sx">{.transition.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-2-40" name="__codelineno-2-40" href="#__codelineno-2-40"></a><span class="w">  </span><span class="sd">## Begin processing an unprocessed item.</span>
+<a id="__codelineno-2-41" name="__codelineno-2-41" href="#__codelineno-2-41"></a><span class="w">  </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+<a id="__codelineno-2-42" name="__codelineno-2-42" href="#__codelineno-2-42"></a>
+<a id="__codelineno-2-43" name="__codelineno-2-43" href="#__codelineno-2-43"></a><span class="c"># Transition: finish processing with success or failure</span>
+<a id="__codelineno-2-44" name="__codelineno-2-44" href="#__codelineno-2-44"></a><span class="k">proc</span><span class="w"> </span><span class="nf">finish</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">success</span><span class="p">:</span><span class="w"> </span><span class="nb">bool</span><span class="p">):</span><span class="w"> </span><span class="n">ProcessingResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="sx">{.transition.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-2-45" name="__codelineno-2-45" href="#__codelineno-2-45"></a><span class="w">  </span><span class="sd">## Complete processing. Returns Completed on success, Failed otherwise.</span>
+<a id="__codelineno-2-46" name="__codelineno-2-46" href="#__codelineno-2-46"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="n">success</span><span class="p">:</span>
+<a id="__codelineno-2-47" name="__codelineno-2-47" href="#__codelineno-2-47"></a><span class="w">    </span><span class="n">ProcessingResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">Completed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+<a id="__codelineno-2-48" name="__codelineno-2-48" href="#__codelineno-2-48"></a><span class="w">  </span><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-2-49" name="__codelineno-2-49" href="#__codelineno-2-49"></a><span class="w">    </span><span class="n">ProcessingResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">Failed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+<a id="__codelineno-2-50" name="__codelineno-2-50" href="#__codelineno-2-50"></a>
+<a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a><span class="c"># Convenience procs for terminal states</span>
+<a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a><span class="k">proc</span><span class="w"> </span><span class="nf">complete</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Completed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="sx">{.transition.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a><span class="w">  </span><span class="sd">## Mark item as successfully completed.</span>
+<a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="w">  </span><span class="n">Completed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+<a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>
+<a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a><span class="k">proc</span><span class="w"> </span><span class="nf">fail</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="n">Processing</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Failed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="sx">{.transition.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a><span class="w">  </span><span class="sd">## Mark item as failed.</span>
+<a id="__codelineno-2-58" name="__codelineno-2-58" href="#__codelineno-2-58"></a><span class="w">  </span><span class="n">Failed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">item</span><span class="p">))</span>
+<a id="__codelineno-2-59" name="__codelineno-2-59" href="#__codelineno-2-59"></a>
+<a id="__codelineno-2-60" name="__codelineno-2-60" href="#__codelineno-2-60"></a><span class="k">when</span><span class="w"> </span><span class="n">isMainModule</span><span class="p">:</span>
+<a id="__codelineno-2-61" name="__codelineno-2-61" href="#__codelineno-2-61"></a><span class="w">  </span><span class="c"># Demonstrate the item processing pipeline</span>
+<a id="__codelineno-2-62" name="__codelineno-2-62" href="#__codelineno-2-62"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Item Processing Typestate Demo"</span>
+<a id="__codelineno-2-63" name="__codelineno-2-63" href="#__codelineno-2-63"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"=============================="</span>
+<a id="__codelineno-2-64" name="__codelineno-2-64" href="#__codelineno-2-64"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-2-65" name="__codelineno-2-65" href="#__codelineno-2-65"></a>
+<a id="__codelineno-2-66" name="__codelineno-2-66" href="#__codelineno-2-66"></a><span class="w">  </span><span class="c"># Create an unprocessed item</span>
+<a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unprocessed</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span><span class="p">))</span>
+<a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"1. Created item in Unprocessed state"</span>
+<a id="__codelineno-2-69" name="__codelineno-2-69" href="#__codelineno-2-69"></a>
+<a id="__codelineno-2-70" name="__codelineno-2-70" href="#__codelineno-2-70"></a><span class="w">  </span><span class="c"># Start processing</span>
+<a id="__codelineno-2-71" name="__codelineno-2-71" href="#__codelineno-2-71"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">inProgress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">raw</span><span class="p">.</span><span class="n">startProcessing</span><span class="p">()</span>
+<a id="__codelineno-2-72" name="__codelineno-2-72" href="#__codelineno-2-72"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"2. Transitioned to Processing state"</span>
+<a id="__codelineno-2-73" name="__codelineno-2-73" href="#__codelineno-2-73"></a>
+<a id="__codelineno-2-74" name="__codelineno-2-74" href="#__codelineno-2-74"></a><span class="w">  </span><span class="c"># Finish with success</span>
+<a id="__codelineno-2-75" name="__codelineno-2-75" href="#__codelineno-2-75"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">successResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">inProgress</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="n">success</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">true</span><span class="p">)</span>
+<a id="__codelineno-2-76" name="__codelineno-2-76" href="#__codelineno-2-76"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"3. Finished processing with success"</span>
+<a id="__codelineno-2-77" name="__codelineno-2-77" href="#__codelineno-2-77"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">successResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-2-78" name="__codelineno-2-78" href="#__codelineno-2-78"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">pCompleted</span><span class="o">:</span>
+<a id="__codelineno-2-79" name="__codelineno-2-79" href="#__codelineno-2-79"></a><span class="w">    </span><span class="n">echo</span><span class="w"> </span><span class="s">"   -&gt; Result: Completed state"</span>
+<a id="__codelineno-2-80" name="__codelineno-2-80" href="#__codelineno-2-80"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">pFailed</span><span class="o">:</span>
+<a id="__codelineno-2-81" name="__codelineno-2-81" href="#__codelineno-2-81"></a><span class="w">    </span><span class="n">echo</span><span class="w"> </span><span class="s">"   -&gt; Result: Failed state (unexpected)"</span>
+<a id="__codelineno-2-82" name="__codelineno-2-82" href="#__codelineno-2-82"></a>
+<a id="__codelineno-2-83" name="__codelineno-2-83" href="#__codelineno-2-83"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-2-84" name="__codelineno-2-84" href="#__codelineno-2-84"></a>
+<a id="__codelineno-2-85" name="__codelineno-2-85" href="#__codelineno-2-85"></a><span class="w">  </span><span class="c"># Demo failure path</span>
+<a id="__codelineno-2-86" name="__codelineno-2-86" href="#__codelineno-2-86"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">raw2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Unprocessed</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="mi">99</span><span class="p">))</span>
+<a id="__codelineno-2-87" name="__codelineno-2-87" href="#__codelineno-2-87"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">inProgress2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">raw2</span><span class="p">.</span><span class="n">startProcessing</span><span class="p">()</span>
+<a id="__codelineno-2-88" name="__codelineno-2-88" href="#__codelineno-2-88"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">failResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">inProgress2</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="n">success</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">false</span><span class="p">)</span>
+<a id="__codelineno-2-89" name="__codelineno-2-89" href="#__codelineno-2-89"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"4. Alternative path: finish with failure"</span>
+<a id="__codelineno-2-90" name="__codelineno-2-90" href="#__codelineno-2-90"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">failResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-2-91" name="__codelineno-2-91" href="#__codelineno-2-91"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">pCompleted</span><span class="o">:</span>
+<a id="__codelineno-2-92" name="__codelineno-2-92" href="#__codelineno-2-92"></a><span class="w">    </span><span class="n">echo</span><span class="w"> </span><span class="s">"   -&gt; Result: Completed state (unexpected)"</span>
+<a id="__codelineno-2-93" name="__codelineno-2-93" href="#__codelineno-2-93"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">pFailed</span><span class="o">:</span>
+<a id="__codelineno-2-94" name="__codelineno-2-94" href="#__codelineno-2-94"></a><span class="w">    </span><span class="n">echo</span><span class="w"> </span><span class="s">"   -&gt; Result: Failed state"</span>
+<a id="__codelineno-2-95" name="__codelineno-2-95" href="#__codelineno-2-95"></a>
+<a id="__codelineno-2-96" name="__codelineno-2-96" href="#__codelineno-2-96"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-2-97" name="__codelineno-2-97" href="#__codelineno-2-97"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Item processing typestate example completed successfully"</span>
+</code></pre></div>
+<p><a href="https://github.com/elijahr/nim-debra/blob/main/examples/item_processing.nim">:material-file-code: View source</a></p>
+<h3 id="example-stack-with-typestate-composition">Example: Stack with Typestate Composition<a class="headerlink" href="#example-stack-with-typestate-composition" title="Permanent link">¶</a></h3>
+<p>Combine stack states, DEBRA states, and bridges to the item processing pipeline:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c"># examples/lockfree_stack_typestates.nim</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="sd">## Lock-free stack with full typestate composition.</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="sd">##</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="sd">## Demonstrates:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="sd">## 1. Stack states (Empty, NonEmpty) enforced at compile time</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="sd">## 2. DEBRA's pin/unpin/retire typestates used internally</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="sd">## 3. Manual bridge from stack to item processing typestate</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="sd">##</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="sd">## This is a "correct by design" lock-free data structure.</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="sd">##</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="sd">## Note: Formal bridge declaration `NonEmpty[T] -&gt; Item[T].Unprocessed[T]`</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="sd">## would require two features not yet in nim-typestates:</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="sd">## 1. Module-qualified bridge syntax: module.Typestate.State</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="sd">## 2. Generic parameter support in bridge declarations</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="sd">##</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="sd">## For now, we demonstrate the conceptual bridge by manually constructing</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="sd">## Unprocessed[T] items from popped values. The typestate composition</span>
+<a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="sd">## pattern works correctly - we just can't declare it formally yet.</span>
+<a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+<a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="kn">import</span><span class="w"> </span><span class="n">typestates</span>
+<a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="kn">import</span><span class="w"> </span><span class="n">debra</span>
+<a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="kn">import</span><span class="w"> </span><span class="p">.</span><span class="o">/</span><span class="n">item_processing</span>
+<a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="kn">import</span><span class="w"> </span><span class="n">std</span><span class="o">/[</span><span class="n">atomics</span><span class="p">,</span><span class="w"> </span><span class="n">options</span><span class="o">]</span>
+<a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>
+<a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="k">type</span>
+<a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">  </span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+<a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">    </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="n">T</span>
+<a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">    </span><span class="n">next</span><span class="p">:</span><span class="w"> </span><span class="n">Atomic</span><span class="o">[</span><span class="k">ptr</span><span class="w"> </span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]]</span>
+<a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>
+<a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">  </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+<a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">    </span><span class="n">top</span><span class="p">:</span><span class="w"> </span><span class="n">Atomic</span><span class="o">[</span><span class="k">ptr</span><span class="w"> </span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]]</span>
+<a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">    </span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span>
+<a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">    </span><span class="n">handle</span><span class="p">:</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span>
+<a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>
+<a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a><span class="w">  </span><span class="n">Empty</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">    </span><span class="sd">## Stack with no elements.</span>
+<a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>
+<a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">  </span><span class="n">NonEmpty</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">    </span><span class="sd">## Stack with at least one element.</span>
+<a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a>
+<a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="n">typestate</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">:</span>
+<a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="w">  </span><span class="n">consumeOnTransition</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">false</span>
+<a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a><span class="w">  </span><span class="n">states</span><span class="w"> </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a><span class="w">  </span><span class="n">transitions</span><span class="p">:</span>
+<a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="w">    </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a><span class="w">    </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">PopResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="w">  </span><span class="c"># Note: Bridge to Item[T].Unprocessed[T] is conceptual (see file header comment).</span>
+<a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a><span class="w">  </span><span class="c"># Generic bridges not yet supported in typestate DSL, so we manually construct</span>
+<a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a><span class="w">  </span><span class="c"># the Unprocessed[T] item in the pop() proc.</span>
+<a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a>
+<a id="__codelineno-3-51" name="__codelineno-3-51" href="#__codelineno-3-51"></a><span class="k">proc</span><span class="w"> </span><span class="nf">destroyNode</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">pointer</span><span class="p">)</span><span class="w"> </span><span class="sx">{.nimcall.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-3-52" name="__codelineno-3-52" href="#__codelineno-3-52"></a><span class="w">  </span><span class="n">dealloc</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
+<a id="__codelineno-3-53" name="__codelineno-3-53" href="#__codelineno-3-53"></a>
+<a id="__codelineno-3-54" name="__codelineno-3-54" href="#__codelineno-3-54"></a><span class="k">proc</span><span class="w"> </span><span class="nf">initStack</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-3-55" name="__codelineno-3-55" href="#__codelineno-3-55"></a><span class="w">  </span><span class="sd">## Create a new empty stack.</span>
+<a id="__codelineno-3-56" name="__codelineno-3-56" href="#__codelineno-3-56"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">base</span><span class="p">:</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-57" name="__codelineno-3-57" href="#__codelineno-3-57"></a><span class="w">  </span><span class="n">base</span><span class="p">.</span><span class="n">top</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="kp">nil</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span><span class="p">)</span>
+<a id="__codelineno-3-58" name="__codelineno-3-58" href="#__codelineno-3-58"></a><span class="w">  </span><span class="n">base</span><span class="p">.</span><span class="n">manager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">manager</span>
+<a id="__codelineno-3-59" name="__codelineno-3-59" href="#__codelineno-3-59"></a><span class="w">  </span><span class="n">base</span><span class="p">.</span><span class="n">handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">registerThread</span><span class="p">(</span><span class="n">manager</span><span class="o">[]</span><span class="p">)</span>
+<a id="__codelineno-3-60" name="__codelineno-3-60" href="#__codelineno-3-60"></a><span class="w">  </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">base</span><span class="p">)</span>
+<a id="__codelineno-3-61" name="__codelineno-3-61" href="#__codelineno-3-61"></a>
+<a id="__codelineno-3-62" name="__codelineno-3-62" href="#__codelineno-3-62"></a><span class="k">proc</span><span class="w"> </span><span class="nf">push</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">stack</span><span class="p">:</span><span class="w"> </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="n">T</span><span class="p">):</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="sx">{.transition.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-3-63" name="__codelineno-3-63" href="#__codelineno-3-63"></a><span class="w">  </span><span class="sd">## Push onto empty stack, returns NonEmpty.</span>
+<a id="__codelineno-3-64" name="__codelineno-3-64" href="#__codelineno-3-64"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">stack</span><span class="p">)</span>
+<a id="__codelineno-3-65" name="__codelineno-3-65" href="#__codelineno-3-65"></a>
+<a id="__codelineno-3-66" name="__codelineno-3-66" href="#__codelineno-3-66"></a><span class="w">  </span><span class="c"># Enter DEBRA critical section</span>
+<a id="__codelineno-3-67" name="__codelineno-3-67" href="#__codelineno-3-67"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unpinned</span><span class="p">(</span><span class="n">base</span><span class="p">.</span><span class="n">handle</span><span class="p">).</span><span class="n">pin</span><span class="p">()</span>
+<a id="__codelineno-3-68" name="__codelineno-3-68" href="#__codelineno-3-68"></a>
+<a id="__codelineno-3-69" name="__codelineno-3-69" href="#__codelineno-3-69"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">newNode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">cast</span><span class="o">[</span><span class="k">ptr</span><span class="w"> </span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">alloc0</span><span class="p">(</span><span class="n">sizeof</span><span class="p">(</span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">)))</span>
+<a id="__codelineno-3-70" name="__codelineno-3-70" href="#__codelineno-3-70"></a><span class="w">  </span><span class="n">newNode</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span>
+<a id="__codelineno-3-71" name="__codelineno-3-71" href="#__codelineno-3-71"></a><span class="w">  </span><span class="n">newNode</span><span class="p">.</span><span class="n">next</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="kp">nil</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span><span class="p">)</span>
+<a id="__codelineno-3-72" name="__codelineno-3-72" href="#__codelineno-3-72"></a><span class="w">  </span><span class="n">base</span><span class="p">.</span><span class="n">top</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">newNode</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">)</span>
+<a id="__codelineno-3-73" name="__codelineno-3-73" href="#__codelineno-3-73"></a>
+<a id="__codelineno-3-74" name="__codelineno-3-74" href="#__codelineno-3-74"></a><span class="w">  </span><span class="c"># Exit critical section</span>
+<a id="__codelineno-3-75" name="__codelineno-3-75" href="#__codelineno-3-75"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">unpinResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<a id="__codelineno-3-76" name="__codelineno-3-76" href="#__codelineno-3-76"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-3-77" name="__codelineno-3-77" href="#__codelineno-3-77"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">uUnpinned</span><span class="o">:</span><span class="w"> </span><span class="k">discard</span>
+<a id="__codelineno-3-78" name="__codelineno-3-78" href="#__codelineno-3-78"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">uNeutralized</span><span class="o">:</span><span class="w"> </span><span class="k">discard</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">neutralized</span><span class="p">.</span><span class="n">acknowledge</span><span class="p">()</span>
+<a id="__codelineno-3-79" name="__codelineno-3-79" href="#__codelineno-3-79"></a>
+<a id="__codelineno-3-80" name="__codelineno-3-80" href="#__codelineno-3-80"></a><span class="w">  </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">base</span><span class="p">)</span>
+<a id="__codelineno-3-81" name="__codelineno-3-81" href="#__codelineno-3-81"></a>
+<a id="__codelineno-3-82" name="__codelineno-3-82" href="#__codelineno-3-82"></a><span class="k">proc</span><span class="w"> </span><span class="nf">push</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">stack</span><span class="p">:</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="n">T</span><span class="p">):</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="sx">{.transition.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-3-83" name="__codelineno-3-83" href="#__codelineno-3-83"></a><span class="w">  </span><span class="sd">## Push onto non-empty stack, returns NonEmpty.</span>
+<a id="__codelineno-3-84" name="__codelineno-3-84" href="#__codelineno-3-84"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">stack</span><span class="p">)</span>
+<a id="__codelineno-3-85" name="__codelineno-3-85" href="#__codelineno-3-85"></a>
+<a id="__codelineno-3-86" name="__codelineno-3-86" href="#__codelineno-3-86"></a><span class="w">  </span><span class="c"># Enter DEBRA critical section</span>
+<a id="__codelineno-3-87" name="__codelineno-3-87" href="#__codelineno-3-87"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unpinned</span><span class="p">(</span><span class="n">base</span><span class="p">.</span><span class="n">handle</span><span class="p">).</span><span class="n">pin</span><span class="p">()</span>
+<a id="__codelineno-3-88" name="__codelineno-3-88" href="#__codelineno-3-88"></a>
+<a id="__codelineno-3-89" name="__codelineno-3-89" href="#__codelineno-3-89"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">newNode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">cast</span><span class="o">[</span><span class="k">ptr</span><span class="w"> </span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">alloc0</span><span class="p">(</span><span class="n">sizeof</span><span class="p">(</span><span class="n">Node</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">)))</span>
+<a id="__codelineno-3-90" name="__codelineno-3-90" href="#__codelineno-3-90"></a><span class="w">  </span><span class="n">newNode</span><span class="p">.</span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span>
+<a id="__codelineno-3-91" name="__codelineno-3-91" href="#__codelineno-3-91"></a>
+<a id="__codelineno-3-92" name="__codelineno-3-92" href="#__codelineno-3-92"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">done</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">false</span>
+<a id="__codelineno-3-93" name="__codelineno-3-93" href="#__codelineno-3-93"></a><span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="n">done</span><span class="p">:</span>
+<a id="__codelineno-3-94" name="__codelineno-3-94" href="#__codelineno-3-94"></a><span class="w">    </span><span class="kd">var</span><span class="w"> </span><span class="n">oldTop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">base</span><span class="p">.</span><span class="n">top</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">)</span>
+<a id="__codelineno-3-95" name="__codelineno-3-95" href="#__codelineno-3-95"></a><span class="w">    </span><span class="n">newNode</span><span class="p">.</span><span class="n">next</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">oldTop</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span><span class="p">)</span>
+<a id="__codelineno-3-96" name="__codelineno-3-96" href="#__codelineno-3-96"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">base</span><span class="p">.</span><span class="n">top</span><span class="p">.</span><span class="n">compareExchange</span><span class="p">(</span><span class="n">oldTop</span><span class="p">,</span><span class="w"> </span><span class="n">newNode</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span><span class="p">):</span>
+<a id="__codelineno-3-97" name="__codelineno-3-97" href="#__codelineno-3-97"></a><span class="w">      </span><span class="n">done</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">true</span>
+<a id="__codelineno-3-98" name="__codelineno-3-98" href="#__codelineno-3-98"></a>
+<a id="__codelineno-3-99" name="__codelineno-3-99" href="#__codelineno-3-99"></a><span class="w">  </span><span class="c"># Exit critical section</span>
+<a id="__codelineno-3-100" name="__codelineno-3-100" href="#__codelineno-3-100"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">unpinResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<a id="__codelineno-3-101" name="__codelineno-3-101" href="#__codelineno-3-101"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-3-102" name="__codelineno-3-102" href="#__codelineno-3-102"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">uUnpinned</span><span class="o">:</span><span class="w"> </span><span class="k">discard</span>
+<a id="__codelineno-3-103" name="__codelineno-3-103" href="#__codelineno-3-103"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">uNeutralized</span><span class="o">:</span><span class="w"> </span><span class="k">discard</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">neutralized</span><span class="p">.</span><span class="n">acknowledge</span><span class="p">()</span>
+<a id="__codelineno-3-104" name="__codelineno-3-104" href="#__codelineno-3-104"></a>
+<a id="__codelineno-3-105" name="__codelineno-3-105" href="#__codelineno-3-105"></a><span class="w">  </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">base</span><span class="p">)</span>
+<a id="__codelineno-3-106" name="__codelineno-3-106" href="#__codelineno-3-106"></a>
+<a id="__codelineno-3-107" name="__codelineno-3-107" href="#__codelineno-3-107"></a><span class="k">proc</span><span class="w"> </span><span class="nf">pop</span><span class="o">*[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">stack</span><span class="p">:</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="p">(</span><span class="n">PopResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">Option</span><span class="o">[</span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]]</span><span class="p">)</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-3-108" name="__codelineno-3-108" href="#__codelineno-3-108"></a><span class="w">  </span><span class="sd">## Pop from non-empty stack.</span>
+<a id="__codelineno-3-109" name="__codelineno-3-109" href="#__codelineno-3-109"></a><span class="w">  </span><span class="sd">## Returns (new stack state, optional item in Unprocessed state).</span>
+<a id="__codelineno-3-110" name="__codelineno-3-110" href="#__codelineno-3-110"></a><span class="w">  </span><span class="sd">##</span>
+<a id="__codelineno-3-111" name="__codelineno-3-111" href="#__codelineno-3-111"></a><span class="w">  </span><span class="sd">## The Option[Unprocessed[T]] will be:</span>
+<a id="__codelineno-3-112" name="__codelineno-3-112" href="#__codelineno-3-112"></a><span class="w">  </span><span class="sd">## - Some(item): If an item was successfully popped</span>
+<a id="__codelineno-3-113" name="__codelineno-3-113" href="#__codelineno-3-113"></a><span class="w">  </span><span class="sd">## - None: If another thread popped the last item first (ABA race)</span>
+<a id="__codelineno-3-114" name="__codelineno-3-114" href="#__codelineno-3-114"></a><span class="w">  </span><span class="sd">##</span>
+<a id="__codelineno-3-115" name="__codelineno-3-115" href="#__codelineno-3-115"></a><span class="w">  </span><span class="sd">## The popped item is in Unprocessed state, ready to flow through</span>
+<a id="__codelineno-3-116" name="__codelineno-3-116" href="#__codelineno-3-116"></a><span class="w">  </span><span class="sd">## the item_processing typestate: Processing -&gt; Completed|Failed.</span>
+<a id="__codelineno-3-117" name="__codelineno-3-117" href="#__codelineno-3-117"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">base</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">StackBase</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">stack</span><span class="p">)</span>
+<a id="__codelineno-3-118" name="__codelineno-3-118" href="#__codelineno-3-118"></a>
+<a id="__codelineno-3-119" name="__codelineno-3-119" href="#__codelineno-3-119"></a><span class="w">  </span><span class="c"># Enter DEBRA critical section - typestate enforced</span>
+<a id="__codelineno-3-120" name="__codelineno-3-120" href="#__codelineno-3-120"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unpinned</span><span class="p">(</span><span class="n">base</span><span class="p">.</span><span class="n">handle</span><span class="p">).</span><span class="n">pin</span><span class="p">()</span>
+<a id="__codelineno-3-121" name="__codelineno-3-121" href="#__codelineno-3-121"></a>
+<a id="__codelineno-3-122" name="__codelineno-3-122" href="#__codelineno-3-122"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">resultStack</span><span class="p">:</span><span class="w"> </span><span class="n">PopResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span>
+<a id="__codelineno-3-123" name="__codelineno-3-123" href="#__codelineno-3-123"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">item</span><span class="p">:</span><span class="w"> </span><span class="n">Option</span><span class="o">[</span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]]</span>
+<a id="__codelineno-3-124" name="__codelineno-3-124" href="#__codelineno-3-124"></a>
+<a id="__codelineno-3-125" name="__codelineno-3-125" href="#__codelineno-3-125"></a><span class="w">  </span><span class="k">block</span><span class="w"> </span><span class="n">popLoop</span><span class="p">:</span>
+<a id="__codelineno-3-126" name="__codelineno-3-126" href="#__codelineno-3-126"></a><span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="kp">true</span><span class="p">:</span>
+<a id="__codelineno-3-127" name="__codelineno-3-127" href="#__codelineno-3-127"></a><span class="w">      </span><span class="kd">var</span><span class="w"> </span><span class="n">oldTop</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">base</span><span class="p">.</span><span class="n">top</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">)</span>
+<a id="__codelineno-3-128" name="__codelineno-3-128" href="#__codelineno-3-128"></a>
+<a id="__codelineno-3-129" name="__codelineno-3-129" href="#__codelineno-3-129"></a><span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="n">oldTop</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kp">nil</span><span class="p">:</span>
+<a id="__codelineno-3-130" name="__codelineno-3-130" href="#__codelineno-3-130"></a><span class="w">        </span><span class="c"># Stack became empty (another thread popped the last item).</span>
+<a id="__codelineno-3-131" name="__codelineno-3-131" href="#__codelineno-3-131"></a><span class="w">        </span><span class="c"># This is a valid race condition in lock-free data structures.</span>
+<a id="__codelineno-3-132" name="__codelineno-3-132" href="#__codelineno-3-132"></a><span class="w">        </span><span class="c"># We return Empty state with None item.</span>
+<a id="__codelineno-3-133" name="__codelineno-3-133" href="#__codelineno-3-133"></a><span class="w">        </span><span class="n">resultStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PopResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">kind</span><span class="p">:</span><span class="w"> </span><span class="n">pEmpty</span><span class="p">,</span><span class="w"> </span><span class="n">empty</span><span class="p">:</span><span class="w"> </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">base</span><span class="p">))</span>
+<a id="__codelineno-3-134" name="__codelineno-3-134" href="#__codelineno-3-134"></a><span class="w">        </span><span class="n">item</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">none</span><span class="p">(</span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">)</span>
+<a id="__codelineno-3-135" name="__codelineno-3-135" href="#__codelineno-3-135"></a><span class="w">        </span><span class="k">break</span><span class="w"> </span><span class="n">popLoop</span>
+<a id="__codelineno-3-136" name="__codelineno-3-136" href="#__codelineno-3-136"></a>
+<a id="__codelineno-3-137" name="__codelineno-3-137" href="#__codelineno-3-137"></a><span class="w">      </span><span class="k">let</span><span class="w"> </span><span class="n">next</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">oldTop</span><span class="p">.</span><span class="n">next</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moRelaxed</span><span class="p">)</span>
+<a id="__codelineno-3-138" name="__codelineno-3-138" href="#__codelineno-3-138"></a>
+<a id="__codelineno-3-139" name="__codelineno-3-139" href="#__codelineno-3-139"></a><span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="n">base</span><span class="p">.</span><span class="n">top</span><span class="p">.</span><span class="n">compareExchange</span><span class="p">(</span><span class="n">oldTop</span><span class="p">,</span><span class="w"> </span><span class="n">next</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span><span class="p">):</span>
+<a id="__codelineno-3-140" name="__codelineno-3-140" href="#__codelineno-3-140"></a><span class="w">        </span><span class="c"># Successfully popped! Bridge: create item in Unprocessed state</span>
+<a id="__codelineno-3-141" name="__codelineno-3-141" href="#__codelineno-3-141"></a><span class="w">        </span><span class="n">item</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">some</span><span class="p">(</span><span class="n">Unprocessed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">Item</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="n">oldTop</span><span class="p">.</span><span class="n">value</span><span class="p">)))</span>
+<a id="__codelineno-3-142" name="__codelineno-3-142" href="#__codelineno-3-142"></a>
+<a id="__codelineno-3-143" name="__codelineno-3-143" href="#__codelineno-3-143"></a><span class="w">        </span><span class="c"># Retire the node through DEBRA - typestate enforced</span>
+<a id="__codelineno-3-144" name="__codelineno-3-144" href="#__codelineno-3-144"></a><span class="w">        </span><span class="c"># This is the ONLY place we retire this node, preventing double-free</span>
+<a id="__codelineno-3-145" name="__codelineno-3-145" href="#__codelineno-3-145"></a><span class="w">        </span><span class="k">let</span><span class="w"> </span><span class="n">ready</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">retireReady</span><span class="p">(</span><span class="n">pinned</span><span class="p">)</span>
+<a id="__codelineno-3-146" name="__codelineno-3-146" href="#__codelineno-3-146"></a><span class="w">        </span><span class="k">discard</span><span class="w"> </span><span class="n">ready</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">cast</span><span class="o">[</span><span class="n">pointer</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">oldTop</span><span class="p">),</span><span class="w"> </span><span class="n">destroyNode</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">)</span>
+<a id="__codelineno-3-147" name="__codelineno-3-147" href="#__codelineno-3-147"></a>
+<a id="__codelineno-3-148" name="__codelineno-3-148" href="#__codelineno-3-148"></a><span class="w">        </span><span class="c"># Determine new stack state based on what's left</span>
+<a id="__codelineno-3-149" name="__codelineno-3-149" href="#__codelineno-3-149"></a><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="n">next</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kp">nil</span><span class="p">:</span>
+<a id="__codelineno-3-150" name="__codelineno-3-150" href="#__codelineno-3-150"></a><span class="w">          </span><span class="n">resultStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PopResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">kind</span><span class="p">:</span><span class="w"> </span><span class="n">pEmpty</span><span class="p">,</span><span class="w"> </span><span class="n">empty</span><span class="p">:</span><span class="w"> </span><span class="n">Empty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">base</span><span class="p">))</span>
+<a id="__codelineno-3-151" name="__codelineno-3-151" href="#__codelineno-3-151"></a><span class="w">        </span><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-3-152" name="__codelineno-3-152" href="#__codelineno-3-152"></a><span class="w">          </span><span class="n">resultStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PopResult</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">kind</span><span class="p">:</span><span class="w"> </span><span class="n">pNonempty</span><span class="p">,</span><span class="w"> </span><span class="n">nonempty</span><span class="p">:</span><span class="w"> </span><span class="n">NonEmpty</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">(</span><span class="n">base</span><span class="p">))</span>
+<a id="__codelineno-3-153" name="__codelineno-3-153" href="#__codelineno-3-153"></a><span class="w">        </span><span class="k">break</span><span class="w"> </span><span class="n">popLoop</span>
+<a id="__codelineno-3-154" name="__codelineno-3-154" href="#__codelineno-3-154"></a>
+<a id="__codelineno-3-155" name="__codelineno-3-155" href="#__codelineno-3-155"></a><span class="w">  </span><span class="c"># Exit DEBRA critical section - must handle neutralization</span>
+<a id="__codelineno-3-156" name="__codelineno-3-156" href="#__codelineno-3-156"></a><span class="w">  </span><span class="c">#</span>
+<a id="__codelineno-3-157" name="__codelineno-3-157" href="#__codelineno-3-157"></a><span class="w">  </span><span class="c"># Neutralization can occur when another thread wants to reclaim memory.</span>
+<a id="__codelineno-3-158" name="__codelineno-3-158" href="#__codelineno-3-158"></a><span class="w">  </span><span class="c"># The neutralization flag is set while we're pinned, but we only detect</span>
+<a id="__codelineno-3-159" name="__codelineno-3-159" href="#__codelineno-3-159"></a><span class="w">  </span><span class="c"># it here when we unpin. This is correct behavior:</span>
+<a id="__codelineno-3-160" name="__codelineno-3-160" href="#__codelineno-3-160"></a><span class="w">  </span><span class="c">#</span>
+<a id="__codelineno-3-161" name="__codelineno-3-161" href="#__codelineno-3-161"></a><span class="w">  </span><span class="c"># 1. During the pop loop, we're pinned (protected from reclamation)</span>
+<a id="__codelineno-3-162" name="__codelineno-3-162" href="#__codelineno-3-162"></a><span class="w">  </span><span class="c"># 2. If neutralization is requested, the flag is set atomically</span>
+<a id="__codelineno-3-163" name="__codelineno-3-163" href="#__codelineno-3-163"></a><span class="w">  </span><span class="c"># 3. We complete our pop operation (CAS, retire, etc.) normally</span>
+<a id="__codelineno-3-164" name="__codelineno-3-164" href="#__codelineno-3-164"></a><span class="w">  </span><span class="c"># 4. At unpin time, we detect neutralization and must acknowledge it</span>
+<a id="__codelineno-3-165" name="__codelineno-3-165" href="#__codelineno-3-165"></a><span class="w">  </span><span class="c"># 5. The acknowledge() call resets the flag and returns Unpinned state</span>
+<a id="__codelineno-3-166" name="__codelineno-3-166" href="#__codelineno-3-166"></a><span class="w">  </span><span class="c">#</span>
+<a id="__codelineno-3-167" name="__codelineno-3-167" href="#__codelineno-3-167"></a><span class="w">  </span><span class="c"># This ensures that:</span>
+<a id="__codelineno-3-168" name="__codelineno-3-168" href="#__codelineno-3-168"></a><span class="w">  </span><span class="c"># - Operations complete atomically (no interruption mid-pop)</span>
+<a id="__codelineno-3-169" name="__codelineno-3-169" href="#__codelineno-3-169"></a><span class="w">  </span><span class="c"># - Neutralization is properly tracked and acknowledged</span>
+<a id="__codelineno-3-170" name="__codelineno-3-170" href="#__codelineno-3-170"></a><span class="w">  </span><span class="c"># - The thread can continue with more operations after acknowledging</span>
+<a id="__codelineno-3-171" name="__codelineno-3-171" href="#__codelineno-3-171"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">unpinResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<a id="__codelineno-3-172" name="__codelineno-3-172" href="#__codelineno-3-172"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-3-173" name="__codelineno-3-173" href="#__codelineno-3-173"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">uUnpinned</span><span class="o">:</span>
+<a id="__codelineno-3-174" name="__codelineno-3-174" href="#__codelineno-3-174"></a><span class="w">    </span><span class="c"># Normal case: no neutralization requested</span>
+<a id="__codelineno-3-175" name="__codelineno-3-175" href="#__codelineno-3-175"></a><span class="w">    </span><span class="k">discard</span>
+<a id="__codelineno-3-176" name="__codelineno-3-176" href="#__codelineno-3-176"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">uNeutralized</span><span class="o">:</span>
+<a id="__codelineno-3-177" name="__codelineno-3-177" href="#__codelineno-3-177"></a><span class="w">    </span><span class="c"># Neutralization was requested during our pinned section.</span>
+<a id="__codelineno-3-178" name="__codelineno-3-178" href="#__codelineno-3-178"></a><span class="w">    </span><span class="c"># We must acknowledge it before the thread can pin again.</span>
+<a id="__codelineno-3-179" name="__codelineno-3-179" href="#__codelineno-3-179"></a><span class="w">    </span><span class="k">discard</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">neutralized</span><span class="p">.</span><span class="n">acknowledge</span><span class="p">()</span>
+<a id="__codelineno-3-180" name="__codelineno-3-180" href="#__codelineno-3-180"></a>
+<a id="__codelineno-3-181" name="__codelineno-3-181" href="#__codelineno-3-181"></a><span class="w">  </span><span class="p">(</span><span class="n">resultStack</span><span class="p">,</span><span class="w"> </span><span class="n">item</span><span class="p">)</span>
+<a id="__codelineno-3-182" name="__codelineno-3-182" href="#__codelineno-3-182"></a>
+<a id="__codelineno-3-183" name="__codelineno-3-183" href="#__codelineno-3-183"></a><span class="k">when</span><span class="w"> </span><span class="n">isMainModule</span><span class="p">:</span>
+<a id="__codelineno-3-184" name="__codelineno-3-184" href="#__codelineno-3-184"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Lock-Free Stack with Typestate Composition"</span>
+<a id="__codelineno-3-185" name="__codelineno-3-185" href="#__codelineno-3-185"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"==========================================="</span>
+<a id="__codelineno-3-186" name="__codelineno-3-186" href="#__codelineno-3-186"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-3-187" name="__codelineno-3-187" href="#__codelineno-3-187"></a>
+<a id="__codelineno-3-188" name="__codelineno-3-188" href="#__codelineno-3-188"></a><span class="w">  </span><span class="c"># Initialize DEBRA manager</span>
+<a id="__codelineno-3-189" name="__codelineno-3-189" href="#__codelineno-3-189"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">manager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initDebraManager</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="p">)</span>
+<a id="__codelineno-3-190" name="__codelineno-3-190" href="#__codelineno-3-190"></a><span class="w">  </span><span class="n">setGlobalManager</span><span class="p">(</span><span class="k">addr</span><span class="w"> </span><span class="n">manager</span><span class="p">)</span>
+<a id="__codelineno-3-191" name="__codelineno-3-191" href="#__codelineno-3-191"></a>
+<a id="__codelineno-3-192" name="__codelineno-3-192" href="#__codelineno-3-192"></a><span class="w">  </span><span class="c"># Create empty stack - typestate: Empty[int]</span>
+<a id="__codelineno-3-193" name="__codelineno-3-193" href="#__codelineno-3-193"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">stack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initStack</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="k">addr</span><span class="w"> </span><span class="n">manager</span><span class="p">)</span>
+<a id="__codelineno-3-194" name="__codelineno-3-194" href="#__codelineno-3-194"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Created empty stack"</span>
+<a id="__codelineno-3-195" name="__codelineno-3-195" href="#__codelineno-3-195"></a>
+<a id="__codelineno-3-196" name="__codelineno-3-196" href="#__codelineno-3-196"></a><span class="w">  </span><span class="c"># Push first element - typestate transitions: Empty -&gt; NonEmpty</span>
+<a id="__codelineno-3-197" name="__codelineno-3-197" href="#__codelineno-3-197"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">nonEmptyStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stack</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+<a id="__codelineno-3-198" name="__codelineno-3-198" href="#__codelineno-3-198"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Pushed 10 (stack is now NonEmpty)"</span>
+<a id="__codelineno-3-199" name="__codelineno-3-199" href="#__codelineno-3-199"></a>
+<a id="__codelineno-3-200" name="__codelineno-3-200" href="#__codelineno-3-200"></a><span class="w">  </span><span class="c"># Push more elements - typestate: NonEmpty -&gt; NonEmpty</span>
+<a id="__codelineno-3-201" name="__codelineno-3-201" href="#__codelineno-3-201"></a><span class="w">  </span><span class="n">nonEmptyStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nonEmptyStack</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">20</span><span class="p">)</span>
+<a id="__codelineno-3-202" name="__codelineno-3-202" href="#__codelineno-3-202"></a><span class="w">  </span><span class="n">nonEmptyStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nonEmptyStack</span><span class="p">.</span><span class="n">push</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+<a id="__codelineno-3-203" name="__codelineno-3-203" href="#__codelineno-3-203"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Pushed 20, 30"</span>
+<a id="__codelineno-3-204" name="__codelineno-3-204" href="#__codelineno-3-204"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-3-205" name="__codelineno-3-205" href="#__codelineno-3-205"></a>
+<a id="__codelineno-3-206" name="__codelineno-3-206" href="#__codelineno-3-206"></a><span class="w">  </span><span class="c"># Pop and process items</span>
+<a id="__codelineno-3-207" name="__codelineno-3-207" href="#__codelineno-3-207"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Popping and processing items:"</span>
+<a id="__codelineno-3-208" name="__codelineno-3-208" href="#__codelineno-3-208"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">currentStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nonEmptyStack</span>
+<a id="__codelineno-3-209" name="__codelineno-3-209" href="#__codelineno-3-209"></a>
+<a id="__codelineno-3-210" name="__codelineno-3-210" href="#__codelineno-3-210"></a><span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="kp">true</span><span class="p">:</span>
+<a id="__codelineno-3-211" name="__codelineno-3-211" href="#__codelineno-3-211"></a><span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="p">(</span><span class="n">popResult</span><span class="p">,</span><span class="w"> </span><span class="n">itemOpt</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">currentStack</span><span class="p">.</span><span class="n">pop</span><span class="p">()</span>
+<a id="__codelineno-3-212" name="__codelineno-3-212" href="#__codelineno-3-212"></a>
+<a id="__codelineno-3-213" name="__codelineno-3-213" href="#__codelineno-3-213"></a><span class="w">    </span><span class="c"># Handle the optional item (Some if popped, None if race condition)</span>
+<a id="__codelineno-3-214" name="__codelineno-3-214" href="#__codelineno-3-214"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">itemOpt</span><span class="p">.</span><span class="n">isSome</span><span class="p">:</span>
+<a id="__codelineno-3-215" name="__codelineno-3-215" href="#__codelineno-3-215"></a><span class="w">      </span><span class="k">let</span><span class="w"> </span><span class="n">item</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">itemOpt</span><span class="p">.</span><span class="n">get</span>
+<a id="__codelineno-3-216" name="__codelineno-3-216" href="#__codelineno-3-216"></a><span class="w">      </span><span class="c"># Item is in Unprocessed state - process it through the pipeline</span>
+<a id="__codelineno-3-217" name="__codelineno-3-217" href="#__codelineno-3-217"></a><span class="w">      </span><span class="k">let</span><span class="w"> </span><span class="n">processing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">item</span><span class="p">.</span><span class="n">startProcessing</span><span class="p">()</span>
+<a id="__codelineno-3-218" name="__codelineno-3-218" href="#__codelineno-3-218"></a><span class="w">      </span><span class="k">let</span><span class="w"> </span><span class="n">processResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">processing</span><span class="p">.</span><span class="n">finish</span><span class="p">(</span><span class="n">success</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">true</span><span class="p">)</span>
+<a id="__codelineno-3-219" name="__codelineno-3-219" href="#__codelineno-3-219"></a>
+<a id="__codelineno-3-220" name="__codelineno-3-220" href="#__codelineno-3-220"></a><span class="w">      </span><span class="k">case</span><span class="w"> </span><span class="n">processResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-3-221" name="__codelineno-3-221" href="#__codelineno-3-221"></a><span class="w">      </span><span class="k">of</span><span class="w"> </span><span class="nl">pCompleted</span><span class="o">:</span>
+<a id="__codelineno-3-222" name="__codelineno-3-222" href="#__codelineno-3-222"></a><span class="w">        </span><span class="n">echo</span><span class="w"> </span><span class="s">"  Popped and completed: "</span><span class="p">,</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">processResult</span><span class="p">.</span><span class="n">completed</span><span class="p">).</span><span class="n">value</span>
+<a id="__codelineno-3-223" name="__codelineno-3-223" href="#__codelineno-3-223"></a><span class="w">      </span><span class="k">of</span><span class="w"> </span><span class="nl">pFailed</span><span class="o">:</span>
+<a id="__codelineno-3-224" name="__codelineno-3-224" href="#__codelineno-3-224"></a><span class="w">        </span><span class="n">echo</span><span class="w"> </span><span class="s">"  Popped but failed: "</span><span class="p">,</span><span class="w"> </span><span class="n">Item</span><span class="o">[</span><span class="nb">int</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="o">/</span><span class="n">processResult</span><span class="p">.</span><span class="n">failed</span><span class="p">).</span><span class="n">value</span>
+<a id="__codelineno-3-225" name="__codelineno-3-225" href="#__codelineno-3-225"></a><span class="w">    </span><span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-3-226" name="__codelineno-3-226" href="#__codelineno-3-226"></a><span class="w">      </span><span class="n">echo</span><span class="w"> </span><span class="s">"  Race condition: another thread popped the item first"</span>
+<a id="__codelineno-3-227" name="__codelineno-3-227" href="#__codelineno-3-227"></a>
+<a id="__codelineno-3-228" name="__codelineno-3-228" href="#__codelineno-3-228"></a><span class="w">    </span><span class="c"># Check stack state</span>
+<a id="__codelineno-3-229" name="__codelineno-3-229" href="#__codelineno-3-229"></a><span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">popResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-3-230" name="__codelineno-3-230" href="#__codelineno-3-230"></a><span class="w">    </span><span class="k">of</span><span class="w"> </span><span class="nl">pEmpty</span><span class="o">:</span>
+<a id="__codelineno-3-231" name="__codelineno-3-231" href="#__codelineno-3-231"></a><span class="w">      </span><span class="n">echo</span><span class="w"> </span><span class="s">"  Stack is now empty"</span>
+<a id="__codelineno-3-232" name="__codelineno-3-232" href="#__codelineno-3-232"></a><span class="w">      </span><span class="k">break</span>
+<a id="__codelineno-3-233" name="__codelineno-3-233" href="#__codelineno-3-233"></a><span class="w">    </span><span class="k">of</span><span class="w"> </span><span class="nl">pNonempty</span><span class="o">:</span>
+<a id="__codelineno-3-234" name="__codelineno-3-234" href="#__codelineno-3-234"></a><span class="w">      </span><span class="n">currentStack</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">popResult</span><span class="p">.</span><span class="n">nonempty</span>
+<a id="__codelineno-3-235" name="__codelineno-3-235" href="#__codelineno-3-235"></a>
+<a id="__codelineno-3-236" name="__codelineno-3-236" href="#__codelineno-3-236"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-3-237" name="__codelineno-3-237" href="#__codelineno-3-237"></a>
+<a id="__codelineno-3-238" name="__codelineno-3-238" href="#__codelineno-3-238"></a><span class="w">  </span><span class="c"># Reclaim retired memory</span>
+<a id="__codelineno-3-239" name="__codelineno-3-239" href="#__codelineno-3-239"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="err">_ in 0..3:</span>
+<a id="__codelineno-3-240" name="__codelineno-3-240" href="#__codelineno-3-240"></a><span class="w">    </span><span class="n">manager</span><span class="p">.</span><span class="n">advance</span><span class="p">()</span>
+<a id="__codelineno-3-241" name="__codelineno-3-241" href="#__codelineno-3-241"></a>
+<a id="__codelineno-3-242" name="__codelineno-3-242" href="#__codelineno-3-242"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">reclaimResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reclaimStart</span><span class="p">(</span><span class="k">addr</span><span class="w"> </span><span class="n">manager</span><span class="p">)</span>
+<a id="__codelineno-3-243" name="__codelineno-3-243" href="#__codelineno-3-243"></a><span class="w">    </span><span class="p">.</span><span class="n">loadEpochs</span><span class="p">()</span>
+<a id="__codelineno-3-244" name="__codelineno-3-244" href="#__codelineno-3-244"></a><span class="w">    </span><span class="p">.</span><span class="n">checkSafe</span><span class="p">()</span>
+<a id="__codelineno-3-245" name="__codelineno-3-245" href="#__codelineno-3-245"></a>
+<a id="__codelineno-3-246" name="__codelineno-3-246" href="#__codelineno-3-246"></a><span class="w">  </span><span class="k">case</span><span class="w"> </span><span class="n">reclaimResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-3-247" name="__codelineno-3-247" href="#__codelineno-3-247"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">rReclaimReady</span><span class="o">:</span>
+<a id="__codelineno-3-248" name="__codelineno-3-248" href="#__codelineno-3-248"></a><span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">reclaimResult</span><span class="p">.</span><span class="n">reclaimready</span><span class="p">.</span><span class="n">tryReclaim</span><span class="p">()</span>
+<a id="__codelineno-3-249" name="__codelineno-3-249" href="#__codelineno-3-249"></a><span class="w">    </span><span class="n">echo</span><span class="w"> </span><span class="s">"Reclaimed "</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="s">" nodes"</span>
+<a id="__codelineno-3-250" name="__codelineno-3-250" href="#__codelineno-3-250"></a><span class="w">  </span><span class="k">of</span><span class="w"> </span><span class="nl">rReclaimBlocked</span><span class="o">:</span>
+<a id="__codelineno-3-251" name="__codelineno-3-251" href="#__codelineno-3-251"></a><span class="w">    </span><span class="n">echo</span><span class="w"> </span><span class="s">"Reclamation blocked (threads still active)"</span>
+<a id="__codelineno-3-252" name="__codelineno-3-252" href="#__codelineno-3-252"></a>
+<a id="__codelineno-3-253" name="__codelineno-3-253" href="#__codelineno-3-253"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">""</span>
+<a id="__codelineno-3-254" name="__codelineno-3-254" href="#__codelineno-3-254"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Lock-free stack with typestate composition completed successfully"</span>
+</code></pre></div>
+<p><a href="https://github.com/elijahr/nim-debra/blob/main/examples/lockfree_stack_typestates.nim">:material-file-code: View source</a></p>
+<h3 id="key-points">Key Points<a class="headerlink" href="#key-points" title="Permanent link">¶</a></h3>
+<ul>
+<li><strong>Nested enforcement</strong>: DEBRA's <code>pin()</code>/<code>unpin()</code> happens inside your <code>push()</code>/<code>pop()</code> - both are type-checked</li>
+<li><strong>Bridges connect state machines</strong>: Popped items flow from stack states into processing states</li>
+<li><strong>Zero runtime cost</strong>: All validation is compile-time</li>
+<li><strong>Module-qualified syntax</strong>: Use <code>module.Typestate.State</code> in bridges for clarity</li>
+</ul>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">¶</a></h2>
 <h3 id="1-minimize-critical-section-duration">1. Minimize Critical Section Duration<a class="headerlink" href="#1-minimize-critical-section-duration" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c"># GOOD - process outside critical section</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">let</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loadSharedData</span><span class="p">()</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">processData</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="c"># BAD - process inside critical section</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
-<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="k">let</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loadSharedData</span><span class="p">()</span>
-<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">processData</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c"># GOOD - process outside critical section</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">let</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loadSharedData</span><span class="p">()</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">processData</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c"># BAD - process inside critical section</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="k">let</span><span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">loadSharedData</span><span class="p">()</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">processData</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
 </code></pre></div>
 <h3 id="2-batch-retirements">2. Batch Retirements<a class="headerlink" href="#2-batch-retirements" title="Permanent link">¶</a></h3>
 <p>Retire multiple objects in a single critical section when possible.</p>
 <h3 id="3-handle-neutralization">3. Handle Neutralization<a class="headerlink" href="#3-handle-neutralization" title="Permanent link">¶</a></h3>
-<p>Always handle the <code>uNeutralized</code> case from <code>unpin()</code>.</p>
+<p>Always handle the <code>uNeutralized</code> case from <code>unpin()</code>. This is a required pattern - neutralization occurs when the epoch advances during a critical section, and you must acknowledge it before re-pinning.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">let</span><span class="w"> </span><span class="n">unpinResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">case</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="k">of</span><span class="w"> </span><span class="nl">uUnpinned</span><span class="o">:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="c"># Normal unpin - continue</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="k">discard</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="k">of</span><span class="w"> </span><span class="nl">uNeutralized</span><span class="o">:</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="c"># Was neutralized - must acknowledge before re-pinning</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span><span class="k">discard</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">neutralized</span><span class="p">.</span><span class="n">acknowledge</span><span class="p">()</span>
+</code></pre></div>
 <h3 id="4-periodic-reclamation">4. Periodic Reclamation<a class="headerlink" href="#4-periodic-reclamation" title="Permanent link">¶</a></h3>
 <p>Don't reclaim after every operation - amortize the cost.</p>
 <h2 id="common-pitfalls">Common Pitfalls<a class="headerlink" href="#common-pitfalls" title="Permanent link">¶</a></h2>
 <h3 id="forgetting-to-pin">Forgetting to Pin<a class="headerlink" href="#forgetting-to-pin" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c"># WRONG - accessing shared data without pinning</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">).</span><span class="n">value</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c"># RIGHT - pin before access</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">).</span><span class="n">value</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c"># WRONG - accessing shared data without pinning</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">).</span><span class="n">value</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c"># RIGHT - pin before access</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">handle</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">).</span><span class="n">value</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
 </code></pre></div>
 <h3 id="retiring-too-early">Retiring Too Early<a class="headerlink" href="#retiring-too-early" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c"># WRONG - retire before unlinking</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">discard</span><span class="w"> </span><span class="n">ready</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">ptr</span><span class="p">,</span><span class="w"> </span><span class="n">destroy</span><span class="p">)</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">newHead</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">)</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c"># RIGHT - retire after unlinking</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">newHead</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">)</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">discard</span><span class="w"> </span><span class="n">ready</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">ptr</span><span class="p">,</span><span class="w"> </span><span class="n">destroy</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c"># WRONG - retire before unlinking</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">discard</span><span class="w"> </span><span class="n">ready</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">ptr</span><span class="p">,</span><span class="w"> </span><span class="n">destroy</span><span class="p">)</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">newHead</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">)</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c"># RIGHT - retire after unlinking</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">queue</span><span class="p">.</span><span class="n">head</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">newHead</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">)</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="k">discard</span><span class="w"> </span><span class="n">ready</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">ptr</span><span class="p">,</span><span class="w"> </span><span class="n">destroy</span><span class="p">)</span>
 </code></pre></div>
 <h3 id="sharing-handles">Sharing Handles<a class="headerlink" href="#sharing-handles" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c"># WRONG - sharing handle between threads</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kd">var</span><span class="w"> </span><span class="n">sharedHandle</span><span class="p">:</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c"># RIGHT - each thread has own handle</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">proc</span><span class="w"> </span><span class="nf">workerThread</span><span class="p">()</span><span class="w"> </span><span class="sx">{.thread.}</span><span class="w"> </span><span class="o">=</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">registerThread</span><span class="p">(</span><span class="n">manager</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c"># WRONG - sharing handle between threads</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kd">var</span><span class="w"> </span><span class="n">sharedHandle</span><span class="p">:</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c"># RIGHT - each thread has own handle</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="k">proc</span><span class="w"> </span><span class="nf">workerThread</span><span class="p">()</span><span class="w"> </span><span class="sx">{.thread.}</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">registerThread</span><span class="p">(</span><span class="n">manager</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="performance-tips">Performance Tips<a class="headerlink" href="#performance-tips" title="Permanent link">¶</a></h2>
 <ol>
@@ -1414,7 +1927,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"></path></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 11, 2025 17:09:00 UTC"><span class="timeago" datetime="2025-12-11T17:09:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 11, 2025 17:09:00 UTC">2025-12-11</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 12, 2025 07:36:40 UTC"><span class="timeago" datetime="2025-12-12T07:36:40+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 12, 2025 07:36:40 UTC">2025-12-12</span>
   </span>
 
     

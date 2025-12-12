@@ -5549,7 +5549,7 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc initialize(m: ManagerUninitialized[MaxThreads]): ManagerReady[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc initialize(m: sink ManagerUninitialized[MaxThreads]): ManagerReady[MaxThreads]</code></pre>
     </div>
   
 
@@ -5567,7 +5567,7 @@ Called automatically during first DebraManager initialization.</p>
           
             <li>
               <code>m</code>
-              (<code>ManagerUninitialized[MaxThreads]</code>)
+              (<code>sink ManagerUninitialized[MaxThreads]</code>)
               
             </li>
           
@@ -5617,7 +5617,7 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc shutdown(m: ManagerReady[MaxThreads]): ManagerShutdown[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc shutdown(m: sink ManagerReady[MaxThreads]): ManagerShutdown[MaxThreads]</code></pre>
     </div>
   
 
@@ -5635,7 +5635,7 @@ Called automatically during first DebraManager initialization.</p>
           
             <li>
               <code>m</code>
-              (<code>ManagerReady[MaxThreads]</code>)
+              (<code>sink ManagerReady[MaxThreads]</code>)
               
             </li>
           
@@ -5656,8 +5656,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L56" target="_blank" rel="noopener">
-            src/debra/typestates/manager.nim:56
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L54" target="_blank" rel="noopener">
+            src/debra/typestates/manager.nim:54
           </a>
         
       </div>
@@ -5720,8 +5720,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L80" target="_blank" rel="noopener">
-            src/debra/typestates/manager.nim:80
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L76" target="_blank" rel="noopener">
+            src/debra/typestates/manager.nim:76
           </a>
         
       </div>
@@ -5969,7 +5969,7 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc register(u: Unregistered[MaxThreads]): RegisterResult[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc register(u: sink Unregistered[MaxThreads]): RegisterResult[MaxThreads]</code></pre>
     </div>
   
 
@@ -5988,7 +5988,7 @@ RegistrationFull if all slots are taken.</p>
           
             <li>
               <code>u</code>
-              (<code>Unregistered[MaxThreads]</code>)
+              (<code>sink Unregistered[MaxThreads]</code>)
               
             </li>
           
@@ -6073,8 +6073,8 @@ RegistrationFull if all slots are taken.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/registration.nim#L76" target="_blank" rel="noopener">
-            src/debra/typestates/registration.nim:76
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/registration.nim#L72" target="_blank" rel="noopener">
+            src/debra/typestates/registration.nim:72
           </a>
         
       </div>
@@ -6137,8 +6137,8 @@ RegistrationFull if all slots are taken.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/registration.nim#L81" target="_blank" rel="noopener">
-            src/debra/typestates/registration.nim:81
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/registration.nim#L77" target="_blank" rel="noopener">
+            src/debra/typestates/registration.nim:77
           </a>
         
       </div>
@@ -6429,7 +6429,7 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc claim(f: Free[MaxThreads]): Claiming[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc claim(f: sink Free[MaxThreads]): Claiming[MaxThreads]</code></pre>
     </div>
   
 
@@ -6447,7 +6447,7 @@ RegistrationFull if all slots are taken.</p>
           
             <li>
               <code>f</code>
-              (<code>Free[MaxThreads]</code>)
+              (<code>sink Free[MaxThreads]</code>)
               
             </li>
           
@@ -6497,7 +6497,7 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc activate(c: Claiming[MaxThreads]): Active[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc activate(c: sink Claiming[MaxThreads]): Active[MaxThreads]</code></pre>
     </div>
   
 
@@ -6516,7 +6516,7 @@ This is where the slot becomes fully owned by a thread.</p>
           
             <li>
               <code>c</code>
-              (<code>Claiming[MaxThreads]</code>)
+              (<code>sink Claiming[MaxThreads]</code>)
               
             </li>
           
@@ -6537,8 +6537,8 @@ This is where the slot becomes fully owned by a thread.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L53" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:53
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L49" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:49
           </a>
         
       </div>
@@ -6566,7 +6566,7 @@ This is where the slot becomes fully owned by a thread.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc drain(a: Active[MaxThreads]): Draining[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc drain(a: sink Active[MaxThreads]): Draining[MaxThreads]</code></pre>
     </div>
   
 
@@ -6585,7 +6585,7 @@ Thread will drain its limbo bags before releasing the slot.</p>
           
             <li>
               <code>a</code>
-              (<code>Active[MaxThreads]</code>)
+              (<code>sink Active[MaxThreads]</code>)
               
             </li>
           
@@ -6606,8 +6606,8 @@ Thread will drain its limbo bags before releasing the slot.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L65" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:65
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L57" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:57
           </a>
         
       </div>
@@ -6635,7 +6635,7 @@ Thread will drain its limbo bags before releasing the slot.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc release(d: Draining[MaxThreads]): Free[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc release(d: sink Draining[MaxThreads]): Free[MaxThreads]</code></pre>
     </div>
   
 
@@ -6654,7 +6654,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
           
             <li>
               <code>d</code>
-              (<code>Draining[MaxThreads]</code>)
+              (<code>sink Draining[MaxThreads]</code>)
               
             </li>
           
@@ -6675,8 +6675,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L77" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:77
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L65" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:65
           </a>
         
       </div>
@@ -6739,8 +6739,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L89" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:89
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L73" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:73
           </a>
         
       </div>
@@ -6803,8 +6803,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L94" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:94
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L78" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:78
           </a>
         
       </div>
@@ -6867,8 +6867,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L99" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:99
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L83" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:83
           </a>
         
       </div>
@@ -6931,8 +6931,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L104" target="_blank" rel="noopener">
-            src/debra/typestates/slot.nim:104
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/slot.nim#L88" target="_blank" rel="noopener">
+            src/debra/typestates/slot.nim:88
           </a>
         
       </div>
@@ -7150,8 +7150,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L28" target="_blank" rel="noopener">
-            src/debra/typestates/guard.nim:28
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L29" target="_blank" rel="noopener">
+            src/debra/typestates/guard.nim:29
           </a>
         
       </div>
@@ -7179,7 +7179,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc pin(u: Unpinned[MaxThreads]): Pinned[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc pin(u: sink Unpinned[MaxThreads]): Pinned[MaxThreads]</code></pre>
     </div>
   
 
@@ -7197,7 +7197,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
           
             <li>
               <code>u</code>
-              (<code>Unpinned[MaxThreads]</code>)
+              (<code>sink Unpinned[MaxThreads]</code>)
               
             </li>
           
@@ -7218,8 +7218,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L35" target="_blank" rel="noopener">
-            src/debra/typestates/guard.nim:35
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L36" target="_blank" rel="noopener">
+            src/debra/typestates/guard.nim:36
           </a>
         
       </div>
@@ -7247,7 +7247,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc unpin(p: Pinned[MaxThreads]): UnpinResult[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc unpin(p: sink Pinned[MaxThreads]): UnpinResult[MaxThreads]</code></pre>
     </div>
   
 
@@ -7265,7 +7265,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
           
             <li>
               <code>p</code>
-              (<code>Pinned[MaxThreads]</code>)
+              (<code>sink Pinned[MaxThreads]</code>)
               
             </li>
           
@@ -7286,8 +7286,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L51" target="_blank" rel="noopener">
-            src/debra/typestates/guard.nim:51
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L52" target="_blank" rel="noopener">
+            src/debra/typestates/guard.nim:52
           </a>
         
       </div>
@@ -7315,7 +7315,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc acknowledge(n: Neutralized[MaxThreads]): Unpinned[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc acknowledge(n: sink Neutralized[MaxThreads]): Unpinned[MaxThreads]</code></pre>
     </div>
   
 
@@ -7333,7 +7333,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
           
             <li>
               <code>n</code>
-              (<code>Neutralized[MaxThreads]</code>)
+              (<code>sink Neutralized[MaxThreads]</code>)
               
             </li>
           
@@ -7418,8 +7418,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L79" target="_blank" rel="noopener">
-            src/debra/typestates/guard.nim:79
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L77" target="_blank" rel="noopener">
+            src/debra/typestates/guard.nim:77
           </a>
         
       </div>
@@ -7482,8 +7482,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L84" target="_blank" rel="noopener">
-            src/debra/typestates/guard.nim:84
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/guard.nim#L82" target="_blank" rel="noopener">
+            src/debra/typestates/guard.nim:82
           </a>
         
       </div>
@@ -7693,7 +7693,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retireReadyFromRetired(r: Retired[MaxThreads]): RetireReady[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc retireReadyFromRetired(r: sink Retired[MaxThreads]): RetireReady[MaxThreads]</code></pre>
     </div>
   
 
@@ -7711,7 +7711,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
           
             <li>
               <code>r</code>
-              (<code>Retired[MaxThreads]</code>)
+              (<code>sink Retired[MaxThreads]</code>)
               
             </li>
           
@@ -7761,7 +7761,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retire(r: RetireReady[MaxThreads]; data: pointer; destructor: Destructor): Retired[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc retire(r: sink RetireReady[MaxThreads]; data: pointer; destructor: Destructor): Retired[MaxThreads]</code></pre>
     </div>
   
 
@@ -7779,7 +7779,7 @@ This completes the lifecycle, making the slot available for reuse.</p>
           
             <li>
               <code>r</code>
-              (<code>RetireReady[MaxThreads]</code>)
+              (<code>sink RetireReady[MaxThreads]</code>)
               
             </li>
           
@@ -7812,8 +7812,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L47" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:47
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L43" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:43
           </a>
         
       </div>
@@ -7872,8 +7872,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L75" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:75
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L71" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:71
           </a>
         
       </div>
@@ -9258,7 +9258,7 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc advance(c: Current[MaxThreads]): Advancing[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc advance(c: sink Current[MaxThreads]): Advancing[MaxThreads]</code></pre>
     </div>
   
 
@@ -9276,7 +9276,7 @@ Returns count of signals sent.</p>
           
             <li>
               <code>c</code>
-              (<code>Current[MaxThreads]</code>)
+              (<code>sink Current[MaxThreads]</code>)
               
             </li>
           
@@ -9326,7 +9326,7 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc complete(a: Advancing[MaxThreads]): Advanced[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc complete(a: sink Advancing[MaxThreads]): Advanced[MaxThreads]</code></pre>
     </div>
   
 
@@ -9344,7 +9344,7 @@ Returns count of signals sent.</p>
           
             <li>
               <code>a</code>
-              (<code>Advancing[MaxThreads]</code>)
+              (<code>sink Advancing[MaxThreads]</code>)
               
             </li>
           
@@ -9365,8 +9365,8 @@ Returns count of signals sent.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/advance.nim#L52" target="_blank" rel="noopener">
-            src/debra/typestates/advance.nim:52
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/advance.nim#L51" target="_blank" rel="noopener">
+            src/debra/typestates/advance.nim:51
           </a>
         
       </div>
@@ -9429,8 +9429,8 @@ Returns count of signals sent.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/advance.nim#L70" target="_blank" rel="noopener">
-            src/debra/typestates/advance.nim:70
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/advance.nim#L68" target="_blank" rel="noopener">
+            src/debra/typestates/advance.nim:68
           </a>
         
       </div>
@@ -9493,8 +9493,8 @@ Returns count of signals sent.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/advance.nim#L75" target="_blank" rel="noopener">
-            src/debra/typestates/advance.nim:75
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/advance.nim#L73" target="_blank" rel="noopener">
+            src/debra/typestates/advance.nim:73
           </a>
         
       </div>
