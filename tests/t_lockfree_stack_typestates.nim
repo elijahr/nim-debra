@@ -144,14 +144,7 @@ suite "Lockfree Stack Typestates":
       check false
 
   test "Memory reclamation after pop":
-    var reclaimedCount = 0
-
-    proc destroyNodeTracked(p: pointer) {.nimcall.} =
-      reclaimedCount.inc()
-      dealloc(p)
-
-    # We can't easily override the destroy function in the example,
-    # but we can verify that items are retired and reclamation is attempted
+    # Verify that items are retired and reclamation is attempted
     let stack = initStack[int](addr manager)
     var nonEmpty = stack.push(1)
     nonEmpty = nonEmpty.push(2)
