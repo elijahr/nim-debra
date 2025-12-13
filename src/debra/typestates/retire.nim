@@ -41,32 +41,6 @@ proc retireReadyFromRetired*[MaxThreads: static int](
   RetireReady[MaxThreads](RetireContext[MaxThreads](r))
 
 
-proc retire*[MaxThreads: static int](
-  r: sink RetireReady[MaxThreads],
-  data: pointer,
-  destructor: Destructor
-): Retired[MaxThreads] {.transition.} =
-  ## Retire an object. Will be reclaimed when safe.
-  let ctx = RetireContext[MaxThreads](r)
-  let state = addr ctx.handle.manager.threads[ctx.handle.idx]
-
-  # Ensure we have a bag with space
-  if state.currentBag == nil or state.currentBag.count >= LimboBagSize:
-    let newBag = allocLimboBag()
-    newBag.epoch = ctx.epoch
-    newBag.next = state.currentBag
-    if state.limboBagHead == nil:
-      state.limboBagHead = newBag
-    state.currentBag = newBag
-    if state.limboBagTail == nil:
-      state.limboBagTail = newBag
-
-  # Add object to bag
-  let bag = state.currentBag
-  bag.objects[bag.count] = RetiredObject(data: data, destructor: destructor)
-  inc bag.count
-
-  Retired[MaxThreads](ctx)
 
 
 proc retire*[T: ref, MaxThreads: static int](
@@ -77,8 +51,33 @@ proc retire*[T: ref, MaxThreads: static int](
   ##
   ## The object will be freed (via GC_unref) when its epoch
   ## becomes safe for reclamation.
-  let ctx = RetireContext[MaxThreads](r)
-  retire(RetireReady[MaxThreads](ctx), cast[pointer](obj.inner), unreffer[T]())
+
+  # Extract values we need before consuming r
+  let handle = RetireContext[MaxThreads](r).handle
+  let epoch = RetireContext[MaxThreads](r).epoch
+  let state = addr handle.manager.threads[handle.idx]
+
+  # Ensure we have a bag with space
+  if state.currentBag == nil or state.currentBag.count >= LimboBagSize:
+    let newBag = allocLimboBag()
+    newBag.epoch = epoch
+    newBag.next = state.currentBag
+    if state.limboBagHead == nil:
+      state.limboBagHead = newBag
+    state.currentBag = newBag
+    if state.limboBagTail == nil:
+      state.limboBagTail = newBag
+
+  # Add object to bag with type-specific unreffer
+  let bag = state.currentBag
+  bag.objects[bag.count] = RetiredObject(
+    data: cast[pointer](obj.inner),
+    destructor: unreffer[T]()
+  )
+  inc bag.count
+
+  # Consume r to create result
+  Retired[MaxThreads](RetireContext[MaxThreads](r))
 
 
 func handle*[MaxThreads: static int](r: RetireReady[MaxThreads]): ThreadHandle[MaxThreads] =
