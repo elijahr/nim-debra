@@ -37,6 +37,7 @@ The following example demonstrates the complete DEBRA+ lifecycle:
 - **Manager**: Coordinates epoch-based reclamation across threads
 - **Handle**: Per-thread registration for DEBRA operations
 - **Pin/Unpin**: Mark critical sections where shared data is accessed
+- **Managed[T]**: Wrapper type that prevents GC from collecting objects until retired
 - **Retire**: Mark removed objects for later safe reclamation
 - **Reclaim**: Free objects when all threads have advanced past their epoch
 

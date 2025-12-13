@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-12-13
+
+### Added
+
+- `Managed[T]` wrapper type for GC-integrated memory management
+  - Wraps `ref` objects and prevents GC collection via `GC_ref`
+  - Automatic cleanup via `GC_unref` during DEBRA reclamation
+  - Transparent field access via dot template
+  - Works with `Atomic[Managed[T]]` for lock-free data structures
+- `managed(obj)` proc to create managed objects from any `ref` type
+- `unreffer[T]()` proc generates type-specific destructors for reclamation
+- Multi-memory-manager CI testing (orc, arc, refc)
+
+### Changed
+
+- **BREAKING**: `retire()` now accepts `Managed[T]` instead of raw pointers
+  - Old: `retire(ptr, destructor)`
+  - New: `retire(managedObj)` - destructor is inferred automatically
+- **BREAKING**: Removed pointer-based retire API entirely
+- Updated `nimble test` task to run tests with all memory managers (orc, arc, refc)
+- All examples updated to use `Managed[T]` pattern
+- Documentation rewritten to use idiomatic Nim `ref` types instead of manual allocation
+
+### Migration Guide
+
+Replace pointer-based retire patterns:
+
+```nim
+# Old (0.1.x)
+let ptr = cast[pointer](alloc0(sizeof(Node)))
+let node = cast[ptr Node](ptr)
+node[] = Node(value: 42)
+discard ready.retire(ptr, proc(p: pointer) = dealloc(p))
+
+# New (0.2.0)
+type
+  NodeObj = object
+    value: int
+  Node = ref NodeObj
+
+let node = managed Node(value: 42)
+discard ready.retire(node)
+```
+
+For self-referential types (linked lists, trees), use the `ref Obj` pattern:
+
+```nim
+type
+  NodeObj[T] = object
+    value: T
+    next: Atomic[Managed[ref NodeObj[T]]]
+  Node[T] = ref NodeObj[T]
+```
+
 ## [0.1.2] - 2025-12-12
 
 ### Added
@@ -71,7 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/elijahr/nim-debra/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/elijahr/nim-debra/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/elijahr/nim-debra/releases/tag/v0.1.0

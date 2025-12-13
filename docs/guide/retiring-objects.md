@@ -10,14 +10,47 @@ Understanding how to retire objects for safe reclamation.
 
 When you remove an object from a lock-free data structure, you cannot immediately free it - other threads might still be accessing it. Instead, you **retire** the object, marking it for later reclamation when safe.
 
+## The Managed Type
+
+DEBRA uses the `Managed[T]` wrapper type to track objects that need epoch-based reclamation:
+
+```nim
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
+
+# Create a managed node - GC won't collect until retired
+let node = managed Node(value: 42)
+```
+
+The `managed()` proc calls `GC_ref` internally, preventing Nim's garbage collector from freeing the object. Only DEBRA's reclamation process (via `GC_unref`) can free it.
+
+## Self-Referential Types
+
+When a type references itself (like linked list nodes), use the `ref Obj` pattern:
+
+```nim
+# CORRECT - use ref Obj pattern for self-reference
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]  # Self-reference works
+  Node = ref NodeObj
+
+# INCORRECT - ref object inline won't work
+type
+  Node = ref object
+    value: int
+    next: Atomic[Managed[Node]]  # Won't compile
+```
+
+This is a Nim limitation with generic distinct types and forward references.
+
 ## Basic Retirement
 
-You must be pinned to retire objects. The `retire()` call takes:
-
-1. **Data pointer**: Pointer to the object being retired
-2. **Destructor**: Function to call when reclaiming
-
-## Single Object Retirement
+You must be pinned to retire objects:
 
 ```nim
 {% include-markdown "../../examples/retire_single.nim" %}
@@ -35,22 +68,20 @@ When retiring multiple objects in a single critical section, use `retireReadyFro
 
 [:material-file-code: View full source](https://github.com/elijahr/nim-debra/blob/main/examples/retire_multiple.nim)
 
-## Destructors
+## Accessing Managed Fields
 
-Destructors must have this signature:
-
-```nim
-proc myDestructor(p: pointer) {.nimcall.}
-```
-
-For objects allocated with `alloc`:
+The `Managed[T]` type provides transparent field access:
 
 ```nim
-proc simpleDestructor(p: pointer) {.nimcall.} =
-  dealloc(p)
-```
+let node = managed Node(value: 42, name: "test")
 
-If the object needs no cleanup (e.g., static memory), pass `nil` as the destructor.
+# Direct field access via dot template
+echo node.value  # 42
+echo node.name   # "test"
+
+# When you need the actual ref
+doSomething(node.inner)
+```
 
 ## Limbo Bags
 
@@ -66,14 +97,14 @@ Always unlink first, then retire:
 
 ```nim
 # RIGHT - retire after unlinking
-queue.head.store(newHead, moRelease)
-let ready = retireReady(pinned)
-discard ready.retire(oldHead, destroy)
+if head.compareExchange(oldHead, next, moRelease, moRelaxed):
+  let ready = retireReady(pinned)
+  discard ready.retire(oldHead)
 
 # WRONG - retire before unlinking (unsafe!)
 let ready = retireReady(pinned)
-discard ready.retire(oldHead, destroy)
-queue.head.store(newHead, moRelease)
+discard ready.retire(oldHead)
+head.store(next, moRelease)
 ```
 
 ## Best Practices
@@ -87,16 +118,8 @@ queue.head.store(newHead, moRelease)
 ### Don't Retire Objects That:
 
 - Are still reachable in the data structure
-- Are local to the current thread (just free them)
+- Are local to the current thread (just let them go out of scope)
 - Are static/global (they're never freed)
-
-## Memory Overhead
-
-Each retired object costs:
-
-- Pointer: 8 bytes
-- Destructor pointer: 8 bytes
-- Limbo bag overhead: ~1.5% per object
 
 ## Next Steps
 

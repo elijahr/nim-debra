@@ -8,6 +8,14 @@ DEBRA+ safe memory reclamation for lock-free data structures in Nim.
 
 ```nim
 import debra
+import std/atomics
+
+# Define your node type using ref Obj pattern
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
 
 # Initialize manager (one per process)
 var manager = initDebraManager[64]()
@@ -17,12 +25,15 @@ setGlobalManager(addr manager)
 let handle = registerThread(manager)
 
 # Critical section - pin to protect memory access
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
+# Create a managed node - GC won't collect until retired
+let node = managed Node(value: 42)
 # ... safely access lock-free data structures ...
 discard pinned.unpin()
 
 # Retire objects when they're no longer needed
-let retired = retireObject(pinned, ptr, destructor)
+let ready = retireReady(pinned)
+let retired = ready.retire(node)
 ```
 
 The typestate system ensures you cannot accidentally access memory outside a critical section, retire objects without being pinned, or perform operations in the wrong order. If it compiles, the protocol is correct.
@@ -51,11 +62,12 @@ For example, you cannot retire an object without being pinned:
 ```nim
 let handle = registerThread(manager)
 # This won't compile - must pin first!
-# let retired = retireObject(handle, ptr, destructor)
+# let ready = retireReady(handle)  # Error: handle is not Pinned
 
 # This is correct:
-let pinned = handle.pin()
-let retired = retireObject(pinned, ptr, destructor)
+let pinned = unpinned(handle).pin()
+let ready = retireReady(pinned)
+let retired = ready.retire(node)
 ```
 
 ## Key Features
@@ -63,7 +75,7 @@ let retired = retireObject(pinned, ptr, destructor)
 - **Typestate-enforced API** - Invalid operation sequences fail at compile time
 - **Signal-based neutralization** - Handles stalled threads for bounded memory usage
 - **Limbo bags** - Thread-local retire queues organized in 64-object batches
-- **Generic implementation** - Works with any pointer type and destructor
+- **Managed[T] wrapper** - Works with any `ref` type, integrates with Nim's GC
 - **O(mn) memory bound** - Where m = threads, n = objects per epoch
 - **Zero runtime overhead** - Typestate validation happens at compile time
 

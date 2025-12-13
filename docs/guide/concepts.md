@@ -44,7 +44,7 @@ Threads must pin the current epoch before accessing lock-free data structures:
 let value = queue.dequeue()
 
 # RIGHT - pinned during access
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 let value = queue.dequeue()
 discard pinned.unpin()
 ```
@@ -57,7 +57,7 @@ Retired objects are stored in thread-local limbo bags:
 
 - Each bag holds up to 64 objects
 - Bags are linked together forming a retire queue
-- Objects include destructor pointers for cleanup
+- Managed objects use `GC_unref` for cleanup when reclaimed
 - Organized by retirement epoch
 
 ### Limbo Bag Structure
@@ -95,7 +95,7 @@ DEBRA+ solves this with **neutralization**:
 
 ```nim
 # Thread 1: Pinned and working
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 # ... long computation ...
 let unpinResult = pinned.unpin()
 case unpinResult.kind:
@@ -104,7 +104,7 @@ of uUnpinned:
   discard
 of uNeutralized:
   # We were neutralized - acknowledge it
-  let unpinned = unpinResult.neutralized.acknowledge()
+  discard unpinResult.neutralized.acknowledge()
 ```
 
 ## Memory Bounds

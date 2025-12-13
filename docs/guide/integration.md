@@ -85,6 +85,21 @@ Combine stack states, DEBRA states, and bridges to the item processing pipeline:
 - **Zero runtime cost**: All validation is compile-time
 - **Module-qualified syntax**: Use `module.Typestate.State` in bridges for clarity
 
+### Self-Referential Types Pattern
+
+For types that reference themselves (linked lists, trees), use the `ref Obj` pattern:
+
+```nim
+# The ref Obj pattern for self-referential Managed types
+type
+  NodeObj[T] = object
+    value: T
+    next: Atomic[Managed[ref NodeObj[T]]]
+  Node[T] = ref NodeObj[T]
+```
+
+This pattern is required because Nim's type system cannot resolve `Managed[Node]` inside `Node`'s definition when `Node = ref object`.
+
 ## Best Practices
 
 ### 1. Minimize Critical Section Duration
@@ -144,12 +159,12 @@ discard pinned.unpin()
 
 ```nim
 # WRONG - retire before unlinking
-discard ready.retire(ptr, destroy)
+discard ready.retire(oldHead)
 queue.head.store(newHead, moRelease)
 
 # RIGHT - retire after unlinking
 queue.head.store(newHead, moRelease)
-discard ready.retire(ptr, destroy)
+discard ready.retire(oldHead)
 ```
 
 ### Sharing Handles
