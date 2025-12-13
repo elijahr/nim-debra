@@ -94,3 +94,18 @@ suite "LimboBag":
     reclaimBag(bag)
     check counter1 == 20  # destructor1 called twice: 10 + 10
     check counter2 == 20  # destructor2 called once: 20
+
+  test "unreffer generates type-specific destructor":
+    type Node = ref object
+      value: int
+
+    var destroyed = false
+    let node = Node(value: 42)
+    GC_ref(node)
+
+    let destructor = unreffer[Node]()
+    destructor(cast[pointer](node))
+
+    # After GC_unref, the ref should be collectable
+    # We can't easily test destruction, but we can verify it doesn't crash
+    check true

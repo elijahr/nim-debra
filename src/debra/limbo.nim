@@ -39,3 +39,12 @@ proc reclaimBag*(bag: ptr LimboBag) =
     if obj.destructor != nil:
       obj.destructor(obj.data)
   freeLimboBag(bag)
+
+
+proc unreffer*[T: ref](): Destructor =
+  ## Generate a destructor that calls GC_unref for type T.
+  ##
+  ## Used internally by retire() to create type-specific
+  ## destructors for Managed[T] objects.
+  result = proc(p: pointer) {.nimcall.} =
+    GC_unref(cast[T](p))
