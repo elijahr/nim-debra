@@ -2,6 +2,10 @@
 
 Understanding thread registration lifecycle in DEBRA+.
 
+## State Machine
+
+![Registration Typestate](../assets/diagrams/registration.svg)
+
 ## Overview
 
 Each thread must register with the DEBRA manager before performing pin/unpin operations. Registration allocates a thread slot and provides a handle for all subsequent operations.

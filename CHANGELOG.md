@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-12-12
+
+### Added
+
+- State machine diagrams for all typestate documentation
+  - `guard.svg` - EpochGuard pin/unpin lifecycle
+  - `retire.svg` - Object retirement flow
+  - `reclaim.svg` - Reclamation process
+  - `registration.svg` - Thread registration
+  - `neutralize.svg` - Neutralization protocol
+  - `advance.svg` - Epoch advancement
+  - `slot.svg` - Thread slot management
+  - `manager.svg` - Manager initialization
+  - `signal_handler.svg` - Signal handler states
+- Example typestate diagrams in integration guide
+  - `item_processing.svg` - Item processing pipeline
+  - `lockfree_stack.svg` - Lock-free stack states
+
 ## [0.1.1] - 2025-12-12
 
 ### Added
@@ -53,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/elijahr/nim-debra/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/elijahr/nim-debra/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/elijahr/nim-debra/releases/tag/v0.1.0

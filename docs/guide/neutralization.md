@@ -2,6 +2,10 @@
 
 Understanding the signal-based neutralization protocol.
 
+## State Machine
+
+![Neutralize Typestate](../assets/diagrams/neutralize.svg)
+
 ## Overview
 
 Neutralization solves the stalled thread problem: what happens when a thread stays pinned for a long time? Without intervention, it blocks reclamation and memory accumulates unboundedly.

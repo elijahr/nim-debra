@@ -2,6 +2,10 @@
 
 Understanding how to retire objects for safe reclamation.
 
+## State Machine
+
+![Retire Typestate](../assets/diagrams/retire.svg)
+
 ## Overview
 
 When you remove an object from a lock-free data structure, you cannot immediately free it - other threads might still be accessing it. Instead, you **retire** the object, marking it for later reclamation when safe.

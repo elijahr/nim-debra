@@ -2,6 +2,10 @@
 
 Understanding the pin/unpin lifecycle for critical sections.
 
+## State Machine
+
+![EpochGuard Typestate](../assets/diagrams/guard.svg)
+
 ## Overview
 
 The pin/unpin protocol marks critical sections where threads access lock-free data structures. Pinning prevents reclamation of objects from the current epoch.

@@ -56,6 +56,8 @@ Your code uses these directly. The compiler verifies you follow the protocol.
 
 ### Example: Item Processing Pipeline
 
+![Item Processing Typestate](../assets/diagrams/item_processing.svg)
+
 Define a typestate for processing items after they leave the data structure:
 
 ```nim
@@ -65,6 +67,8 @@ Define a typestate for processing items after they leave the data structure:
 [:material-file-code: View source](https://github.com/elijahr/nim-debra/blob/main/examples/item_processing.nim)
 
 ### Example: Stack with Typestate Composition
+
+![Lock-Free Stack Typestate](../assets/diagrams/lockfree_stack.svg)
 
 Combine stack states, DEBRA states, and bridges to the item processing pipeline:
 

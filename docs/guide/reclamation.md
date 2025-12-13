@@ -2,6 +2,10 @@
 
 Understanding safe memory reclamation in DEBRA+.
 
+## State Machine
+
+![Reclaim Typestate](../assets/diagrams/reclaim.svg)
+
 ## Overview
 
 Reclamation is the process of safely freeing retired objects. The reclamation system walks thread-local limbo bags and frees objects from old epochs that are no longer accessible.
