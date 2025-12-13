@@ -6,6 +6,7 @@ import typestates
 
 import ../types
 import ../limbo
+import ../managed
 import ./guard
 
 type
@@ -66,6 +67,18 @@ proc retire*[MaxThreads: static int](
   inc bag.count
 
   Retired[MaxThreads](ctx)
+
+
+proc retire*[T: ref, MaxThreads: static int](
+  r: sink RetireReady[MaxThreads],
+  obj: Managed[T]
+): Retired[MaxThreads] {.transition.} =
+  ## Retire a managed object for epoch-based reclamation.
+  ##
+  ## The object will be freed (via GC_unref) when its epoch
+  ## becomes safe for reclamation.
+  let ctx = RetireContext[MaxThreads](r)
+  retire(RetireReady[MaxThreads](ctx), cast[pointer](obj.inner), unreffer[T]())
 
 
 func handle*[MaxThreads: static int](r: RetireReady[MaxThreads]): ThreadHandle[MaxThreads] =
