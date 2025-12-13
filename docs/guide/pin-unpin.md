@@ -53,7 +53,7 @@ Avoid these while pinned:
 - **I/O operations**: Don't do file/network I/O while pinned
 - **Sleeping**: Don't call sleep or delay functions
 
-Why? Pinning blocks epoch advancement and prevents reclamation. Long critical sections waste memory.
+Why? While a thread is pinned, objects retired by other threads cannot be reclaimed. Long critical sections delay reclamation and cause memory to accumulate in limbo bags.
 
 ## Typestate Guarantees
 
