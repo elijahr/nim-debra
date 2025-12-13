@@ -4,15 +4,10 @@
 import debra
 import std/[atomics, os]
 
-type Node = object
-  value: int
-
-proc destroyNode(p: pointer) {.nimcall.} =
-  dealloc(p)
-
-proc allocNode(value: int): ptr Node =
-  result = cast[ptr Node](alloc0(sizeof(Node)))
-  result.value = value
+type
+  NodeObj = object
+    value: int
+  Node = ref NodeObj
 
 var
   manager: DebraManager[4]
@@ -44,9 +39,9 @@ proc workerThread() {.thread.} =
     let u = unpinned(handle)
     let pinned = u.pin()
 
-    let node = allocNode(i)
+    let node = managed Node(value: i)
     let ready = retireReady(pinned)
-    discard ready.retire(cast[pointer](node), destroyNode)
+    discard ready.retire(node)
 
     let unpinResult = pinned.unpin()
     case unpinResult.kind:
