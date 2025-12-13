@@ -20,6 +20,7 @@ import ./debra/typestates/reclaim
 import ./debra/typestates/neutralize
 import ./debra/typestates/advance
 import ./debra/typestates/slot
+import ./debra/managed
 
 export types
 export signal.setGlobalManager, signal.installSignalHandler
@@ -34,6 +35,7 @@ export reclaim
 export neutralize
 export advance
 export slot
+export managed
 
 proc registerThread*[MaxThreads: static int](
   manager: var DebraManager[MaxThreads]
