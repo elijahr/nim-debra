@@ -4,19 +4,12 @@
 import debra
 import std/atomics
 
-# Simple node type for demonstration
-type Node = object
-  value: int
-  next: ptr Node
-
-# Destructor for retired nodes
-proc destroyNode(p: pointer) {.nimcall.} =
-  dealloc(p)
-
-# Allocate a node
-proc allocNode(value: int): ptr Node =
-  result = cast[ptr Node](alloc0(sizeof(Node)))
-  result.value = value
+# Node type using ref object pattern for self-reference
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
 
 # Helper to perform one pin/unpin cycle with retirement
 proc doCycle(handle: ThreadHandle[4], manager: var DebraManager[4], value: int) =
@@ -24,12 +17,12 @@ proc doCycle(handle: ThreadHandle[4], manager: var DebraManager[4], value: int) 
   let u = unpinned(handle)
   let pinned = u.pin()
 
-  # Allocate and immediately retire a node (simulating removal from data structure)
-  let node = allocNode(value)
+  # Create a managed node (GC won't collect until retired)
+  let node = managed Node(value: value)
 
   # Retire the node for later reclamation
   let ready = retireReady(pinned)
-  discard ready.retire(cast[pointer](node), destroyNode)
+  discard ready.retire(node)
 
   # Exit critical section
   let unpinResult = pinned.unpin()
@@ -41,7 +34,7 @@ proc doCycle(handle: ThreadHandle[4], manager: var DebraManager[4], value: int) 
   of uNeutralized:
     discard unpinResult.neutralized.acknowledge()
 
-when isMainModule:
+proc main() =
   # 1. Initialize manager (supports up to 4 threads)
   var manager = initDebraManager[4]()
   setGlobalManager(addr manager)
@@ -70,3 +63,6 @@ when isMainModule:
     echo "Reclamation blocked (normal at startup)"
 
   echo "Basic usage example completed successfully"
+
+when isMainModule:
+  main()

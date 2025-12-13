@@ -1,63 +1,36 @@
 # examples/retire_single.nim
-## Retiring a single object for safe reclamation.
+## Single object retirement example.
 
 import debra
 import std/atomics
 
-type Node = object
-  value: int
-  next: ptr Node
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
 
-proc destroyNode(p: pointer) {.nimcall.} =
-  echo "Destroying node with value: ", cast[ptr Node](p).value
-  dealloc(p)
-
-proc allocNode(value: int): ptr Node =
-  result = cast[ptr Node](alloc0(sizeof(Node)))
-  result.value = value
-
-proc retireSingleDemo() =
-  var manager = initDebraManager[64]()
+proc main() =
+  var manager = initDebraManager[4]()
   setGlobalManager(addr manager)
-
   let handle = registerThread(manager)
 
-  # Retire a single object
-  let u = unpinned(handle)
-  let pinned = u.pin()
+  # Enter critical section
+  let pinned = unpinned(handle).pin()
 
-  # Simulate removing a node from a data structure
-  let node = allocNode(42)
-  echo "Allocated node with value: ", node.value
+  # Create a managed node
+  let node = managed Node(value: 42)
+  echo "Created node with value: ", node.value
 
-  # Retire the node - it will be reclaimed when safe
+  # Retire the node
   let ready = retireReady(pinned)
-  discard ready.retire(cast[pointer](node), destroyNode)
-  echo "Node retired, waiting for safe reclamation"
+  discard ready.retire(node)
+  echo "Node retired for later reclamation"
 
-  let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  # Exit critical section
+  discard pinned.unpin()
 
-  # Advance epochs to make reclamation possible
-  manager.advance()
-  manager.advance()
-  manager.advance()
-
-  # Reclaim
-  let reclaimResult = reclaimStart(addr manager)
-    .loadEpochs()
-    .checkSafe()
-
-  case reclaimResult.kind:
-  of rReclaimReady:
-    let count = reclaimResult.reclaimready.tryReclaim()
-    echo "Reclaimed ", count, " object(s)"
-  of rReclaimBlocked:
-    echo "Reclamation blocked"
-
-  echo "Retire single example completed successfully"
+  echo "Single retirement example completed"
 
 when isMainModule:
-  retireSingleDemo()
+  main()

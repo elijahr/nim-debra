@@ -1,60 +1,38 @@
 # examples/retire_multiple.nim
-## Retiring multiple objects in a single critical section.
+## Multiple object retirement example.
 
 import debra
 import std/atomics
 
-type Node = object
-  value: int
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
 
-proc destroyNode(p: pointer) {.nimcall.} =
-  dealloc(p)
-
-proc allocNode(value: int): ptr Node =
-  result = cast[ptr Node](alloc0(sizeof(Node)))
-  result.value = value
-
-proc retireMultipleDemo() =
-  var manager = initDebraManager[64]()
+proc main() =
+  var manager = initDebraManager[4]()
   setGlobalManager(addr manager)
-
   let handle = registerThread(manager)
 
-  # Retire multiple objects in one critical section
-  let u = unpinned(handle)
-  let pinned = u.pin()
+  # Enter critical section
+  let pinned = unpinned(handle).pin()
 
-  # Simulate batch removal from a data structure
+  # Retire multiple nodes in a single critical section
   var ready = retireReady(pinned)
-  for i in 0..<5:
-    let node = allocNode(i * 10)
-    let retired = ready.retire(cast[pointer](node), destroyNode)
-    # Get ready state back for next retirement
+
+  for i in 1..5:
+    let node = managed Node(value: i * 10)
+    echo "Retiring node with value: ", node.value
+    let retired = ready.retire(node)
     ready = retireReadyFromRetired(retired)
-    echo "Retired node ", i
 
-  let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  echo "Retired 5 nodes"
 
-  # Advance epochs
-  for _ in 0..<3:
-    manager.advance()
+  # Exit critical section
+  discard pinned.unpin()
 
-  # Reclaim all
-  let reclaimResult = reclaimStart(addr manager)
-    .loadEpochs()
-    .checkSafe()
-
-  case reclaimResult.kind:
-  of rReclaimReady:
-    let count = reclaimResult.reclaimready.tryReclaim()
-    echo "Reclaimed ", count, " objects"
-  of rReclaimBlocked:
-    echo "Reclamation blocked"
-
-  echo "Retire multiple example completed successfully"
+  echo "Multiple retirement example completed"
 
 when isMainModule:
-  retireMultipleDemo()
+  main()

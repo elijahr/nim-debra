@@ -1,22 +1,29 @@
 # examples/pin_unpin.nim
-## Pin/unpin protocol: critical sections and neutralization handling.
+## Pin/unpin lifecycle example with neutralization handling.
 
 import debra
 import std/atomics
 
-when isMainModule:
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
+
+proc main() =
   var manager = initDebraManager[4]()
   setGlobalManager(addr manager)
-
   let handle = registerThread(manager)
 
   # Basic pin/unpin cycle
-  block basicCycle:
-    let u = unpinned(handle)
-    let pinned = u.pin()
+  echo "=== Basic Pin/Unpin ==="
+  block:
+    let pinned = unpinned(handle).pin()
+    echo "Thread pinned at epoch: ", pinned.epoch
 
-    # Access lock-free data structures here
-    # All reads/writes to shared data should happen while pinned
+    # Do work while pinned...
+    let node = managed Node(value: 42)
+    echo "Created node: ", node.value
 
     let unpinResult = pinned.unpin()
     case unpinResult.kind:
@@ -26,24 +33,31 @@ when isMainModule:
       echo "Was neutralized - acknowledging"
       discard unpinResult.neutralized.acknowledge()
 
-  # Demonstrate neutralization handling
-  block neutralizationDemo:
-    let u = unpinned(handle)
-    let pinned = u.pin()
+  # Multiple pin/unpin cycles
+  echo ""
+  echo "=== Multiple Cycles ==="
+  for i in 1..3:
+    let pinned = unpinned(handle).pin()
+    echo "Cycle ", i, ": pinned at epoch ", pinned.epoch
 
-    # Simulate being neutralized by setting the flag directly
-    manager.threads[handle.idx].neutralized.store(true, moRelease)
+    # Retire a node
+    let node = managed Node(value: i * 100)
+    let ready = retireReady(pinned)
+    discard ready.retire(node)
 
     let unpinResult = pinned.unpin()
     case unpinResult.kind:
     of uUnpinned:
-      echo "Normal unpin (unexpected)"
+      echo "Cycle ", i, ": unpinned normally"
     of uNeutralized:
-      echo "Detected neutralization - must acknowledge before re-pinning"
-      let acknowledged = unpinResult.neutralized.acknowledge()
-      # Now we can pin again
-      let pinned2 = acknowledged.pin()
-      discard pinned2.unpin()
-      echo "Successfully re-pinned after acknowledgment"
+      echo "Cycle ", i, ": neutralized"
+      discard unpinResult.neutralized.acknowledge()
 
-  echo "Pin/unpin example completed successfully"
+    # Advance epoch between cycles
+    manager.advance()
+
+  echo ""
+  echo "Pin/unpin example completed"
+
+when isMainModule:
+  main()
