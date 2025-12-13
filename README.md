@@ -13,7 +13,7 @@ nim-debra implements the DEBRA+ algorithm (Distributed Epoch-Based Reclamation w
 
 ## Features
 
-- **Generic** - Works with any pointer type
+- **Managed[T] wrapper** - Works with any `ref` type, integrates with Nim's GC
 - **Typestate-enforced** - Correct operation sequencing validated at compile-time
 - **Signal-based neutralization** - Handles stalled threads for bounded memory
 - **O(mn) memory bound** - Where m = threads, n = hazardous pointers per thread
@@ -41,6 +41,14 @@ nimble install debra
 
 ```nim
 import debra
+import std/atomics
+
+# Define node type using ref Obj pattern for self-reference
+type
+  NodeObj = object
+    value: int
+    next: Atomic[Managed[ref NodeObj]]
+  Node = ref NodeObj
 
 # Initialize manager (one per process)
 var manager = initDebraManager[64]()
@@ -50,8 +58,15 @@ setGlobalManager(addr manager)
 let handle = registerThread(manager)
 
 # Critical section
-let pinned = handle.pin()
-# ... access shared data ...
+let pinned = unpinned(handle).pin()
+
+# Create managed objects - GC won't collect until retired
+let node = managed Node(value: 42)
+
+# Retire objects for later reclamation
+let ready = retireReady(pinned)
+discard ready.retire(node)
+
 discard pinned.unpin()
 ```
 
