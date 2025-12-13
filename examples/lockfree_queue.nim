@@ -1,118 +1,95 @@
 # examples/lockfree_queue.nim
-## Complete lock-free queue (Michael-Scott) with DEBRA+ memory reclamation.
+## Lock-free Michael-Scott queue with DEBRA reclamation.
 
 import debra
 import std/[atomics, options]
 
 type
-  QueueNode[T] = object
+  NodeObj[T] = object
     value: T
-    next: Atomic[ptr QueueNode[T]]
+    next: Atomic[Managed[ref NodeObj[T]]]
+  Node[T] = ref NodeObj[T]
 
-  LockFreeQueue*[T] = object
-    head: Atomic[ptr QueueNode[T]]
-    tail: Atomic[ptr QueueNode[T]]
+  Queue*[T] = object
+    head: Atomic[Managed[ref NodeObj[T]]]
+    tail: Atomic[Managed[ref NodeObj[T]]]
     manager: ptr DebraManager[64]
     handle: ThreadHandle[64]
 
-proc destroyQueueNode[T](p: pointer) {.nimcall.} =
-  dealloc(p)
-
-proc initQueue*[T](manager: ptr DebraManager[64]): LockFreeQueue[T] =
-  # Create sentinel node
-  let sentinel = cast[ptr QueueNode[T]](alloc0(sizeof(QueueNode[T])))
-  sentinel.next.store(nil, moRelaxed)
-
-  result.head.store(sentinel, moRelaxed)
-  result.tail.store(sentinel, moRelaxed)
+proc newQueue*[T](manager: ptr DebraManager[64]): Queue[T] =
   result.manager = manager
   result.handle = registerThread(manager[])
 
-proc enqueue*[T](queue: var LockFreeQueue[T], value: T) =
-  let u = unpinned(queue.handle)
-  let pinned = u.pin()
+  # Create sentinel node
+  let sentinel = managed Node[T]()
+  result.head.store(sentinel, moRelaxed)
+  result.tail.store(sentinel, moRelaxed)
 
-  let newNode = cast[ptr QueueNode[T]](alloc0(sizeof(QueueNode[T])))
-  newNode.value = value
-  newNode.next.store(nil, moRelaxed)
+proc enqueue*[T](queue: var Queue[T], value: T) =
+  let pinned = unpinned(queue.handle).pin()
 
-  var done = false
-  while not done:
+  let newNode = managed Node[T](value: value)
+
+  while true:
     var tail = queue.tail.load(moAcquire)
-    var next = tail.next.load(moAcquire)
+    let next = tail.inner.next.load(moAcquire)
 
-    if next == nil:
-      var expected: ptr QueueNode[T] = nil
-      if tail.next.compareExchange(expected, newNode, moRelease, moRelaxed):
+    if next.isNil:
+      var expected: Managed[Node[T]]
+      if tail.inner.next.compareExchange(expected, newNode, moRelease, moRelaxed):
         discard queue.tail.compareExchange(tail, newNode, moRelease, moRelaxed)
-        done = true
+        break
     else:
       discard queue.tail.compareExchange(tail, next, moRelease, moRelaxed)
 
-  let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  discard pinned.unpin()
 
-proc dequeue*[T](queue: var LockFreeQueue[T]): Option[T] =
-  let u = unpinned(queue.handle)
-  let pinned = u.pin()
+proc dequeue*[T](queue: var Queue[T]): Option[T] =
+  let pinned = unpinned(queue.handle).pin()
 
-  var done = false
-  result = none(T)
-
-  while not done:
+  while true:
     var head = queue.head.load(moAcquire)
     var tail = queue.tail.load(moAcquire)
-    let next = head.next.load(moAcquire)
+    let next = head.inner.next.load(moAcquire)
 
-    if next != nil:
-      if head == tail:
-        # Tail is lagging, help advance it
-        discard queue.tail.compareExchange(tail, next, moRelease, moRelaxed)
-      else:
-        if queue.head.compareExchange(head, next, moRelease, moRelaxed):
-          result = some(next.value)
-
-          # Retire old head (sentinel) for safe reclamation
-          let ready = retireReady(pinned)
-          discard ready.retire(cast[pointer](head), destroyQueueNode[T])
-
-          done = true
+    if head == tail:
+      if next.isNil:
+        discard pinned.unpin()
+        return none(T)
+      discard queue.tail.compareExchange(tail, next, moRelease, moRelaxed)
     else:
-      done = true  # Queue is empty
+      let value = next.value
+      if queue.head.compareExchange(head, next, moRelease, moRelaxed):
+        # Retire old head (sentinel)
+        let ready = retireReady(pinned)
+        discard ready.retire(head)
 
-  let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+        discard pinned.unpin()
+        return some(value)
 
-when isMainModule:
+proc main() =
   var manager = initDebraManager[64]()
   setGlobalManager(addr manager)
 
-  var queue = initQueue[int](addr manager)
+  var queue = newQueue[int](addr manager)
 
-  # Enqueue some values
-  for i in 1..5:
-    queue.enqueue(i * 10)
-    echo "Enqueued: ", i * 10
+  echo "Enqueueing 1, 2, 3..."
+  queue.enqueue(1)
+  queue.enqueue(2)
+  queue.enqueue(3)
 
-  # Dequeue all values
+  echo "Dequeueing..."
   while true:
-    let value = queue.dequeue()
-    if value.isNone:
+    let item = queue.dequeue()
+    if item.isNone:
       break
-    echo "Dequeued: ", value.get
+    echo "  Dequeued: ", item.get
 
-  # Advance and reclaim
+  # Reclaim
   for _ in 0..3:
     manager.advance()
 
-  let reclaimResult = reclaimStart(addr manager)
-    .loadEpochs()
-    .checkSafe()
-
+  let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
   case reclaimResult.kind:
   of rReclaimReady:
     let count = reclaimResult.reclaimready.tryReclaim()
@@ -120,4 +97,7 @@ when isMainModule:
   of rReclaimBlocked:
     echo "Reclamation blocked"
 
-  echo "Lock-free queue example completed successfully"
+  echo "Lock-free queue example completed"
+
+when isMainModule:
+  main()
