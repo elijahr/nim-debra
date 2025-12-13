@@ -970,6 +970,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#unreffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unreffer
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2614,6 +2625,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#unreffer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unreffer
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3983,8 +4005,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L38" target="_blank" rel="noopener">
-            src/debra.nim:38
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L40" target="_blank" rel="noopener">
+            src/debra.nim:40
           </a>
         
       </div>
@@ -4053,8 +4075,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L57" target="_blank" rel="noopener">
-            src/debra.nim:57
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L59" target="_blank" rel="noopener">
+            src/debra.nim:59
           </a>
         
       </div>
@@ -4116,8 +4138,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L68" target="_blank" rel="noopener">
-            src/debra.nim:68
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L70" target="_blank" rel="noopener">
+            src/debra.nim:70
           </a>
         
       </div>
@@ -4184,8 +4206,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L75" target="_blank" rel="noopener">
-            src/debra.nim:75
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L77" target="_blank" rel="noopener">
+            src/debra.nim:77
           </a>
         
       </div>
@@ -4814,6 +4836,59 @@ together forming a thread-local retire queue.</p>
         
           <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/limbo.nim#L35" target="_blank" rel="noopener">
             src/debra/limbo.nim:35
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="unreffer" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">unreffer</span>
+      
+    <a href="#unreffer" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim">proc unreffer(): Destructor</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Generate a destructor that calls GC_unref for type T.</p>
+<p>Used internally by retire() to create type-specific
+destructors for Managed[T] objects.</p>
+      </div>
+    
+
+    
+
+    
+      <div class="doc-section doc-section-returns">
+        <h5>Returns</h5>
+        <p><code>Destructor</code></p>
+      </div>
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/limbo.nim#L44" target="_blank" rel="noopener">
+            src/debra/limbo.nim:44
           </a>
         
       </div>
@@ -7538,8 +7613,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L12" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:12
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L13" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:13
           </a>
         
       </div>
@@ -7571,8 +7646,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L16" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:16
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L17" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:17
           </a>
         
       </div>
@@ -7604,8 +7679,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L17" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:17
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L18" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:18
           </a>
         
       </div>
@@ -7668,8 +7743,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L26" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:26
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L27" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:27
           </a>
         
       </div>
@@ -7732,8 +7807,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L36" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:36
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L37" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:37
           </a>
         
       </div>
@@ -7761,14 +7836,16 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retire(r: sink RetireReady[MaxThreads]; data: pointer; destructor: Destructor): Retired[MaxThreads]</code></pre>
+      <pre><code class="language-nim">proc retire(r: sink RetireReady[MaxThreads]; obj: Managed[T]): Retired[MaxThreads]</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Retire an object. Will be reclaimed when safe.</p>
+        <p>Retire a managed object for epoch-based reclamation.</p>
+<p>The object will be freed (via GC_unref) when its epoch
+becomes safe for reclamation.</p>
       </div>
     
 
@@ -7784,14 +7861,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
             </li>
           
             <li>
-              <code>data</code>
-              (<code>pointer</code>)
-              
-            </li>
-          
-            <li>
-              <code>destructor</code>
-              (<code>Destructor</code>)
+              <code>obj</code>
+              (<code>Managed[T]</code>)
               
             </li>
           
@@ -7812,8 +7883,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L43" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:43
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L46" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:46
           </a>
         
       </div>
@@ -7872,8 +7943,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L71" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:71
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L83" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:83
           </a>
         
       </div>
