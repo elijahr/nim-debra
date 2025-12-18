@@ -80,5 +80,40 @@ proc retire*[T: ref, MaxThreads: static int](
   Retired[MaxThreads](RetireContext[MaxThreads](r))
 
 
+proc retire*[MaxThreads: static int](
+  r: sink RetireReady[MaxThreads],
+  p: pointer,
+  destructor: Destructor
+): Retired[MaxThreads] {.transition.} =
+  ## Retire a raw pointer for epoch-based reclamation.
+  ##
+  ## The destructor will be called when the epoch becomes safe.
+  ## Use for manually-managed memory (ptr types, alloc/dealloc, etc.)
+
+  # Extract values we need before consuming r
+  let handle = RetireContext[MaxThreads](r).handle
+  let epoch = RetireContext[MaxThreads](r).epoch
+  let state = addr handle.manager.threads[handle.idx]
+
+  # Ensure we have a bag with space
+  if state.currentBag == nil or state.currentBag.count >= LimboBagSize:
+    let newBag = allocLimboBag()
+    newBag.epoch = epoch
+    newBag.next = state.currentBag
+    if state.limboBagHead == nil:
+      state.limboBagHead = newBag
+    state.currentBag = newBag
+    if state.limboBagTail == nil:
+      state.limboBagTail = newBag
+
+  # Add object to bag with provided destructor
+  let bag = state.currentBag
+  bag.objects[bag.count] = RetiredObject(data: p, destructor: destructor)
+  inc bag.count
+
+  # Consume r to create result
+  Retired[MaxThreads](RetireContext[MaxThreads](r))
+
+
 func handle*[MaxThreads: static int](r: RetireReady[MaxThreads]): ThreadHandle[MaxThreads] =
   RetireContext[MaxThreads](r).handle
