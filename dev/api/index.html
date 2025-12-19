@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
@@ -28,7 +28,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1806,6 +1806,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#retire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        retire
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#handle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3461,6 +3472,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#retire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        retire
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#handle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4005,8 +4027,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L40" target="_blank" rel="noopener">
-            src/debra.nim:40
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L42" target="_blank" rel="noopener">
+            src/debra.nim:42
           </a>
         
       </div>
@@ -4075,8 +4097,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L59" target="_blank" rel="noopener">
-            src/debra.nim:59
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L61" target="_blank" rel="noopener">
+            src/debra.nim:61
           </a>
         
       </div>
@@ -4138,8 +4160,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L70" target="_blank" rel="noopener">
-            src/debra.nim:70
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L72" target="_blank" rel="noopener">
+            src/debra.nim:72
           </a>
         
       </div>
@@ -4206,8 +4228,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L77" target="_blank" rel="noopener">
-            src/debra.nim:77
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L79" target="_blank" rel="noopener">
+            src/debra.nim:79
           </a>
         
       </div>
@@ -7895,6 +7917,88 @@ becomes safe for reclamation.</p>
     
       
       
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="retire" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">retire</span>
+      
+        
+          <span class="doc-label" data-label="transition">transition</span>
+        
+      
+    <a href="#retire" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim">proc retire(r: sink RetireReady[MaxThreads]; p: pointer; destructor: Destructor): Retired[MaxThreads]</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Retire a raw pointer for epoch-based reclamation.</p>
+<p>The destructor will be called when the epoch becomes safe.
+Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-parameters">
+        <h5>Parameters</h5>
+        <ul>
+          
+            <li>
+              <code>r</code>
+              (<code>sink RetireReady[MaxThreads]</code>)
+              
+            </li>
+          
+            <li>
+              <code>p</code>
+              (<code>pointer</code>)
+              
+            </li>
+          
+            <li>
+              <code>destructor</code>
+              (<code>Destructor</code>)
+              
+            </li>
+          
+        </ul>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-returns">
+        <h5>Returns</h5>
+        <p><code>Retired[MaxThreads]</code></p>
+      </div>
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L83" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:83
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
         <div class="doc doc-object doc-func">
   
 
@@ -7943,8 +8047,8 @@ becomes safe for reclamation.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L83" target="_blank" rel="noopener">
-            src/debra/typestates/retire.nim:83
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/retire.nim#L118" target="_blank" rel="noopener">
+            src/debra/typestates/retire.nim:118
           </a>
         
       </div>
@@ -9675,10 +9779,10 @@ Returns count of signals sent.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.annotate", "navigation.instant", "navigation.sections", "navigation.expand", "toc.follow"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.annotate", "navigation.instant", "navigation.sections", "navigation.expand", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
         <script src="../js/timeago.min.js"></script>
       
