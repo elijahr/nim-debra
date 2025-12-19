@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2025-12-18
+
+### Added
+
+- Pointer-based `retire(ptr, destructor)` API for lock-free memory reclamation
+  - Enables truly lock-free code on all memory managers (arc, orc, refc)
+  - Use with `ptr T` and `alloc0`/`dealloc` for lock-free data structures
+- `retireAndReclaim(handle, ptr, destructor)` convenience proc
+  - Combines pin, retire, unpin, and reclaim into a single call
+  - Optional `eager` parameter controls immediate reclamation attempt
+- `retireAndReclaim(handle, Managed[ref T])` overload for managed refs
+- Lock-free guarantees documentation in README
+  - Compile-time checks section
+  - `isLockFree` verification examples
+  - Recommended patterns for lock-free code
+
+### Changed
+
+- `Managed[ref T]` now emits compile-time error on arc/orc by default
+  - `Atomic[ref T]` uses spinlocks on arc/orc, defeating lock-free guarantees
+  - Use `-d:allowSpinlockManagedRef` to opt-in to spinlock fallback
+  - Pointer-based retire API recommended for lock-free code
+- Updated README Quick Start with both high-level and low-level API examples
+
 ## [0.2.0] - 2025-12-13
 
 ### Added
@@ -125,7 +149,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/elijahr/nim-debra/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/elijahr/nim-debra/compare/v0.1.0...v0.1.1

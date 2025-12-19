@@ -18,6 +18,65 @@ nim-debra implements the DEBRA+ algorithm (Distributed Epoch-Based Reclamation w
 - **Signal-based neutralization** - Handles stalled threads for bounded memory
 - **O(mn) memory bound** - Where m = threads, n = hazardous pointers per thread
 
+## Lock-Free Guarantees
+
+nim-debra is designed for lock-free concurrent data structures. To ensure your code is truly lock-free:
+
+### Compile-Time Checks
+
+Nim's atomics module supports `-d:nimEnforceLockFreeAtomics` to emit compile-time errors when using types that would fall back to spinlocks.
+
+nim-debra adds additional checks by default:
+
+- **Managed[ref T] on arc/orc**: Errors by default since `Atomic[ref T]` uses spinlocks. Use `-d:allowSpinlockManagedRef` to allow.
+- **Generic lock-free enforcement**: Use `-d:nimEnforceLockFreeAtomics` to catch other spinlock fallbacks.
+
+### Verifying Lock-Free Status
+
+Use `isLockFree` to check types at compile-time:
+
+```nim
+import std/atomics
+
+static:
+  assert int.isLockFree           # true on all platforms
+  assert pointer.isLockFree       # true on all platforms
+  assert uint64.isLockFree        # true on 64-bit platforms
+
+  # ref types are NOT lock-free on arc/orc!
+  when defined(gcArc) or defined(gcOrc):
+    doAssert not (ref object).isLockFree
+```
+
+### Recommended Patterns for Lock-Free Code
+
+For maximum portability and guaranteed lock-free operation:
+
+- **Use `ptr T`** with `alloc0`/`dealloc` for data structure nodes
+- **Use pointer-based retire**: `retire(ptr, destructor)` instead of `retire(Managed[ref T])`
+- **Test with multiple memory managers**: Test with both `--mm:arc` and `--mm:refc`
+- **Enable enforcement in CI**: Use `-d:nimEnforceLockFreeAtomics` in continuous integration
+
+Example lock-free node:
+
+```nim
+type
+  NodeObj = object
+    value: int
+    next: Atomic[ptr NodeObj]
+
+# Allocate
+let node = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
+node.value = 42
+
+# Retire with custom destructor
+proc destroyNode(p: pointer) {.nimcall.} =
+  dealloc(p)
+
+let ready = retireReady(pinned)
+discard ready.retire(node, destroyNode)
+```
+
 ## Documentation
 
 Full documentation is available at **[elijahr.github.io/nim-debra](https://elijahr.github.io/nim-debra/latest/)**.
@@ -39,6 +98,39 @@ nimble install debra
 
 ## Quick Start
 
+### High-Level Convenience API
+
+For simple retire + reclaim workflows:
+
+```nim
+import debra
+
+type
+  NodeObj = object
+    value: int
+    next: ptr NodeObj
+
+# Custom destructor
+proc destroyNode(p: pointer) {.nimcall.} =
+  dealloc(p)
+
+# Initialize manager and register thread
+var manager = initDebraManager[64]()
+setGlobalManager(addr manager)
+let handle = registerThread(manager)
+
+# Allocate node
+let node = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
+node.value = 42
+
+# Retire and try to reclaim in one call
+retireAndReclaim(handle, node, destroyNode)
+```
+
+### Low-Level Typestate API
+
+For batching operations or fine-grained control:
+
 ```nim
 import debra
 import std/atomics
@@ -57,7 +149,7 @@ setGlobalManager(addr manager)
 # Register thread (once per thread)
 let handle = registerThread(manager)
 
-# Critical section
+# Pin for critical section
 let pinned = unpinned(handle).pin()
 
 # Create managed objects - GC won't collect until retired
@@ -67,7 +159,13 @@ let node = managed Node(value: 42)
 let ready = retireReady(pinned)
 discard ready.retire(node)
 
+# Unpin when leaving critical section
 discard pinned.unpin()
+
+# Explicitly reclaim when appropriate
+let reclaim = reclaimStart(addr manager).loadEpochs().checkSafe()
+if reclaim.kind == rReclaimReady:
+  discard reclaim.reclaimready.tryReclaim()
 ```
 
 ## References

@@ -14,8 +14,19 @@ type
 proc managed*[T: ref](obj: T): Managed[T] =
   ## Create a managed ref object.
   ##
+  ## WARNING: Atomic[Managed[ref T]] uses spinlocks on arc/orc memory managers.
+  ## For truly lock-free code, use pointer-based retire API with ptr T instead.
+  ##
+  ## To allow spinlock fallback, compile with: -d:allowSpinlockManagedRef
+  ##
   ## Calls GC_ref to prevent garbage collection.
   ## Object will only be freed when retired and epoch-safe.
+  when not defined(allowSpinlockManagedRef):
+    when defined(gcArc) or defined(gcOrc) or defined(gcAtomicArc):
+      {.error: "Managed[ref T] is not lock-free on arc/orc memory managers. " &
+               "Atomic operations on ref types use spinlocks, defeating lock-free guarantees. " &
+               "Use pointer-based retire(ptr, destructor) API instead, or " &
+               "compile with -d:allowSpinlockManagedRef to explicitly allow spinlock fallback.".}
   GC_ref(obj)
   Managed[T](obj)
 
