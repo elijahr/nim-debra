@@ -97,6 +97,28 @@
   --doc-symbol-class-bg-color: #0550ae1a;
   --doc-symbol-type_alias-bg-color: #0550ae1a;
   --doc-symbol-module-bg-color: #5cad0f1a;
+
+  /* Nim-specific symbol colors */
+  --doc-symbol-const-fg-color: #cf222e;
+  --doc-symbol-const-bg-color: #cf222e1a;
+  --doc-symbol-var-fg-color: #953800;
+  --doc-symbol-var-bg-color: #9538001a;
+  --doc-symbol-let-fg-color: #953800;
+  --doc-symbol-let-bg-color: #9538001a;
+  --doc-symbol-type-fg-color: #0550ae;
+  --doc-symbol-type-bg-color: #0550ae1a;
+  --doc-symbol-proc-fg-color: #8250df;
+  --doc-symbol-proc-bg-color: #8250df1a;
+  --doc-symbol-func-fg-color: #8250df;
+  --doc-symbol-func-bg-color: #8250df1a;
+  --doc-symbol-iterator-fg-color: #8250df;
+  --doc-symbol-iterator-bg-color: #8250df1a;
+  --doc-symbol-template-fg-color: #8250df;
+  --doc-symbol-template-bg-color: #8250df1a;
+  --doc-symbol-macro-fg-color: #8250df;
+  --doc-symbol-macro-bg-color: #8250df1a;
+  --doc-symbol-converter-fg-color: #8250df;
+  --doc-symbol-converter-bg-color: #8250df1a;
 }
 
 [data-md-color-scheme="slate"] {
@@ -117,6 +139,28 @@
   --doc-symbol-class-bg-color: #79c0ff1a;
   --doc-symbol-type_alias-bg-color: #79c0ff1a;
   --doc-symbol-module-bg-color: #baff791a;
+
+  /* Nim-specific symbol colors (dark mode) */
+  --doc-symbol-const-fg-color: #ff7b72;
+  --doc-symbol-const-bg-color: #ff7b721a;
+  --doc-symbol-var-fg-color: #ffa657;
+  --doc-symbol-var-bg-color: #ffa6571a;
+  --doc-symbol-let-fg-color: #ffa657;
+  --doc-symbol-let-bg-color: #ffa6571a;
+  --doc-symbol-type-fg-color: #79c0ff;
+  --doc-symbol-type-bg-color: #79c0ff1a;
+  --doc-symbol-proc-fg-color: #d2a8ff;
+  --doc-symbol-proc-bg-color: #d2a8ff1a;
+  --doc-symbol-func-fg-color: #d2a8ff;
+  --doc-symbol-func-bg-color: #d2a8ff1a;
+  --doc-symbol-iterator-fg-color: #d2a8ff;
+  --doc-symbol-iterator-bg-color: #d2a8ff1a;
+  --doc-symbol-template-fg-color: #d2a8ff;
+  --doc-symbol-template-bg-color: #d2a8ff1a;
+  --doc-symbol-macro-fg-color: #d2a8ff;
+  --doc-symbol-macro-bg-color: #d2a8ff1a;
+  --doc-symbol-converter-fg-color: #d2a8ff;
+  --doc-symbol-converter-bg-color: #d2a8ff1a;
 }
 
 code.doc-symbol {
@@ -207,6 +251,107 @@ code.doc-symbol-module::after {
   content: "mod";
 }
 
+/* Nim-specific symbol styles */
+code.doc-symbol-const,
+a code.doc-symbol-const {
+  color: var(--doc-symbol-const-fg-color);
+  background-color: var(--doc-symbol-const-bg-color);
+}
+
+code.doc-symbol-const::after {
+  content: "const";
+}
+
+code.doc-symbol-var,
+a code.doc-symbol-var {
+  color: var(--doc-symbol-var-fg-color);
+  background-color: var(--doc-symbol-var-bg-color);
+}
+
+code.doc-symbol-var::after {
+  content: "var";
+}
+
+code.doc-symbol-let,
+a code.doc-symbol-let {
+  color: var(--doc-symbol-let-fg-color);
+  background-color: var(--doc-symbol-let-bg-color);
+}
+
+code.doc-symbol-let::after {
+  content: "let";
+}
+
+code.doc-symbol-type,
+a code.doc-symbol-type {
+  color: var(--doc-symbol-type-fg-color);
+  background-color: var(--doc-symbol-type-bg-color);
+}
+
+code.doc-symbol-type::after {
+  content: "type";
+}
+
+code.doc-symbol-proc,
+a code.doc-symbol-proc {
+  color: var(--doc-symbol-proc-fg-color);
+  background-color: var(--doc-symbol-proc-bg-color);
+}
+
+code.doc-symbol-proc::after {
+  content: "proc";
+}
+
+code.doc-symbol-func,
+a code.doc-symbol-func {
+  color: var(--doc-symbol-func-fg-color);
+  background-color: var(--doc-symbol-func-bg-color);
+}
+
+code.doc-symbol-func::after {
+  content: "func";
+}
+
+code.doc-symbol-iterator,
+a code.doc-symbol-iterator {
+  color: var(--doc-symbol-iterator-fg-color);
+  background-color: var(--doc-symbol-iterator-bg-color);
+}
+
+code.doc-symbol-iterator::after {
+  content: "iter";
+}
+
+code.doc-symbol-template,
+a code.doc-symbol-template {
+  color: var(--doc-symbol-template-fg-color);
+  background-color: var(--doc-symbol-template-bg-color);
+}
+
+code.doc-symbol-template::after {
+  content: "templ";
+}
+
+code.doc-symbol-macro,
+a code.doc-symbol-macro {
+  color: var(--doc-symbol-macro-fg-color);
+  background-color: var(--doc-symbol-macro-bg-color);
+}
+
+code.doc-symbol-macro::after {
+  content: "macro";
+}
+
+code.doc-symbol-converter,
+a code.doc-symbol-converter {
+  color: var(--doc-symbol-converter-fg-color);
+  background-color: var(--doc-symbol-converter-bg-color);
+}
+
+code.doc-symbol-converter::after {
+  content: "conv";
+}
+
 .doc-signature .autorefs {
   color: inherit;
   border-bottom: 1px dotted currentcolor;
@@ -251,4 +396,215 @@ code.doc-symbol-module::after {
 
 .doc-attribution a {
   color: inherit;
+}
+
+/* Type field documentation */
+.doc-section-fields,
+.doc-section-values {
+  margin-top: 1rem;
+}
+
+.doc-field-list,
+.doc-value-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.5rem 0;
+}
+
+.doc-field,
+.doc-value {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.doc-field:last-child,
+.doc-value:last-child {
+  border-bottom: none;
+}
+
+.doc-field-name,
+.doc-value-name {
+  font-weight: 600;
+}
+
+.doc-field-type,
+.doc-value-explicit code {
+  color: var(--md-code-fg-color);
+  background-color: var(--md-code-bg-color);
+  padding: 0.1em 0.3em;
+  border-radius: 0.2rem;
+  margin-left: 0.3em;
+}
+
+.doc-field-private {
+  opacity: 0.7;
+}
+
+.doc-field-private-label {
+  color: var(--md-default-fg-color--lighter);
+  font-size: 0.85em;
+  font-style: italic;
+  margin-left: 0.3em;
+}
+
+.doc-field-branch {
+  color: var(--md-default-fg-color--lighter);
+  font-size: 0.85em;
+  margin-left: 0.3em;
+}
+
+.doc-field-description,
+.doc-value-description {
+  color: var(--md-default-fg-color--light);
+}
+
+/* Doc object container - visual separation between entries */
+.doc.doc-object {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.doc.doc-object:last-child {
+  border-bottom: none;
+}
+
+/* Doc heading - tighter spacing */
+.doc.doc-heading {
+  margin-bottom: 0.5rem;
+}
+
+/* Pragma/label badges - supports both standalone and key:value formats */
+.doc-label {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.1em 0.4em;
+  margin-left: 0.5em;
+  border-radius: 0.25rem;
+  background-color: var(--md-default-fg-color--lightest);
+  color: var(--md-default-fg-color--light);
+  vertical-align: middle;
+  font-family: var(--md-code-font-family);
+}
+
+/* Key-value pragma styling (e.g., deprecated: "msg") */
+.doc-label[data-label*=":"] {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+[data-md-color-scheme="slate"] .doc-label[data-label*=":"] {
+  background-color: #4a3f0a;
+  color: #ffc107;
+}
+
+/* Signature block - subtle background */
+.doc-signature {
+  margin: 0.5rem 0;
+  border-radius: 0.25rem;
+}
+
+.doc-signature pre {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--md-code-bg-color);
+  border-left: 3px solid var(--md-accent-fg-color);
+}
+
+/* Doc contents - tighter spacing */
+.doc.doc-contents {
+  margin-top: 0.75rem;
+  padding-left: 0;
+}
+
+/* Section headings (Parameters, Returns, etc.) - smaller and muted */
+.doc-section h5 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--md-default-fg-color--light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0.75rem 0 0.25rem 0;
+  border: none;
+}
+
+/* Parameters list - more compact */
+.doc-section-parameters ul,
+.doc-section-returns ul,
+.doc-section-raises ul {
+  margin: 0.25rem 0;
+  padding-left: 1.25rem;
+}
+
+.doc-section-parameters li,
+.doc-section-returns li,
+.doc-section-raises li {
+  margin: 0.15rem 0;
+  font-size: 0.9rem;
+}
+
+/* Returns section - inline when simple */
+.doc-section-returns p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+/* Raises section - subtle warning styling */
+.doc-section-raises {
+  border-left: 2px solid #d97706;
+  padding-left: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.doc-section-raises h5 {
+  color: #d97706;
+}
+
+[data-md-color-scheme="slate"] .doc-section-raises {
+  border-left-color: #fbbf24;
+}
+
+[data-md-color-scheme="slate"] .doc-section-raises h5 {
+  color: #fbbf24;
+}
+
+/* Description - tighter paragraph spacing */
+.doc-description p {
+  margin: 0.5rem 0;
+}
+
+.doc-description p:first-child {
+  margin-top: 0;
+}
+
+/* Source link styling - footnote-like appearance */
+.doc-source {
+  font-size: 0.7rem;
+  color: var(--md-default-fg-color--lighter);
+  margin-top: 0.75rem;
+  text-align: right;
+  opacity: 0.7;
+}
+
+.doc-source:hover {
+  opacity: 1;
+}
+
+.doc-source-label {
+  font-style: italic;
+}
+
+.doc-source a {
+  color: inherit;
+}
+
+.doc-source a:hover {
+  color: var(--md-accent-fg-color);
+}
+
+.doc-source code {
+  font-size: inherit;
+  background: none;
+  padding: 0;
 }

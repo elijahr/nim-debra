@@ -861,6 +861,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#QuiescentSignal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QuiescentSignal
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1016,6 +1027,28 @@
   
     <nav class="md-nav" aria-label="signal">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#globalManagerPtr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        globalManagerPtr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threadLocalIdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        threadLocalIdx
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#installSignalHandler" class="md-nav__link">
@@ -2527,6 +2560,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#QuiescentSignal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QuiescentSignal
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2682,6 +2726,28 @@
   
     <nav class="md-nav" aria-label="signal">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#globalManagerPtr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        globalManagerPtr
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#threadLocalIdx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        threadLocalIdx
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#installSignalHandler" class="md-nav__link">
@@ -3979,7 +4045,8 @@ with signal-based neutralization for lock-free data structures.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc registerThread(manager: var DebraManager[MaxThreads]): ThreadHandle[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">registerThread</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -4054,7 +4121,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc neutralizeStalled(manager: var DebraManager[MaxThreads]; epochsBeforeNeutralize: uint64 = 2): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">neutralizeStalled</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="n">epochsBeforeNeutralize</span><span class="p">:</span><span class="w"> </span><span class="n">uint64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
@@ -4128,7 +4196,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc advance(manager: var DebraManager[MaxThreads])</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">advance</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">)</span>
+</code></pre>
     </div>
   
 
@@ -4191,7 +4260,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc currentEpoch(manager: var DebraManager[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">currentEpoch</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
@@ -4274,11 +4344,54 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ThreadState</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ThreadState</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+      <div class="doc-description">
+        <p>Per-thread state tracked by the DEBRA manager.</p>
+      </div>
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">currentBag</code>
+            <code class="doc-field-type">ptr LimboBag</code>
+            
+            
+            <span class="doc-field-description"> – Currently filling limbo bag.</span>
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">limboBagHead</code>
+            <code class="doc-field-type">ptr LimboBag</code>
+            
+            
+            <span class="doc-field-description"> – Head of limbo bag list (newest).</span>
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">limboBagTail</code>
+            <code class="doc-field-type">ptr LimboBag</code>
+            
+            
+            <span class="doc-field-description"> – Tail of limbo bag list (oldest).</span>
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -4307,11 +4420,38 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type DebraManager</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+      <div class="doc-description">
+        <p>Coordinates epoch-based reclamation across threads.</p>
+      </div>
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">threads</code>
+            <code class="doc-field-type">array[MaxThreads, ThreadState[MaxThreads]]</code>
+            
+            
+            <span class="doc-field-description"> – Per-thread state.</span>
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -4340,11 +4480,46 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ThreadHandle</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+      <div class="doc-description">
+        <p>Handle for a registered thread. Required for pin/unpin.</p>
+      </div>
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">idx</code>
+            <code class="doc-field-type">int</code>
+            
+            
+            <span class="doc-field-description"> – Index into the threads array.</span>
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            <span class="doc-field-description"> – Pointer to the manager.</span>
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -4373,11 +4548,20 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type DebraRegistrationError</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">DebraRegistrationError</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+      <div class="doc-description">
+        <p>Raised when thread registration fails (e.g., max threads reached).</p>
+      </div>
+    
+
+    
+
     
 
     
@@ -4409,7 +4593,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc initDebraManager(): DebraManager[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">initDebraManager</span><span class="p">():</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -4481,7 +4666,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">const DefaultMaxThreads</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">const</span><span class="w"> </span><span class="n">DefaultMaxThreads</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span>
+</code></pre>
     </div>
   
 
@@ -4518,7 +4704,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">const CacheLineBytes</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">const</span><span class="w"> </span><span class="n">CacheLineBytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span>
+</code></pre>
     </div>
   
 
@@ -4535,6 +4722,46 @@ Raises DebraRegistrationError if max threads already registered.</p>
         
           <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/constants.nim#L8" target="_blank" rel="noopener">
             src/debra/constants.nim:8
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-let">
+  
+
+  <h4 id="QuiescentSignal" class="doc doc-heading">
+    <code class="doc-symbol doc-symbol-heading doc-symbol-let"></code>
+    <span class="doc doc-object-name doc-let-name">QuiescentSignal</span>
+  <a href="#QuiescentSignal" class="headerlink" title="Permanent link">¶</a></h4>
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">let</span><span class="w"> </span><span class="n">QuiescentSignal</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SIGUSR1</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents">
+    
+      <div class="doc-description">
+        <p>POSIX signal used for thread neutralization.</p>
+      </div>
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/constants.nim#L10" target="_blank" rel="noopener">
+            src/debra/constants.nim:10
           </a>
         
       </div>
@@ -4579,7 +4806,8 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">const LimboBagSize</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">const</span><span class="w"> </span><span class="n">LimboBagSize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span>
+</code></pre>
     </div>
   
 
@@ -4612,11 +4840,16 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Destructor</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Destructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">proc</span><span class="w"> </span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">pointer</span><span class="p">)</span><span class="w"> </span><span class="sx">{.nimcall.}</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -4645,11 +4878,42 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type RetiredObject</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">RetiredObject</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">data</code>
+            <code class="doc-field-type">pointer</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">destructor</code>
+            <code class="doc-field-type">Destructor</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -4678,11 +4942,58 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type LimboBag</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">LimboBag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">objects</code>
+            <code class="doc-field-type">array[LimboBagSize, RetiredObject]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">count</code>
+            <code class="doc-field-type">int</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">epoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">next</code>
+            <code class="doc-field-type">ptr LimboBag</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -4714,7 +5025,8 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc allocLimboBag(): ptr LimboBag</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">allocLimboBag</span><span class="p">():</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">LimboBag</span>
+</code></pre>
     </div>
   
 
@@ -4765,7 +5077,8 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc freeLimboBag(bag: ptr LimboBag)</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">freeLimboBag</span><span class="p">(</span><span class="n">bag</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">LimboBag</span><span class="p">)</span>
+</code></pre>
     </div>
   
 
@@ -4824,7 +5137,8 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc reclaimBag(bag: ptr LimboBag)</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">reclaimBag</span><span class="p">(</span><span class="n">bag</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">LimboBag</span><span class="p">)</span>
+</code></pre>
     </div>
   
 
@@ -4883,7 +5197,8 @@ together forming a thread-local retire queue.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc unreffer(): Destructor</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">unreffer</span><span class="p">():</span><span class="w"> </span><span class="n">Destructor</span>
+</code></pre>
     </div>
   
 
@@ -4947,6 +5262,90 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
     
       
       
+        <div class="doc doc-object doc-var">
+  
+
+  <h4 id="globalManagerPtr" class="doc doc-heading">
+    <code class="doc-symbol doc-symbol-heading doc-symbol-var"></code>
+    <span class="doc doc-object-name doc-var-name">globalManagerPtr</span>
+  <a href="#globalManagerPtr" class="headerlink" title="Permanent link">¶</a></h4>
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="kd">var</span><span class="w"> </span><span class="n">globalManagerPtr</span><span class="p">:</span><span class="w"> </span><span class="n">pointer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">nil</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents">
+    
+      <div class="doc-description">
+        <p>Set during manager initialization. Used by signal handler.</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-type">
+        <p><strong>Type:</strong> <code>pointer</code></p>
+      </div>
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L15" target="_blank" rel="noopener">
+            src/debra/signal.nim:15
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-var">
+  
+
+  <h4 id="threadLocalIdx" class="doc doc-heading">
+    <code class="doc-symbol doc-symbol-heading doc-symbol-var"></code>
+    <span class="doc doc-object-name doc-var-name">threadLocalIdx</span>
+  <a href="#threadLocalIdx" class="headerlink" title="Permanent link">¶</a></h4>
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="kd">var</span><span class="w"> </span><span class="n">threadLocalIdx</span><span class="p">:</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents">
+    
+
+    
+      <div class="doc-section doc-section-type">
+        <p><strong>Type:</strong> <code>int</code></p>
+      </div>
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L19" target="_blank" rel="noopener">
+            src/debra/signal.nim:19
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
         <div class="doc doc-object doc-proc">
   
 
@@ -4960,7 +5359,8 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc installSignalHandler()</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">installSignalHandler</span><span class="p">()</span>
+</code></pre>
     </div>
   
 
@@ -5008,7 +5408,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc isSignalHandlerInstalled(): bool</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">isSignalHandlerInstalled</span><span class="p">():</span><span class="w"> </span><span class="nb">bool</span>
+</code></pre>
     </div>
   
 
@@ -5059,7 +5460,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc setGlobalManager(manager: pointer)</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">setGlobalManager</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="n">pointer</span><span class="p">)</span>
+</code></pre>
     </div>
   
 
@@ -5140,11 +5542,19 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type SignalHandlerContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">SignalHandlerContext</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+    
+
     
 
     
@@ -5173,11 +5583,16 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type HandlerUninstalled</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">HandlerUninstalled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">SignalHandlerContext</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5206,11 +5621,16 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type HandlerInstalled</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">HandlerInstalled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">SignalHandlerContext</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5242,7 +5662,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc initSignalHandler(): HandlerUninstalled</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">initSignalHandler</span><span class="p">():</span><span class="w"> </span><span class="n">HandlerUninstalled</span>
+</code></pre>
     </div>
   
 
@@ -5297,7 +5718,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc install(h: HandlerUninstalled): HandlerInstalled</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">install</span><span class="p">(</span><span class="n">h</span><span class="p">:</span><span class="w"> </span><span class="n">HandlerUninstalled</span><span class="p">):</span><span class="w"> </span><span class="n">HandlerInstalled</span>
+</code></pre>
     </div>
   
 
@@ -5361,7 +5783,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func isInstalled(h: HandlerInstalled): bool</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">isInstalled</span><span class="p">(</span><span class="n">h</span><span class="p">:</span><span class="w"> </span><span class="n">HandlerInstalled</span><span class="p">):</span><span class="w"> </span><span class="nb">bool</span>
+</code></pre>
     </div>
   
 
@@ -5445,11 +5868,34 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ManagerContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ManagerContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -5478,11 +5924,16 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ManagerUninitialized</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ManagerUninitialized</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ManagerContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5511,11 +5962,16 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ManagerReady</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ManagerReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ManagerContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5544,11 +6000,16 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ManagerShutdown</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ManagerShutdown</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ManagerContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5580,7 +6041,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc uninitializedManager(mgr: ptr DebraManager[MaxThreads]): ManagerUninitialized[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">uninitializedManager</span><span class="p">(</span><span class="n">mgr</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ManagerUninitialized</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -5648,7 +6110,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc initialize(m: sink ManagerUninitialized[MaxThreads]): ManagerReady[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">initialize</span><span class="p">(</span><span class="n">m</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">ManagerUninitialized</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ManagerReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -5716,7 +6179,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc shutdown(m: sink ManagerReady[MaxThreads]): ManagerShutdown[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">shutdown</span><span class="p">(</span><span class="n">m</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">ManagerReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ManagerShutdown</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -5780,7 +6244,8 @@ Called automatically during first DebraManager initialization.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func getManager(m: ManagerReady[MaxThreads]): ptr DebraManager[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">getManager</span><span class="p">(</span><span class="n">m</span><span class="p">:</span><span class="w"> </span><span class="n">ManagerReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -5865,11 +6330,42 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type RegistrationContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">RegistrationContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">idx</code>
+            <code class="doc-field-type">int</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -5898,11 +6394,16 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Unregistered</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Unregistered</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">RegistrationContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5931,11 +6432,16 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Registered</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Registered</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">RegistrationContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -5964,11 +6470,16 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type RegistrationFull</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">RegistrationFull</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">RegistrationContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -6000,7 +6511,8 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc unregistered(mgr: ptr DebraManager[MaxThreads]): Unregistered[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">unregistered</span><span class="p">(</span><span class="n">mgr</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Unregistered</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -6068,15 +6580,16 @@ properly claim slots in the thread array using lock-free CAS operations.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc register(u: sink Unregistered[MaxThreads]): RegisterResult[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="n">u</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Unregistered</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">RegisterResult</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Try to register thread by claiming a slot. Returns Registered if successful,
-RegistrationFull if all slots are taken.</p>
+        <p>Try to register thread by claiming a slot. Returns Registered if successful,</p>
+<p>RegistrationFull if all slots are taken.</p>
       </div>
     
 
@@ -6133,7 +6646,8 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func idx(r: Registered[MaxThreads]): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">idx</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">Registered</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
@@ -6197,7 +6711,8 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func getHandle(r: Registered[MaxThreads]): ThreadHandle[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">getHandle</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">Registered</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -6286,11 +6801,42 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type SlotContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">SlotContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">idx</code>
+            <code class="doc-field-type">int</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -6319,11 +6865,16 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Free</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Free</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">SlotContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -6352,11 +6903,16 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Claiming</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Claiming</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">SlotContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -6385,11 +6941,16 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Active</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Active</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">SlotContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -6418,11 +6979,16 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Draining</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Draining</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">SlotContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -6454,7 +7020,8 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc freeSlot(idx: int; mgr: ptr DebraManager[MaxThreads]): Free[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">freeSlot</span><span class="p">(</span><span class="n">idx</span><span class="p">:</span><span class="w"> </span><span class="nb">int</span><span class="p">;</span><span class="w"> </span><span class="n">mgr</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Free</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -6528,7 +7095,8 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc claim(f: sink Free[MaxThreads]): Claiming[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">claim</span><span class="p">(</span><span class="n">f</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Free</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Claiming</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -6596,15 +7164,16 @@ RegistrationFull if all slots are taken.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc activate(c: sink Claiming[MaxThreads]): Active[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">activate</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Claiming</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Active</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Complete slot claim. Transition to Active state.
-This is where the slot becomes fully owned by a thread.</p>
+        <p>Complete slot claim. Transition to Active state.</p>
+<p>This is where the slot becomes fully owned by a thread.</p>
       </div>
     
 
@@ -6665,15 +7234,16 @@ This is where the slot becomes fully owned by a thread.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc drain(a: sink Active[MaxThreads]): Draining[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">drain</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Active</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Draining</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Begin unregistration. Transition to Draining state.
-Thread will drain its limbo bags before releasing the slot.</p>
+        <p>Begin unregistration. Transition to Draining state.</p>
+<p>Thread will drain its limbo bags before releasing the slot.</p>
       </div>
     
 
@@ -6734,15 +7304,16 @@ Thread will drain its limbo bags before releasing the slot.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc release(d: sink Draining[MaxThreads]): Free[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">release</span><span class="p">(</span><span class="n">d</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Draining</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Free</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Release slot back to free pool. Transition back to Free state.
-This completes the lifecycle, making the slot available for reuse.</p>
+        <p>Release slot back to free pool. Transition back to Free state.</p>
+<p>This completes the lifecycle, making the slot available for reuse.</p>
       </div>
     
 
@@ -6799,7 +7370,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func idx(s: Active[MaxThreads]): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">idx</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Active</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
@@ -6863,7 +7435,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func idx(s: Draining[MaxThreads]): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">idx</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Draining</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
@@ -6927,7 +7500,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func manager(s: Active[MaxThreads]): ptr DebraManager[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">manager</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Active</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -6991,7 +7565,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func manager(s: Draining[MaxThreads]): ptr DebraManager[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">manager</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Draining</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7075,11 +7650,42 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type EpochGuardContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">EpochGuardContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">handle</code>
+            <code class="doc-field-type">ThreadHandle[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">epoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -7108,11 +7714,16 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Unpinned</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Unpinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">EpochGuardContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -7141,11 +7752,16 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Pinned</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Pinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">EpochGuardContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -7174,11 +7790,16 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Neutralized</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Neutralized</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">EpochGuardContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -7210,7 +7831,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc unpinned(handle: ThreadHandle[MaxThreads]): Unpinned[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">unpinned</span><span class="p">(</span><span class="n">handle</span><span class="p">:</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Unpinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7278,7 +7900,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc pin(u: sink Unpinned[MaxThreads]): Pinned[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">pin</span><span class="p">(</span><span class="n">u</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Unpinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Pinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7346,7 +7969,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc unpin(p: sink Pinned[MaxThreads]): UnpinResult[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">unpin</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Pinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">UnpinResult</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7414,7 +8038,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc acknowledge(n: sink Neutralized[MaxThreads]): Unpinned[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">acknowledge</span><span class="p">(</span><span class="n">n</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Neutralized</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Unpinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7478,7 +8103,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func epoch(p: Pinned[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">epoch</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">Pinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
@@ -7542,7 +8168,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func handle(p: Pinned[MaxThreads]): ThreadHandle[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">handle</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">Pinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7626,11 +8253,42 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type RetireContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">RetireContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">handle</code>
+            <code class="doc-field-type">ThreadHandle[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">epoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -7659,11 +8317,16 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type RetireReady</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">RetireReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">RetireContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -7692,11 +8355,16 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Retired</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Retired</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">RetireContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -7728,7 +8396,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retireReady(p: Pinned[MaxThreads]): RetireReady[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">retireReady</span><span class="p">(</span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">Pinned</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">RetireReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7792,7 +8461,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retireReadyFromRetired(r: sink Retired[MaxThreads]): RetireReady[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">retireReadyFromRetired</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Retired</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">RetireReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7860,7 +8530,8 @@ This completes the lifecycle, making the slot available for reuse.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retire(r: sink RetireReady[MaxThreads]; obj: Managed[T]): Retired[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">retire</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">RetireReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="n">obj</span><span class="p">:</span><span class="w"> </span><span class="n">Managed</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Retired</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -7936,7 +8607,8 @@ becomes safe for reclamation.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc retire(r: sink RetireReady[MaxThreads]; p: pointer; destructor: Destructor): Retired[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">retire</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">RetireReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="n">p</span><span class="p">:</span><span class="w"> </span><span class="n">pointer</span><span class="p">;</span><span class="w"> </span><span class="n">destructor</span><span class="p">:</span><span class="w"> </span><span class="n">Destructor</span><span class="p">):</span><span class="w"> </span><span class="n">Retired</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -8014,7 +8686,8 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func handle(r: RetireReady[MaxThreads]): ThreadHandle[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">handle</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">RetireReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -8094,11 +8767,50 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ReclaimContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ReclaimContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">globalEpoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">safeEpoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -8127,11 +8839,16 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ReclaimStart</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ReclaimStart</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ReclaimContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8160,11 +8877,16 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type EpochsLoaded</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">EpochsLoaded</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ReclaimContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8193,11 +8915,16 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ReclaimReady</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ReclaimReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ReclaimContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8226,11 +8953,16 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ReclaimBlocked</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ReclaimBlocked</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">ReclaimContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8262,7 +8994,8 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc reclaimStart(mgr: ptr DebraManager[MaxThreads]): ReclaimStart[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">reclaimStart</span><span class="p">(</span><span class="n">mgr</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ReclaimStart</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -8330,7 +9063,8 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc loadEpochs(s: ReclaimStart[MaxThreads]): EpochsLoaded[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">loadEpochs</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">ReclaimStart</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">EpochsLoaded</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -8394,7 +9128,8 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func safeEpoch(e: EpochsLoaded[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">safeEpoch</span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">EpochsLoaded</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
@@ -8458,7 +9193,8 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc checkSafe(e: EpochsLoaded[MaxThreads]): ReclaimCheck[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">checkSafe</span><span class="p">(</span><span class="n">e</span><span class="p">:</span><span class="w"> </span><span class="n">EpochsLoaded</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ReclaimCheck</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -8526,15 +9262,16 @@ Use for manually-managed memory (ptr types, alloc/dealloc, etc.)</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc tryReclaim(r: ReclaimReady[MaxThreads]): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">tryReclaim</span><span class="p">(</span><span class="n">r</span><span class="p">:</span><span class="w"> </span><span class="n">ReclaimReady</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Reclaim all eligible objects from all threads' limbo bags.
-Returns count of objects reclaimed.</p>
+        <p>Reclaim all eligible objects from all threads' limbo bags.</p>
+<p>Returns count of objects reclaimed.</p>
       </div>
     
 
@@ -8613,11 +9350,58 @@ to pinned threads that are stalled (behind globalEpoch by threshold).</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type NeutralizeContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">NeutralizeContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">globalEpoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">threshold</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">signalsSent</code>
+            <code class="doc-field-type">int</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -8646,11 +9430,16 @@ to pinned threads that are stalled (behind globalEpoch by threshold).</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ScanStart</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ScanStart</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">NeutralizeContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8679,11 +9468,16 @@ to pinned threads that are stalled (behind globalEpoch by threshold).</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Scanning</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Scanning</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">NeutralizeContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8712,11 +9506,16 @@ to pinned threads that are stalled (behind globalEpoch by threshold).</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type ScanComplete</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">ScanComplete</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">NeutralizeContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -8748,7 +9547,8 @@ to pinned threads that are stalled (behind globalEpoch by threshold).</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc scanStart(mgr: ptr DebraManager[MaxThreads]): ScanStart[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">scanStart</span><span class="p">(</span><span class="n">mgr</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ScanStart</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -8816,15 +9616,16 @@ to pinned threads that are stalled (behind globalEpoch by threshold).</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc loadEpoch(s: ScanStart[MaxThreads]; epochsBeforeNeutralize: uint64 = 2): Scanning[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">loadEpoch</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">ScanStart</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="n">epochsBeforeNeutralize</span><span class="p">:</span><span class="w"> </span><span class="n">uint64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">):</span><span class="w"> </span><span class="n">Scanning</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Load global epoch and compute threshold for stalled threads.
-Threads with epoch &lt; (globalEpoch - epochsBeforeNeutralize) get signaled.</p>
+        <p>Load global epoch and compute threshold for stalled threads.</p>
+<p>Threads with epoch &lt; (globalEpoch - epochsBeforeNeutralize) get signaled.</p>
       </div>
     
 
@@ -8887,7 +9688,8 @@ Threads with epoch &lt; (globalEpoch - epochsBeforeNeutralize) get signaled.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func globalEpoch(s: Scanning[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">globalEpoch</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Scanning</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
@@ -8951,7 +9753,8 @@ Threads with epoch &lt; (globalEpoch - epochsBeforeNeutralize) get signaled.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func threshold(s: Scanning[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">threshold</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Scanning</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
@@ -9019,15 +9822,16 @@ Threads with epoch &lt; (globalEpoch - epochsBeforeNeutralize) get signaled.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc scanAndSignal(s: Scanning[MaxThreads]): ScanComplete[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">scanAndSignal</span><span class="p">(</span><span class="n">s</span><span class="p">:</span><span class="w"> </span><span class="n">Scanning</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">ScanComplete</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Scan all registered threads and send SIGUSR1 to stalled pinned threads.
-Returns count of signals sent.</p>
+        <p>Scan all registered threads and send SIGUSR1 to stalled pinned threads.</p>
+<p>Returns count of signals sent.</p>
       </div>
     
 
@@ -9084,7 +9888,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func signalsSent(c: ScanComplete[MaxThreads]): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">signalsSent</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="n">ScanComplete</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
@@ -9148,7 +9953,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func extractSignalCount(c: ScanComplete[MaxThreads]): int</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">extractSignalCount</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="n">ScanComplete</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
     </div>
   
 
@@ -9232,11 +10038,50 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type AdvanceContext</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">AdvanceContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+      
+      
+      <div class="doc-section doc-section-fields">
+        <p class="doc-section-title">Fields</p>
+        <ul class="doc-field-list">
+          
+          <li class="doc-field">
+            <code class="doc-field-name">manager</code>
+            <code class="doc-field-type">ptr DebraManager[MaxThreads]</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">oldEpoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+          <li class="doc-field">
+            <code class="doc-field-name">newEpoch</code>
+            <code class="doc-field-type">uint64</code>
+            
+            
+            
+          </li>
+          
+        </ul>
+      </div>
+      
+    
+
     
 
     
@@ -9265,11 +10110,16 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Current</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Current</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">AdvanceContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -9298,11 +10148,16 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Advancing</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Advancing</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">AdvanceContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -9331,11 +10186,16 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">type Advanced</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">type</span><span class="w"> </span><span class="n">Advanced</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">:</span><span class="w"> </span><span class="k">static</span><span class="w"> </span><span class="nb">int</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">distinct</span><span class="w"> </span><span class="n">AdvanceContext</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
   <div class="doc doc-contents">
+    
+
+    
+
     
 
     
@@ -9367,7 +10227,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc advanceCurrent(mgr: ptr DebraManager[MaxThreads]): Current[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">advanceCurrent</span><span class="p">(</span><span class="n">mgr</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Current</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -9435,7 +10296,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc advance(c: sink Current[MaxThreads]): Advancing[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">advance</span><span class="p">(</span><span class="n">c</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Current</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Advancing</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -9503,7 +10365,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">proc complete(a: sink Advancing[MaxThreads]): Advanced[MaxThreads]</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">complete</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="n">sink</span><span class="w"> </span><span class="n">Advancing</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">Advanced</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span>
+</code></pre>
     </div>
   
 
@@ -9567,7 +10430,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func newEpoch(a: Advanced[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">newEpoch</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="n">Advanced</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
@@ -9631,7 +10495,8 @@ Returns count of signals sent.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim">func oldEpoch(a: Advanced[MaxThreads]): uint64</code></pre>
+      <pre><code class="language-nim highlight"><span class="k">func</span><span class="w"> </span><span class="nf">oldEpoch</span><span class="p">(</span><span class="n">a</span><span class="p">:</span><span class="w"> </span><span class="n">Advanced</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="n">uint64</span>
+</code></pre>
     </div>
   
 
