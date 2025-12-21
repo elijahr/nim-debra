@@ -21,25 +21,21 @@ type
     epoch*: uint64
     next*: ptr LimboBag
 
-
 proc allocLimboBag*(): ptr LimboBag =
   ## Allocate a new empty limbo bag.
   result = cast[ptr LimboBag](c_calloc(1, csize_t(sizeof(LimboBag))))
-
 
 proc freeLimboBag*(bag: ptr LimboBag) =
   ## Free a limbo bag (does NOT call destructors).
   c_free(bag)
 
-
 proc reclaimBag*(bag: ptr LimboBag) =
   ## Call destructors for all objects in bag, then free bag.
-  for i in 0..<bag.count:
+  for i in 0 ..< bag.count:
     let obj = bag.objects[i]
     if obj.destructor != nil:
       obj.destructor(obj.data)
   freeLimboBag(bag)
-
 
 proc unreffer*[T: ref](): Destructor =
   ## Generate a destructor that calls GC_unref for type T.

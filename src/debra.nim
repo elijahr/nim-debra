@@ -40,7 +40,7 @@ export managed
 export convenience
 
 proc registerThread*[MaxThreads: static int](
-  manager: var DebraManager[MaxThreads]
+    manager: var DebraManager[MaxThreads]
 ): ThreadHandle[MaxThreads] {.raises: [DebraRegistrationError].} =
   ## Register current thread with the DEBRA manager.
   ##
@@ -50,17 +50,16 @@ proc registerThread*[MaxThreads: static int](
 
   let u = unregistered(addr manager)
   let result = u.register()
-  case result.kind:
+  case result.kind
   of rRegistered:
     return result.registered.getHandle()
   of rRegistrationFull:
-    raise newException(DebraRegistrationError,
-      "Maximum threads (" & $MaxThreads & ") already registered")
-
+    raise newException(
+      DebraRegistrationError, "Maximum threads (" & $MaxThreads & ") already registered"
+    )
 
 proc neutralizeStalled*[MaxThreads: static int](
-  manager: var DebraManager[MaxThreads],
-  epochsBeforeNeutralize: uint64 = 2
+    manager: var DebraManager[MaxThreads], epochsBeforeNeutralize: uint64 = 2
 ): int =
   ## Signal all stalled threads. Returns number of signals sent.
   let op = scanStart(addr manager)
@@ -68,16 +67,14 @@ proc neutralizeStalled*[MaxThreads: static int](
   let complete = scanning.scanAndSignal()
   complete.extractSignalCount()
 
-
 proc advance*[MaxThreads: static int](
-  manager: var DebraManager[MaxThreads]
+    manager: var DebraManager[MaxThreads]
 ) {.inline.} =
   ## Advance the global epoch.
   discard manager.globalEpoch.fetchAdd(1'u64, moRelease)
 
-
 proc currentEpoch*[MaxThreads: static int](
-  manager: var DebraManager[MaxThreads]
+    manager: var DebraManager[MaxThreads]
 ): uint64 {.inline.} =
   ## Get current global epoch.
   manager.globalEpoch.load(moAcquire)

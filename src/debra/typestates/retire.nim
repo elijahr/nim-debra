@@ -23,29 +23,20 @@ typestate RetireContext[MaxThreads: static int]:
   transitions:
     RetireReady[MaxThreads] -> Retired[MaxThreads]
 
-
 proc retireReady*[MaxThreads: static int](
-  p: Pinned[MaxThreads]
+    p: Pinned[MaxThreads]
 ): RetireReady[MaxThreads] =
   ## Create retire context from pinned state.
-  RetireReady[MaxThreads](RetireContext[MaxThreads](
-    handle: p.handle,
-    epoch: p.epoch
-  ))
-
+  RetireReady[MaxThreads](RetireContext[MaxThreads](handle: p.handle, epoch: p.epoch))
 
 proc retireReadyFromRetired*[MaxThreads: static int](
-  r: sink Retired[MaxThreads]
+    r: sink Retired[MaxThreads]
 ): RetireReady[MaxThreads] =
   ## Get back to RetireReady after retiring (for multiple retires).
   RetireReady[MaxThreads](RetireContext[MaxThreads](r))
 
-
-
-
 proc retire*[T: ref, MaxThreads: static int](
-  r: sink RetireReady[MaxThreads],
-  obj: Managed[T]
+    r: sink RetireReady[MaxThreads], obj: Managed[T]
 ): Retired[MaxThreads] {.transition.} =
   ## Retire a managed object for epoch-based reclamation.
   ##
@@ -70,20 +61,15 @@ proc retire*[T: ref, MaxThreads: static int](
 
   # Add object to bag with type-specific unreffer
   let bag = state.currentBag
-  bag.objects[bag.count] = RetiredObject(
-    data: cast[pointer](obj.inner),
-    destructor: unreffer[T]()
-  )
+  bag.objects[bag.count] =
+    RetiredObject(data: cast[pointer](obj.inner), destructor: unreffer[T]())
   inc bag.count
 
   # Consume r to create result
   Retired[MaxThreads](RetireContext[MaxThreads](r))
 
-
 proc retire*[MaxThreads: static int](
-  r: sink RetireReady[MaxThreads],
-  p: pointer,
-  destructor: Destructor
+    r: sink RetireReady[MaxThreads], p: pointer, destructor: Destructor
 ): Retired[MaxThreads] {.transition.} =
   ## Retire a raw pointer for epoch-based reclamation.
   ##
@@ -114,6 +100,7 @@ proc retire*[MaxThreads: static int](
   # Consume r to create result
   Retired[MaxThreads](RetireContext[MaxThreads](r))
 
-
-func handle*[MaxThreads: static int](r: RetireReady[MaxThreads]): ThreadHandle[MaxThreads] =
+func handle*[MaxThreads: static int](
+    r: RetireReady[MaxThreads]
+): ThreadHandle[MaxThreads] =
   RetireContext[MaxThreads](r).handle

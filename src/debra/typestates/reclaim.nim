@@ -21,32 +21,30 @@ type
 
 typestate ReclaimContext[MaxThreads: static int]:
   inheritsFromRootObj = true
-  states ReclaimStart[MaxThreads], EpochsLoaded[MaxThreads], ReclaimReady[MaxThreads], ReclaimBlocked[MaxThreads]
+  states ReclaimStart[MaxThreads],
+    EpochsLoaded[MaxThreads], ReclaimReady[MaxThreads], ReclaimBlocked[MaxThreads]
   transitions:
     ReclaimStart[MaxThreads] -> EpochsLoaded[MaxThreads]
-    EpochsLoaded[MaxThreads] -> ReclaimReady[MaxThreads] | ReclaimBlocked[MaxThreads] as ReclaimCheck[MaxThreads]
-
+    EpochsLoaded[MaxThreads] ->
+      ReclaimReady[MaxThreads] | ReclaimBlocked[MaxThreads] as ReclaimCheck[MaxThreads]
 
 proc reclaimStart*[MaxThreads: static int](
-  mgr: ptr DebraManager[MaxThreads]
+    mgr: ptr DebraManager[MaxThreads]
 ): ReclaimStart[MaxThreads] =
   ## Begin reclamation attempt.
-  ReclaimStart[MaxThreads](ReclaimContext[MaxThreads](
-    manager: mgr,
-    globalEpoch: 0,
-    safeEpoch: 0
-  ))
-
+  ReclaimStart[MaxThreads](
+    ReclaimContext[MaxThreads](manager: mgr, globalEpoch: 0, safeEpoch: 0)
+  )
 
 proc loadEpochs*[MaxThreads: static int](
-  s: ReclaimStart[MaxThreads]
+    s: ReclaimStart[MaxThreads]
 ): EpochsLoaded[MaxThreads] {.transition.} =
   ## Load global epoch and compute minimum epoch across pinned threads.
   var ctx = ReclaimContext[MaxThreads](s)
   ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
   ctx.safeEpoch = ctx.globalEpoch
 
-  for i in 0..<MaxThreads:
+  for i in 0 ..< MaxThreads:
     if ctx.manager.threads[i].pinned.load(moAcquire):
       let threadEpoch = ctx.manager.threads[i].epoch.load(moAcquire)
       if threadEpoch < ctx.safeEpoch:
@@ -54,13 +52,11 @@ proc loadEpochs*[MaxThreads: static int](
 
   result = EpochsLoaded[MaxThreads](ctx)
 
-
 func safeEpoch*[MaxThreads: static int](e: EpochsLoaded[MaxThreads]): uint64 =
   ReclaimContext[MaxThreads](e).safeEpoch
 
-
 proc checkSafe*[MaxThreads: static int](
-  e: EpochsLoaded[MaxThreads]
+    e: EpochsLoaded[MaxThreads]
 ): ReclaimCheck[MaxThreads] {.transition.} =
   ## Check if any epochs are safe to reclaim.
   let ctx = ReclaimContext[MaxThreads](e)
@@ -69,17 +65,16 @@ proc checkSafe*[MaxThreads: static int](
   else:
     ReclaimCheck[MaxThreads] -> ReclaimBlocked[MaxThreads](ctx)
 
-
 proc tryReclaim*[MaxThreads: static int](
-  r: ReclaimReady[MaxThreads]
+    r: ReclaimReady[MaxThreads]
 ): int {.notATransition.} =
   ## Reclaim all eligible objects from all threads' limbo bags.
   ## Returns count of objects reclaimed.
   let ctx = ReclaimContext[MaxThreads](r)
-  let safeEpoch = ctx.safeEpoch - 1  # Objects retired BEFORE this epoch are safe
+  let safeEpoch = ctx.safeEpoch - 1 # Objects retired BEFORE this epoch are safe
   var count = 0
 
-  for i in 0..<MaxThreads:
+  for i in 0 ..< MaxThreads:
     let state = addr ctx.manager.threads[i]
 
     # Walk from tail (oldest) and reclaim eligible bags
@@ -89,7 +84,7 @@ proc tryReclaim*[MaxThreads: static int](
     while bag != nil:
       if bag.epoch < safeEpoch:
         # This bag's objects are safe to reclaim
-        for j in 0..<bag.count:
+        for j in 0 ..< bag.count:
           let obj = bag.objects[j]
           if obj.destructor != nil:
             obj.destructor(obj.data)

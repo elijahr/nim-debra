@@ -37,7 +37,7 @@ proc neutralizationHandler(sig: cint) {.noconv.} =
     # - pinned: 8 bytes (padded)
     # - neutralized: 8 bytes (padded)
     # - osThreadId: 8 bytes
-    const headerSize = 128  # Two cache lines
+    const headerSize = 128 # Two cache lines
     const threadStateSize = 32
 
     let threadOffset = headerSize + threadLocalIdx * threadStateSize
@@ -51,7 +51,6 @@ proc neutralizationHandler(sig: cint) {.noconv.} =
       pinnedPtr[].store(false, moRelease)
       neutralizedPtr[].store(true, moRelease)
 
-
 proc installSignalHandler*() =
   ## Install SIGUSR1 handler for DEBRA+ neutralization.
   ##
@@ -63,16 +62,14 @@ proc installSignalHandler*() =
   var sa: Sigaction
   sa.sa_handler = neutralizationHandler
   discard sigemptyset(sa.sa_mask)
-  sa.sa_flags = 0  # No SA_RESTART - we want operations to be interrupted
+  sa.sa_flags = 0 # No SA_RESTART - we want operations to be interrupted
 
   if sigaction(QuiescentSignal, sa, nil) == 0:
     signalHandlerInstalled = true
 
-
 proc isSignalHandlerInstalled*(): bool =
   ## Check if signal handler has been installed.
   signalHandlerInstalled
-
 
 proc setGlobalManager*(manager: pointer) =
   ## Set the global manager pointer for signal handler.

@@ -3,13 +3,12 @@
 ## The Managed[T] type wraps a ref object and prevents Nim's GC
 ## from collecting it until explicitly retired through DEBRA.
 
-type
-  Managed*[T] = distinct T
-    ## A DEBRA-managed ref object.
-    ##
-    ## Created with `managed()`, which calls GC_ref to prevent
-    ## automatic garbage collection. Must be retired through
-    ## DEBRA for reclamation.
+type Managed*[T] = distinct T
+  ## A DEBRA-managed ref object.
+  ##
+  ## Created with `managed()`, which calls GC_ref to prevent
+  ## automatic garbage collection. Must be retired through
+  ## DEBRA for reclamation.
 
 proc managed*[T: ref](obj: T): Managed[T] =
   ## Create a managed ref object.
@@ -23,10 +22,13 @@ proc managed*[T: ref](obj: T): Managed[T] =
   ## Object will only be freed when retired and epoch-safe.
   when not defined(allowSpinlockManagedRef):
     when defined(gcArc) or defined(gcOrc) or defined(gcAtomicArc):
-      {.error: "Managed[ref T] is not lock-free on arc/orc memory managers. " &
-               "Atomic operations on ref types use spinlocks, defeating lock-free guarantees. " &
-               "Use pointer-based retire(ptr, destructor) API instead, or " &
-               "compile with -d:allowSpinlockManagedRef to explicitly allow spinlock fallback.".}
+      {.
+        error:
+          "Managed[ref T] is not lock-free on arc/orc memory managers. " &
+          "Atomic operations on ref types use spinlocks, defeating lock-free guarantees. " &
+          "Use pointer-based retire(ptr, destructor) API instead, or " &
+          "compile with -d:allowSpinlockManagedRef to explicitly allow spinlock fallback."
+      .}
   GC_ref(obj)
   Managed[T](obj)
 

@@ -44,7 +44,7 @@ suite "Retire typestate":
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
 
-    for i in 0..<LimboBagSize:
+    for i in 0 ..< LimboBagSize:
       let node = managed Node(value: i)
       let retired = ready.retire(node)
       ready = retireReadyFromRetired(retired)
@@ -59,7 +59,7 @@ suite "Retire typestate":
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
 
-    for i in 0..<3:
+    for i in 0 ..< 3:
       let node = managed Node(value: i)
       let retired = ready.retire(node)
       ready = retireReadyFromRetired(retired)

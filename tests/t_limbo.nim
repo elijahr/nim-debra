@@ -36,7 +36,8 @@ suite "LimboBag":
         counter[] += 1
 
     let bag = allocLimboBag()
-    bag.objects[0] = RetiredObject(data: addr destructorCallCount, destructor: countingDestructor)
+    bag.objects[0] =
+      RetiredObject(data: addr destructorCallCount, destructor: countingDestructor)
     bag.count = 1
 
     reclaimBag(bag)
@@ -51,8 +52,9 @@ suite "LimboBag":
         counter[] += 1
 
     let bag = allocLimboBag()
-    for i in 0..<5:
-      bag.objects[i] = RetiredObject(data: addr destructorCallCount, destructor: countingDestructor)
+    for i in 0 ..< 5:
+      bag.objects[i] =
+        RetiredObject(data: addr destructorCallCount, destructor: countingDestructor)
     bag.count = 5
 
     reclaimBag(bag)
@@ -68,7 +70,7 @@ suite "LimboBag":
 
     # Should not crash
     reclaimBag(bag)
-    check true  # If we reach here, test passed
+    check true # If we reach here, test passed
 
   test "reclaimBag with mixed destructors":
     var counter1 = 0
@@ -92,8 +94,8 @@ suite "LimboBag":
     bag.count = 4
 
     reclaimBag(bag)
-    check counter1 == 20  # destructor1 called twice: 10 + 10
-    check counter2 == 20  # destructor2 called once: 20
+    check counter1 == 20 # destructor1 called twice: 10 + 10
+    check counter2 == 20 # destructor2 called once: 20
 
   test "unreffer generates type-specific destructor":
     type Node = ref object

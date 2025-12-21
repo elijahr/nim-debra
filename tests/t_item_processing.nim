@@ -23,7 +23,7 @@ suite "Item Processing Typestate":
     let result = processing.finish(success = true)
 
     # Verify it's completed
-    case result.kind:
+    case result.kind
     of pCompleted:
       check Item[string](result.completed).value == "test"
     of pFailed:
@@ -38,7 +38,7 @@ suite "Item Processing Typestate":
     let result = processing.finish(success = false)
 
     # Verify it's failed
-    case result.kind:
+    case result.kind
     of pCompleted:
       checkpoint "Expected Failed but got Completed"
       check false
@@ -90,10 +90,9 @@ suite "Item Processing Typestate":
     check Item[int](failedItem).value == 456
 
   test "works with custom types":
-    type
-      CustomData = object
-        id: int
-        name: string
+    type CustomData = object
+      id: int
+      name: string
 
     let data = CustomData(id: 1, name: "test")
     let unprocessed = Unprocessed[CustomData](Item[CustomData](value: data))
@@ -102,7 +101,7 @@ suite "Item Processing Typestate":
     let processing = unprocessed.startProcessing()
     let result = processing.finish(success = true)
 
-    case result.kind:
+    case result.kind
     of pCompleted:
       let completedData = Item[CustomData](result.completed).value
       check completedData.id == 1

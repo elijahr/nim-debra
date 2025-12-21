@@ -10,14 +10,12 @@
 
 import std/posix
 
-type
-  ThreadId* = object
-    ## Platform-abstracted thread identifier for use with pthread_kill.
-    handle: Pthread
+type ThreadId* = object
+  ## Platform-abstracted thread identifier for use with pthread_kill.
+  handle: Pthread
 
-const
-  InvalidThreadId* = ThreadId(handle: Pthread(0))
-    ## Sentinel value representing no thread.
+const InvalidThreadId* = ThreadId(handle: Pthread(0))
+  ## Sentinel value representing no thread.
 
 proc currentThreadId*(): ThreadId =
   ## Get the ThreadId of the current thread.

@@ -5,9 +5,8 @@
 
 import ../src/debra/managed
 
-type
-  Node = ref object
-    value: int
+type Node = ref object
+  value: int
 
 # This should trigger compile error on arc/orc
 let node = Node(value: 42)

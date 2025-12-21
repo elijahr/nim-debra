@@ -30,48 +30,42 @@ typestate NeutralizeContext[MaxThreads: static int]:
     ScanStart[MaxThreads] -> Scanning[MaxThreads]
     Scanning[MaxThreads] -> ScanComplete[MaxThreads]
 
-
 proc scanStart*[MaxThreads: static int](
-  mgr: ptr DebraManager[MaxThreads]
+    mgr: ptr DebraManager[MaxThreads]
 ): ScanStart[MaxThreads] =
   ## Begin neutralization scan.
-  ScanStart[MaxThreads](NeutralizeContext[MaxThreads](
-    manager: mgr,
-    globalEpoch: 0,
-    threshold: 0,
-    signalsSent: 0
-  ))
-
+  ScanStart[MaxThreads](
+    NeutralizeContext[MaxThreads](
+      manager: mgr, globalEpoch: 0, threshold: 0, signalsSent: 0
+    )
+  )
 
 proc loadEpoch*[MaxThreads: static int](
-  s: ScanStart[MaxThreads],
-  epochsBeforeNeutralize: uint64 = 2
+    s: ScanStart[MaxThreads], epochsBeforeNeutralize: uint64 = 2
 ): Scanning[MaxThreads] {.transition.} =
   ## Load global epoch and compute threshold for stalled threads.
   ## Threads with epoch < (globalEpoch - epochsBeforeNeutralize) get signaled.
   var ctx = NeutralizeContext[MaxThreads](s)
   ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
 
-  ctx.threshold = if ctx.globalEpoch > epochsBeforeNeutralize:
-    ctx.globalEpoch - epochsBeforeNeutralize
-  else:
-    0'u64
+  ctx.threshold =
+    if ctx.globalEpoch > epochsBeforeNeutralize:
+      ctx.globalEpoch - epochsBeforeNeutralize
+    else:
+      0'u64
 
   result = Scanning[MaxThreads](ctx)
-
 
 func globalEpoch*[MaxThreads: static int](s: Scanning[MaxThreads]): uint64 =
   ## Get the global epoch loaded during scan start.
   NeutralizeContext[MaxThreads](s).globalEpoch
 
-
 func threshold*[MaxThreads: static int](s: Scanning[MaxThreads]): uint64 =
   ## Get the epoch threshold for neutralization.
   NeutralizeContext[MaxThreads](s).threshold
 
-
 proc scanAndSignal*[MaxThreads: static int](
-  s: Scanning[MaxThreads]
+    s: Scanning[MaxThreads]
 ): ScanComplete[MaxThreads] {.transition.} =
   ## Scan all registered threads and send SIGUSR1 to stalled pinned threads.
   ## Returns count of signals sent.
@@ -79,7 +73,7 @@ proc scanAndSignal*[MaxThreads: static int](
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
   let currentTid = currentThreadId()
 
-  for i in 0..<MaxThreads:
+  for i in 0 ..< MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:
       # Thread is registered
       if ctx.manager.threads[i].pinned.load(moAcquire):
@@ -95,14 +89,10 @@ proc scanAndSignal*[MaxThreads: static int](
 
   result = ScanComplete[MaxThreads](ctx)
 
-
 func signalsSent*[MaxThreads: static int](c: ScanComplete[MaxThreads]): int =
   ## Get number of signals sent during scan.
   NeutralizeContext[MaxThreads](c).signalsSent
 
-
-func extractSignalCount*[MaxThreads: static int](
-  c: ScanComplete[MaxThreads]
-): int =
+func extractSignalCount*[MaxThreads: static int](c: ScanComplete[MaxThreads]): int =
   ## Extract the count of signals sent. Terminal operation.
   NeutralizeContext[MaxThreads](c).signalsSent

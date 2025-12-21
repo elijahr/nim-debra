@@ -6,6 +6,7 @@ import ../src/debra
 type
   NodeObj = object
     value: int
+
   Node = ptr NodeObj
 
 var destroyedCount = 0
@@ -30,7 +31,7 @@ suite "DEBRA Convenience API":
     retireAndReclaim(handle, node, destroyNode)
 
     # Should work without error
-    check destroyedCount >= 0  # May or may not reclaim immediately
+    check destroyedCount >= 0 # May or may not reclaim immediately
 
   test "retireAndReclaim with pointer - no eager reclaim":
     let node = cast[Node](alloc0(sizeof(NodeObj)))
@@ -39,10 +40,10 @@ suite "DEBRA Convenience API":
     # Retire without immediate reclaim attempt
     retireAndReclaim(handle, node, destroyNode, eager = false)
 
-    check destroyedCount == 0  # Should not have reclaimed yet
+    check destroyedCount == 0 # Should not have reclaimed yet
 
   test "multiple retireAndReclaim calls":
-    for i in 0..<10:
+    for i in 0 ..< 10:
       let node = cast[Node](alloc0(sizeof(NodeObj)))
       node.value = i
       retireAndReclaim(handle, node, destroyNode, eager = true)

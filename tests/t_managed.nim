@@ -45,7 +45,7 @@ suite "Managed type":
     let b = a
     let c = managed Node(value: 1)
     check a == b
-    check a != c  # Different refs
+    check a != c # Different refs
 
   test "Atomic[Managed[T]] works":
     type Node = ref object

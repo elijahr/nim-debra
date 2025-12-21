@@ -5,10 +5,9 @@ import debra/types
 import debra/typestates/registration
 import debra/typestates/manager
 
-type
-  ConcurrentRegTestData* = object
-    manager: ptr DebraManager[4]
-    registrationResult: RegisterResult[4]
+type ConcurrentRegTestData* = object
+  manager: ptr DebraManager[4]
+  registrationResult: RegisterResult[4]
 
 var
   globalThreadData: array[4, ConcurrentRegTestData]
@@ -86,11 +85,11 @@ suite "Registration typestate":
     globalThreadIds.store(0, moRelaxed)
 
     # Initialize thread data
-    for i in 0..<4:
+    for i in 0 ..< 4:
       globalThreadData[i].manager = addr mgr
 
     # Start all threads
-    for i in 0..<4:
+    for i in 0 ..< 4:
       createThread(threads[i], concurrentRegisterProc)
 
     # Wait for all threads to be ready
@@ -101,16 +100,16 @@ suite "Registration typestate":
     globalGoFlag.store(true, moRelease)
 
     # Wait for all threads to complete
-    for i in 0..<4:
+    for i in 0 ..< 4:
       joinThread(threads[i])
 
     # Verify all registrations succeeded
-    for i in 0..<4:
+    for i in 0 ..< 4:
       check globalThreadData[i].registrationResult.kind == rRegistered
 
     # Verify each thread got a unique slot index
-    var seenIndices: set[0..3]
-    for i in 0..<4:
+    var seenIndices: set[0 .. 3]
+    for i in 0 ..< 4:
       let idx = globalThreadData[i].registrationResult.registered.idx
       check idx >= 0
       check idx < 4

@@ -20,16 +20,13 @@ typestate SignalHandlerContext:
   transitions:
     HandlerUninstalled -> HandlerInstalled
 
-
 proc neutralizationHandler(sig: cint) {.noconv.} =
   ## SIGUSR1 handler - placeholder, real impl in signal.nim
   discard
 
-
 proc initSignalHandler*(): HandlerUninstalled =
   ## Create uninstalled signal handler context.
   HandlerUninstalled(SignalHandlerContext(installed: false))
-
 
 proc install*(h: HandlerUninstalled): HandlerInstalled {.transition.} =
   ## Install SIGUSR1 handler for DEBRA+ neutralization.
@@ -39,7 +36,6 @@ proc install*(h: HandlerUninstalled): HandlerInstalled {.transition.} =
   sa.sa_flags = 0
   discard sigaction(QuiescentSignal, sa, nil)
   result = HandlerInstalled(SignalHandlerContext(installed: true))
-
 
 func isInstalled*(h: HandlerInstalled): bool =
   ## Check if handler is installed.

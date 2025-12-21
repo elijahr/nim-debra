@@ -7,10 +7,7 @@ import debra/thread_id
 # Work around macOS pthread_t stringify issue by defining a simple converter
 # This prevents Nim from auto-generating an invalid $ operator for Pthread
 proc `$`*(tid: ThreadId): string =
-  if tid.isValid():
-    "ThreadId(valid)"
-  else:
-    "ThreadId(invalid)"
+  if tid.isValid(): "ThreadId(valid)" else: "ThreadId(invalid)"
 
 suite "ThreadId":
   test "currentThreadId returns valid thread ID":

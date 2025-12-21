@@ -11,10 +11,7 @@ import ./typestates/retire
 import ./typestates/reclaim
 
 proc retireAndReclaim*[MT: static int](
-  handle: ThreadHandle[MT],
-  p: pointer,
-  destructor: Destructor,
-  eager: bool = true
+    handle: ThreadHandle[MT], p: pointer, destructor: Destructor, eager: bool = true
 ) =
   ## Retire a pointer and optionally attempt immediate reclamation.
   ##
@@ -41,7 +38,8 @@ proc retireAndReclaim*[MT: static int](
 
   # Convert Retired back to Pinned for unpinning
   let ctx = RetireContext[MT](retired)
-  let pinnedAgain = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
+  let pinnedAgain =
+    Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
   discard pinnedAgain.unpin()
 
   # Optional eager reclamation
@@ -51,9 +49,7 @@ proc retireAndReclaim*[MT: static int](
       discard reclaim.reclaimready.tryReclaim()
 
 proc retireAndReclaim*[T: ref, MT: static int](
-  handle: ThreadHandle[MT],
-  obj: Managed[T],
-  eager: bool = true
+    handle: ThreadHandle[MT], obj: Managed[T], eager: bool = true
 ) =
   ## Retire a Managed[ref T] and optionally attempt immediate reclamation.
   ##
@@ -81,7 +77,8 @@ proc retireAndReclaim*[T: ref, MT: static int](
 
   # Convert Retired back to Pinned for unpinning
   let ctx = RetireContext[MT](retired)
-  let pinnedAgain = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
+  let pinnedAgain =
+    Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
   discard pinnedAgain.unpin()
 
   # Optional eager reclamation

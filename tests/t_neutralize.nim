@@ -35,7 +35,7 @@ suite "Neutralize typestate":
     mgr = DebraManager[4]()
     mgr.globalEpoch.store(1'u64, moRelaxed)
     mgr.activeThreadMask.store(0'u64, moRelaxed)
-    for i in 0..<4:
+    for i in 0 ..< 4:
       mgr.threads[i].epoch.store(0'u64, moRelaxed)
       mgr.threads[i].pinned.store(false, moRelaxed)
       mgr.threads[i].neutralized.store(false, moRelaxed)
@@ -77,7 +77,7 @@ suite "Neutralize typestate":
 
     let scanning = scanStart(addr mgr).loadEpoch(epochsBeforeNeutralize = 2)
     let complete = scanning.scanAndSignal()
-    check complete.signalsSent == 0  # Not stalled enough (epoch 9 >= threshold 8)
+    check complete.signalsSent == 0 # Not stalled enough (epoch 9 >= threshold 8)
 
   test "scanAndSignal signals real thread beyond threshold":
     # Spawn a real helper thread
@@ -122,7 +122,7 @@ suite "Neutralize typestate":
     # This test validates typestate transitions and count extraction
     # without needing real signals
     mgr.globalEpoch.store(10'u64, moRelaxed)
-    mgr.activeThreadMask.store(0b0000'u64, moRelaxed)  # No threads registered
+    mgr.activeThreadMask.store(0b0000'u64, moRelaxed) # No threads registered
 
     let complete = scanStart(addr mgr).loadEpoch().scanAndSignal()
     let count = complete.extractSignalCount()

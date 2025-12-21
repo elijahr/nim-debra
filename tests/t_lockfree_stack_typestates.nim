@@ -42,9 +42,9 @@ suite "Lockfree Stack Typestates":
     let (popResult, itemOpt) = nonEmpty.pop()
 
     # Should get Empty state
-    case popResult.kind:
+    case popResult.kind
     of pEmpty:
-      check true  # Expected
+      check true # Expected
     of pNonempty:
       checkpoint "Expected Empty but got NonEmpty"
       check false
@@ -64,12 +64,12 @@ suite "Lockfree Stack Typestates":
     let (popResult, itemOpt) = nonEmpty.pop()
 
     # Should get NonEmpty state
-    case popResult.kind:
+    case popResult.kind
     of pEmpty:
       checkpoint "Expected NonEmpty but got Empty"
       check false
     of pNonempty:
-      check true  # Expected
+      check true # Expected
       # Verify we can pop again
       let (popResult2, itemOpt2) = popResult.nonempty.pop()
       check itemOpt2.isSome
@@ -92,7 +92,7 @@ suite "Lockfree Stack Typestates":
       if itemOpt.isSome:
         values.add(Item[int](itemOpt.get).value)
 
-      case popResult.kind:
+      case popResult.kind
       of pEmpty:
         break
       of pNonempty:
@@ -115,7 +115,7 @@ suite "Lockfree Stack Typestates":
       let processing = unprocessed.startProcessing()
       let result = processing.finish(success = true)
 
-      case result.kind:
+      case result.kind
       of pCompleted:
         check Item[string](result.completed).value == "test-data"
       of pFailed:
@@ -137,7 +137,7 @@ suite "Lockfree Stack Typestates":
     # If we could somehow call pop on the old NonEmpty reference again
     # (which typestates prevent at compile time), we would get None.
     # For now, verify the state is Empty after first pop.
-    case popResult1.kind:
+    case popResult1.kind
     of pEmpty:
       check true
     of pNonempty:
@@ -154,22 +154,20 @@ suite "Lockfree Stack Typestates":
     var currentStack = nonEmpty
     while true:
       let (popResult, _) = currentStack.pop()
-      case popResult.kind:
+      case popResult.kind
       of pEmpty:
         break
       of pNonempty:
         currentStack = popResult.nonempty
 
     # Advance epochs to make reclamation possible
-    for _ in 0..3:
+    for _ in 0 .. 3:
       manager.advance()
 
     # Attempt reclamation
-    let reclaimResult = reclaimStart(addr manager)
-      .loadEpochs()
-      .checkSafe()
+    let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
 
-    case reclaimResult.kind:
+    case reclaimResult.kind
     of rReclaimReady:
       let count = reclaimResult.reclaimready.tryReclaim()
       # Should have reclaimed the 3 nodes
@@ -209,7 +207,7 @@ suite "Lockfree Stack Typestates":
 
     # Verify we can continue using the stack (which proves neutralization
     # handling works, even if we can't directly observe the internal state)
-    case popResult.kind:
+    case popResult.kind
     of pEmpty:
       checkpoint "Stack should not be empty yet"
       check false
@@ -235,7 +233,7 @@ suite "Lockfree Stack Typestates":
       let (popResult, itemOpt) = currentStack.pop()
       if itemOpt.isSome:
         values.add(Item[int](itemOpt.get).value)
-      case popResult.kind:
+      case popResult.kind
       of pEmpty:
         break
       of pNonempty:
@@ -253,7 +251,7 @@ suite "Lockfree Stack Typestates":
       let (popResult, itemOpt) = currentStack.pop()
       if itemOpt.isSome:
         values.add(Item[int](itemOpt.get).value)
-      case popResult.kind:
+      case popResult.kind
       of pEmpty:
         break
       of pNonempty:
@@ -262,10 +260,9 @@ suite "Lockfree Stack Typestates":
     check values == @[20, 10]
 
   test "Push and pop with custom types":
-    type
-      Person = object
-        name: string
-        age: int
+    type Person = object
+      name: string
+      age: int
 
     let stack = initStack[Person](addr manager)
     let person1 = Person(name: "Alice", age: 30)
@@ -283,7 +280,7 @@ suite "Lockfree Stack Typestates":
       check p.age == 25
 
     # Pop Alice
-    case popResult1.kind:
+    case popResult1.kind
     of pEmpty:
       checkpoint "Stack should not be empty yet"
       check false

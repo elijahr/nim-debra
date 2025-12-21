@@ -23,7 +23,7 @@ suite "DebraManager":
 
   test "all thread states unpinned initially":
     var manager = initDebraManager[64]()
-    for i in 0..<64:
+    for i in 0 ..< 64:
       check manager.threads[i].pinned.load(moRelaxed) == false
 
 suite "ThreadState limbo bags":

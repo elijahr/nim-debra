@@ -12,6 +12,7 @@ import debra/typestates/reclaim
 type
   TestNodeObj = object
     value: int
+
   TestNode = ref TestNodeObj
 
 suite "Reclaim typestate":
@@ -42,7 +43,7 @@ suite "Reclaim typestate":
     let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
-    for i in 0..<5:
+    for i in 0 ..< 5:
       let node = managed TestNode(value: i)
       let retired = ready.retire(node)
       ready = retireReadyFromRetired(retired)
@@ -70,7 +71,7 @@ suite "Reclaim typestate":
     let p0 = unpinned(h0).pin()
     check p0.epoch == 1
     var ready0 = retireReady(p0)
-    for i in 0..<3:
+    for i in 0 ..< 3:
       let node = managed TestNode(value: i)
       let retired = ready0.retire(node)
       ready0 = retireReadyFromRetired(retired)
@@ -84,7 +85,7 @@ suite "Reclaim typestate":
     let p1 = unpinned(h1).pin()
     check p1.epoch == 2
     var ready1 = retireReady(p1)
-    for i in 0..<4:
+    for i in 0 ..< 4:
       let node = managed TestNode(value: i)
       let retired = ready1.retire(node)
       ready1 = retireReadyFromRetired(retired)
@@ -98,7 +99,7 @@ suite "Reclaim typestate":
     let p2 = unpinned(h2).pin()
     check p2.epoch == 3
     var ready2 = retireReady(p2)
-    for i in 0..<5:
+    for i in 0 ..< 5:
       let node = managed TestNode(value: i)
       let retired = ready2.retire(node)
       ready2 = retireReadyFromRetired(retired)
@@ -123,7 +124,7 @@ suite "Reclaim typestate":
 
     # Verify loadEpochs computes correct safe epoch
     let loaded = reclaimStart(addr mgr).loadEpochs()
-    check loaded.safeEpoch == 3  # Minimum of pinned threads: min(5, 3) = 3
+    check loaded.safeEpoch == 3 # Minimum of pinned threads: min(5, 3) = 3
 
     # Check reclaim is ready (safeEpoch > 1)
     let result = loaded.checkSafe()
@@ -136,7 +137,7 @@ suite "Reclaim typestate":
     # - epoch 2 objects (4 items) should NOT be reclaimed yet (not safe)
     # - epoch 3 objects (5 items) should NOT be reclaimed (not safe)
     let count = result.reclaimready.tryReclaim()
-    check count == 3  # Only the 3 from epoch 1
+    check count == 3 # Only the 3 from epoch 1
 
     # Unpin thread 1 (which was at epoch 3)
     mgr.threads[1].pinned.store(false, moRelease)
@@ -144,14 +145,14 @@ suite "Reclaim typestate":
     # Now minimum pinned epoch is just thread 0 at epoch 5
     # Try reclaim again with only thread 0 pinned at epoch 5
     let loaded2 = reclaimStart(addr mgr).loadEpochs()
-    check loaded2.safeEpoch == 5  # Only thread 0 pinned at epoch 5
+    check loaded2.safeEpoch == 5 # Only thread 0 pinned at epoch 5
 
     let result2 = loaded2.checkSafe()
     check result2.kind == rReclaimReady
     # With safeEpoch = 5, threshold is 4, so bags with epoch < 4 are reclaimable
     # This includes epoch 2 (4 objects) and epoch 3 (5 objects)
     let count2 = result2.reclaimready.tryReclaim()
-    check count2 == 9  # 4 from epoch 2 + 5 from epoch 3
+    check count2 == 9 # 4 from epoch 2 + 5 from epoch 3
 
     # Clean up remaining pinned thread
     discard p0_v2.unpin()

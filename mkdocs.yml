@@ -106,3 +106,6 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/elijahr/nim-debra
+
+extra_css:
+  - css/custom.css
