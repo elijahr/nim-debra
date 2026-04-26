@@ -7,20 +7,33 @@
 ## 3. Manual bridge from stack to item processing typestate
 ##
 ## This is a "correct by design" lock-free data structure.
+##
+## ## Why `Atomic[ptr NodeObj[T]]` and not `Atomic[Managed[ref NodeObj[T]]]`
+##
+## `Managed[ref T]` is the right tool for non-atomic shared ownership.
+## But `Atomic[ref T]` (and therefore `Atomic[Managed[ref T]]`) falls back
+## to spinlock-based atomics on arc/orc, defeating lock-free guarantees.
+##
+## For atomic pointer storage in lock-free code, this example uses the
+## explicit `retain` / `release` / `releaseDestructor` helpers from
+## `debra/refptr`: `retain` increments the GC ref count and hands back a
+## raw `ptr T`, `releaseDestructor[T]()` is a `Destructor` that DEBRA
+## calls at reclamation time to balance the retain.
 
 import typestates
 import debra
+import debra/atomics
 import ./item_processing
-import std/[atomics, options]
+import std/options
 
 type
   NodeObj[T] = object
     value: T
-    next: Atomic[Managed[ref NodeObj[T]]]
+    next: Atomic[ptr NodeObj[T]]
   Node[T] = ref NodeObj[T]
 
   StackBase[T] = object
-    top: Atomic[Managed[ref NodeObj[T]]]
+    top: Atomic[ptr NodeObj[T]]
     manager: ptr DebraManager[64]
     handle: ThreadHandle[64]
 
@@ -50,7 +63,7 @@ proc push*[T](stack: Empty[T], value: T): NonEmpty[T] {.transition.} =
 
   let pinned = unpinned(base.handle).pin()
 
-  let newNode = managed Node[T](value: value)
+  let newNode = retain Node[T](value: value)
   base.top.store(newNode, moRelease)
 
   let unpinResult = pinned.unpin()
@@ -66,12 +79,13 @@ proc push*[T](stack: NonEmpty[T], value: T): NonEmpty[T] {.transition.} =
 
   let pinned = unpinned(base.handle).pin()
 
-  let newNode = managed Node[T](value: value)
+  let newNode = retain Node[T](value: value)
 
   while true:
-    var oldTop = base.top.load(moAcquire)
-    newNode.inner.next.store(oldTop, moRelaxed)
-    if base.top.compareExchange(oldTop, newNode, moRelease, moRelaxed):
+    let oldTop = base.top.load(moAcquire)
+    newNode.next.store(oldTop, moRelaxed)
+    var observed = oldTop
+    if base.top.compareExchangeStrong(observed, newNode, moRelease, moRelaxed):
       break
 
   let unpinResult = pinned.unpin()
@@ -93,23 +107,26 @@ proc pop*[T](stack: NonEmpty[T]): (PopResult[T], Option[Unprocessed[T]]) =
 
   block popLoop:
     while true:
-      var oldTop = base.top.load(moAcquire)
+      let oldTop = base.top.load(moAcquire)
 
-      if oldTop.isNil:
+      if oldTop == nil:
         resultStack = PopResult[T](kind: pEmpty, empty: Empty[T](base))
         item = none(Unprocessed[T])
         break popLoop
 
-      let next = oldTop.inner.next.load(moRelaxed)
+      let next = oldTop.next.load(moRelaxed)
 
-      if base.top.compareExchange(oldTop, next, moRelease, moRelaxed):
+      var observed = oldTop
+      if base.top.compareExchangeStrong(observed, next, moRelease, moRelaxed):
         item = some(Unprocessed[T](Item[T](value: oldTop.value)))
 
-        # Retire the node
+        # Retire the node. The destructor balances the `retain` from
+        # `push` once the epoch is safe.
         let ready = retireReady(pinned)
-        discard ready.retire(oldTop)
+        discard ready.retire(
+          cast[pointer](oldTop), releaseDestructor[NodeObj[T]]())
 
-        if next.isNil:
+        if next == nil:
           resultStack = PopResult[T](kind: pEmpty, empty: Empty[T](base))
         else:
           resultStack = PopResult[T](kind: pNonempty, nonempty: NonEmpty[T](base))
