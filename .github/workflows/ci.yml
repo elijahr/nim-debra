@@ -59,7 +59,43 @@ jobs:
         run: rm -rf ~/.cache/nim
 
       - name: Run tests
-        run: nimble test
+        shell: bash
+        run: |
+          set -o pipefail
+          # Workaround for nimble v0.20.x: `nimble <task>` exits 0 even when
+          # an inner `exec` aborts the script (it logs `Error:` but does not
+          # propagate the failure). Tee output and grep for nimble's error
+          # markers to force a non-zero exit.
+          nimble_run() {
+            local logfile
+            logfile="$(mktemp)"
+            "$@" 2>&1 | tee "$logfile"
+            local rc=${PIPESTATUS[0]}
+            if [[ $rc -ne 0 ]]; then
+              return $rc
+            fi
+            if grep -Eq '^[[:space:]]*Error:' "$logfile"; then
+              echo "::error::nimble reported an error but exited 0; failing the step."
+              return 1
+            fi
+          }
+          nimble_run nimble test
 
       - name: Test examples
-        run: nimble testExamples
+        shell: bash
+        run: |
+          set -o pipefail
+          nimble_run() {
+            local logfile
+            logfile="$(mktemp)"
+            "$@" 2>&1 | tee "$logfile"
+            local rc=${PIPESTATUS[0]}
+            if [[ $rc -ne 0 ]]; then
+              return $rc
+            fi
+            if grep -Eq '^[[:space:]]*Error:' "$logfile"; then
+              echo "::error::nimble reported an error but exited 0; failing the step."
+              return 1
+            fi
+          }
+          nimble_run nimble testExamples
