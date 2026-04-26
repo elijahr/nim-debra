@@ -1,5 +1,12 @@
 # examples/reclamation_background.nim
-## Background reclamation: dedicated thread for memory reclamation.
+## Background epoch-advancement thread paired with per-worker reclamation.
+##
+## Each thread reclaims its own retired objects: cross-thread reclamation is
+## not supported in DEBRA+ because the limbo bag list is mutated by the owning
+## thread without synchronization. A dedicated background thread is still
+## useful for driving the global epoch forward so workers' retires become
+## eligible for reclamation; the workers themselves call `reclaimNow(handle)`
+## on a cadence.
 ##
 ## ## refc compatibility
 ##
@@ -11,25 +18,23 @@
 ##   `managed`. The refc heap (`gch`) is thread-local
 ##   (`{.rtlThreadVar.}` in `system/gc.nim`), so the cell metadata lives on
 ##   the worker's heap.
-## * The dedicated reclaimer thread later calls `GC_unref` from the destructor
-##   stored in the limbo bag. That reaches into the reclaimer's `gch`, mutates
-##   a refcount on a cell that doesn't belong to it, and crashes inside
-##   `decRef` (`SIGSEGV` at `system/gc.nim:251`).
-## * refc has no public API for cross-thread `ref` release. `ForeignCell` /
-##   `setupForeignThreadGc` initialize the calling thread's own heap; they do
-##   not let one thread free another thread's cells.
+## * If a different thread later called the `GC_unref` destructor stored in
+##   the limbo bag, it would reach into a foreign `gch`, mutate a refcount on
+##   a cell that doesn't belong to it, and crash inside `decRef`.
+## * refc has no public API for cross-thread `ref` release. arc and orc use
+##   atomic, shared refcounts and tolerate cross-thread `=destroy` /
+##   `GC_unref`.
 ##
-## Use `--mm:arc` or `--mm:orc` (with `-d:allowSpinlockManagedRef` for
-## `Managed[ref T]`) for background reclamation patterns. Both arc and orc use
-## atomic, shared refcounts and tolerate cross-thread `=destroy` / `GC_unref`.
+## Per-thread reclamation avoids the cross-thread `GC_unref` problem because
+## the same worker thread that allocated a node also frees it. We still skip
+## under refc here for consistency with the historical example.
 ##
 ## See also: `examples/reclamation_periodic.nim` for a single-threaded
-## reclamation pattern that works under all GCs.
+## reclamation pattern.
 
 when defined(gcRefc):
   echo "reclamation_background: skipped under --mm:refc"
-  echo "  refc's per-thread GC heap does not support cross-thread GC_unref."
-  echo "  Use --mm:arc or --mm:orc for background reclamation patterns."
+  echo "  Use --mm:arc or --mm:orc for the Managed[ref T] worker pattern."
 else:
   import debra
   import std/[atomics, os]
@@ -44,43 +49,39 @@ else:
     shouldStop: Atomic[bool]
     totalReclaimed: Atomic[int]
 
-  proc reclaimerThread() {.thread.} =
-    ## Background thread that periodically attempts reclamation.
+  proc epochDriverThread() {.thread.} =
+    ## Background thread that periodically advances the global epoch.
+    ##
+    ## This thread does NOT reclaim on behalf of the workers: each worker
+    ## reclaims its own retired objects. Driving the epoch forward unblocks
+    ## reclamation in workers that are not actively advancing (e.g., because
+    ## their hot path is too tight to use `advanceEvery`).
     while not shouldStop.load(moAcquire):
-      let reclaimResult = reclaimStart(addr manager)
-        .loadEpochs()
-        .checkSafe()
-
-      case reclaimResult.kind:
-      of rReclaimReady:
-        {.cast(gcsafe).}:
-          let count = reclaimResult.reclaimready.tryReclaim()
-          discard totalReclaimed.fetchAdd(count, moRelaxed)
-      of rReclaimBlocked:
-        discard
-
-      sleep(5)  # 5ms between attempts
+      manager.advance()
+      sleep(5) # 5ms cadence
 
   proc workerThread() {.thread.} =
-    ## Worker thread that performs operations.
-    let handle = registerThread(manager)
+    ## Worker thread that retires and reclaims its own objects.
+    {.cast(gcsafe).}:
+      let handle = registerThread(manager)
 
-    for i in 0..<100:
-      let u = unpinned(handle)
-      let pinned = u.pin()
+      for i in 0 ..< 100:
+        withPin(handle):
+          let node = managed Node(value: i)
+          it.retire(node)
 
-      let node = managed Node(value: i)
-      let ready = retireReady(pinned)
-      discard ready.retire(node)
+        # Reclaim our own bag occasionally. The background thread keeps the
+        # global epoch advancing, so most of these passes find work.
+        if i mod 10 == 9:
+          let count = reclaimNow(handle)
+          discard totalReclaimed.fetchAdd(count, moRelaxed)
 
-      let unpinResult = pinned.unpin()
-      case unpinResult.kind:
-      of uUnpinned: discard
-      of uNeutralized: discard unpinResult.neutralized.acknowledge()
-
-      # Occasionally advance epoch
-      if i mod 10 == 0:
+      # Drain remaining retired objects before the worker exits, otherwise
+      # they leak (no other thread can reclaim them).
+      for _ in 0 ..< 4:
         manager.advance()
+      let count = reclaimNow(handle)
+      discard totalReclaimed.fetchAdd(count, moRelaxed)
 
   when isMainModule:
     manager = initDebraManager[4]()
@@ -88,25 +89,22 @@ else:
     shouldStop.store(false, moRelaxed)
     totalReclaimed.store(0, moRelaxed)
 
-    # Start background reclaimer
-    var reclaimer: Thread[void]
-    createThread(reclaimer, reclaimerThread)
+    # Start background epoch driver
+    var driver: Thread[void]
+    createThread(driver, epochDriverThread)
 
     # Start worker threads
     var workers: array[2, Thread[void]]
-    for i in 0..<2:
+    for i in 0 ..< 2:
       createThread(workers[i], workerThread)
 
     # Wait for workers to finish
-    for i in 0..<2:
+    for i in 0 ..< 2:
       joinThread(workers[i])
 
-    # Give reclaimer time to clean up remaining objects
-    sleep(50)
-
-    # Stop reclaimer
+    # Stop epoch driver
     shouldStop.store(true, moRelease)
-    joinThread(reclaimer)
+    joinThread(driver)
 
-    echo "Total reclaimed by background thread: ", totalReclaimed.load(moRelaxed)
+    echo "Total reclaimed across workers: ", totalReclaimed.load(moRelaxed)
     echo "Background reclamation example completed successfully"

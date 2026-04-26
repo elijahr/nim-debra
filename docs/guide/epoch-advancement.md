@@ -27,9 +27,11 @@ limbo bag grow more between advances; smaller `n` increases atomic-store
 contention.
 
 **Periodic-thread.** A dedicated background thread calls
-`manager.advance()` plus `reclaimNow(manager)` on a timer (e.g. every
-1 ms or every 1000 ops). Keeps the hot path free of any epoch work at the
-cost of one extra registered thread.
+`manager.advance()` on a timer (e.g. every 1 ms or every 1000 ops). Keeps
+the hot path free of advance work at the cost of one extra thread. Each
+worker still calls `reclaimNow(handle)` on its own cadence to drain its own
+limbo bags; reclamation is per-thread (cross-thread reclamation is not
+supported, see [reclamation guide](reclamation.md)).
 
 ## Worked example
 
@@ -43,7 +45,7 @@ proc pop(...): Option[T] =
       it.retire(cast[pointer](seg), segmentDestructor)
   handle.advanceEvery(64)   # cadence-controlled global advance
   if eager:
-    discard reclaimNow(manager)
+    discard reclaimNow(handle)  # per-thread reclamation
 ```
 
 `advanceEvery(64)` makes 63 of every 64 calls a single non-atomic

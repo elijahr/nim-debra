@@ -8,14 +8,31 @@ Understanding safe memory reclamation in DEBRA+.
 
 ## Overview
 
-Reclamation is the process of safely freeing retired objects. The reclamation system walks thread-local limbo bags and frees objects from old epochs that are no longer accessible.
+Reclamation is the process of safely freeing retired objects. Each registered
+thread reclaims its own retired objects from its own thread-local limbo bag
+list. There is no cross-thread reclamation: the bag list is mutated by the
+owning thread (via `retire`) without synchronization, so another thread cannot
+walk it safely.
+
+## Per-thread reclamation
+
+Pass your `ThreadHandle` to `reclaimStart(handle)` (or `reclaimNow(handle)`) to
+walk and free your own thread's retired objects. A thread that retires but
+never calls reclaim leaks its bags. The recommended pattern is to fold a
+reclaim attempt into your hot path on a cadence (e.g. once every N retires);
+see the [epoch advancement guide](epoch-advancement.md).
+
+If a thread stalls or exits while still pinned, the [neutralization
+mechanism](neutralization.md) forces it to unpin so the global epoch can
+advance, but it does not free that thread's already-retired bags. Drain
+your bags before exiting the thread.
 
 ## Reclamation Steps
 
-1. **Start**: Begin reclamation process
+1. **Start**: Begin reclamation process for your handle's slot
 2. **Load epochs**: Read global epoch and all thread epochs
 3. **Check safety**: Determine if any epochs are safe to reclaim
-4. **Try reclaim**: Walk limbo bags and free eligible objects
+4. **Try reclaim**: Walk this thread's own limbo bags and free eligible objects
 
 ## Epoch Safety
 
@@ -31,9 +48,12 @@ Attempt reclamation every N operations to amortize the cost:
 
 [:material-file-code: View full source](https://github.com/elijahr/nim-debra/blob/main/examples/reclamation_periodic.nim)
 
-## Background Reclamation
+## Background Epoch Advancement
 
-Dedicate a thread to reclamation for best separation of concerns:
+A dedicated background thread cannot reclaim other threads' retired objects:
+each thread reclaims its own. A background thread is still useful for driving
+the global epoch forward (`manager.advance()`) while workers continue to
+retire and reclaim on their own slots.
 
 ```nim
 {% include-markdown "../../examples/reclamation_background.nim" %}
@@ -77,7 +97,7 @@ Reclamation cost:
 Optimization tips:
 
 1. **Batch reclamation**: Don't reclaim after every operation
-2. **Separate thread**: Dedicate a thread to reclamation
+2. **Cadence helper**: Use `handle.advanceEvery(n)` plus a periodic `reclaimNow(handle)` call
 3. **Threshold**: Only reclaim when enough objects accumulated
 
 ## Next Steps
