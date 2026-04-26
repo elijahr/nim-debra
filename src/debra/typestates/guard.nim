@@ -87,8 +87,10 @@ proc unpin*[MaxThreads: static int](
     let pinned = unpinned(handle).pin()
     let res = pinned.unpin()
     case res.kind
-    of uUnpinned: discard
-    of uNeutralized: discard res.neutralized.acknowledge()
+    of uUnpinned:
+      discard
+    of uNeutralized:
+      discard res.neutralized.acknowledge()
   let ctx = EpochGuardContext[MaxThreads](p)
   let mgr = ctx.handle.manager
   let idx = ctx.handle.idx

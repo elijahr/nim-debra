@@ -18,7 +18,7 @@ when isMainModule:
     body()
 
     let unpinResult = pinned.unpin()
-    case unpinResult.kind:
+    case unpinResult.kind
     of uUnpinned:
       discard
     of uNeutralized:
@@ -26,8 +26,9 @@ when isMainModule:
       discard unpinResult.neutralized.acknowledge()
 
   # Use the wrapper for clean critical sections
-  withPinnedSection(proc() =
-    echo "Working in critical section..."
+  withPinnedSection(
+    proc() =
+      echo "Working in critical section..."
   )
 
   # Manual handling with retry logic
@@ -48,7 +49,7 @@ when isMainModule:
         manager.threads[handle.idx].neutralized.store(true, moRelease)
 
       let unpinResult = pinned.unpin()
-      case unpinResult.kind:
+      case unpinResult.kind
       of uUnpinned:
         done = true
         echo "Completed on attempt ", attempts

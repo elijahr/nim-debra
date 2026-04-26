@@ -65,15 +65,18 @@ proc retire*[T: ref, MaxThreads: static int](
     import debra
     type Node = ref object
       value: int
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
     let pinned = unpinned(handle).pin()
     let n = managed Node(value: 1)
     let retired = retireReady(pinned).retire(n)
-    let pinnedAgain = Pinned[4](EpochGuardContext[4](
-      handle: RetireContext[4](retired).handle,
-      epoch: RetireContext[4](retired).epoch))
+    let pinnedAgain = Pinned[4](
+      EpochGuardContext[4](
+        handle: RetireContext[4](retired).handle, epoch: RetireContext[4](retired).epoch
+      )
+    )
     discard pinnedAgain.unpin()
 
   # Extract values we need before consuming r
@@ -115,16 +118,20 @@ proc retire*[MaxThreads: static int](
   ## Use for manually-managed memory (ptr types, alloc/dealloc, etc.)
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
     let pinned = unpinned(handle).pin()
     let raw = alloc0(8)
     let retired = retireReady(pinned).retire(raw, dtor)
-    let pinnedAgain = Pinned[4](EpochGuardContext[4](
-      handle: RetireContext[4](retired).handle,
-      epoch: RetireContext[4](retired).epoch))
+    let pinnedAgain = Pinned[4](
+      EpochGuardContext[4](
+        handle: RetireContext[4](retired).handle, epoch: RetireContext[4](retired).epoch
+      )
+    )
     discard pinnedAgain.unpin()
 
   # Extract values we need before consuming r

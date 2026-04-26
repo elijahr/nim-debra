@@ -8,6 +8,7 @@ type
   NodeObj = object
     value: int
     next: Atomic[Managed[ref NodeObj]]
+
   Node = ref NodeObj
 
 proc main() =
@@ -21,11 +22,10 @@ proc main() =
   # Retire multiple nodes in a single critical section
   var ready = retireReady(pinned)
 
-  for i in 1..5:
+  for i in 1 .. 5:
     let node = managed Node(value: i * 10)
     echo "Retiring node with value: ", node.value
-    let retired = ready.retire(node)
-    ready = retireReadyFromRetired(retired)
+    ready.retire(node)
 
   echo "Retired 5 nodes"
 

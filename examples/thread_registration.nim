@@ -11,7 +11,7 @@ proc workerThread() {.thread.} =
   let handle = registerThread(manager)
 
   # Perform some pin/unpin cycles
-  for i in 0..<100:
+  for i in 0 ..< 100:
     let u = unpinned(handle)
     let pinned = u.pin()
 
@@ -19,7 +19,7 @@ proc workerThread() {.thread.} =
     discard
 
     let unpinResult = pinned.unpin()
-    case unpinResult.kind:
+    case unpinResult.kind
     of uUnpinned:
       discard
     of uNeutralized:
@@ -32,11 +32,11 @@ when isMainModule:
 
   # Start worker threads
   var threads: array[4, Thread[void]]
-  for i in 0..<4:
+  for i in 0 ..< 4:
     createThread(threads[i], workerThread)
 
   # Wait for all threads to complete
-  for i in 0..<4:
+  for i in 0 ..< 4:
     joinThread(threads[i])
 
   echo "Thread registration example completed successfully"

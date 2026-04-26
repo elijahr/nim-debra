@@ -23,6 +23,7 @@ type
   NodeObj[T] = object
     value: T
     next: Atomic[ptr NodeObj[T]]
+
   Node[T] = ref NodeObj[T]
 
   Stack*[T] = object
@@ -83,11 +84,11 @@ proc main() =
     echo "  Popped: ", item.get
 
   # Reclaim
-  for _ in 0..3:
+  for _ in 0 .. 3:
     manager.advance()
 
   let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
-  case reclaimResult.kind:
+  case reclaimResult.kind
   of rReclaimReady:
     let count = reclaimResult.reclaimready.tryReclaim()
     echo "Reclaimed ", count, " nodes"

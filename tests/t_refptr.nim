@@ -10,6 +10,7 @@ import ../src/debra/refptr
 type
   NodeObj = object
     value: int
+
   Node = ref NodeObj
 
 suite "refptr retain/release":

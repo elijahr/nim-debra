@@ -58,6 +58,7 @@ proc retain*[T: ref](obj: T): ptr typeof(obj[]) {.inline.} =
   runnableExamples:
     type Node = ref object
       value: int
+
     let r = Node(value: 5)
     let p = retain(r)
     doAssert p != nil
@@ -76,6 +77,7 @@ proc release*[T](p: ptr T) {.inline.} =
   runnableExamples:
     type Node = ref object
       value: int
+
     var p: ptr Node = nil
     release(p) # nil-safe no-op
     let r = Node(value: 1)
@@ -97,6 +99,7 @@ proc releaseDestructor*[T](): Destructor =
     import debra
     type Node = ref object
       value: int
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)

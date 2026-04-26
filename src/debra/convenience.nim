@@ -52,7 +52,9 @@ proc retire*[MT: static int](
   ## manually rebuilding `RetireReady` from `Retired`.
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -62,9 +64,7 @@ proc retire*[MT: static int](
   let retired = retire(move(pin), p, destructor)
   pin = retireReadyFromRetired(retired)
 
-proc retire*[T: ref, MT: static int](
-    pin: var RetireReady[MT], obj: Managed[T]
-) =
+proc retire*[T: ref, MT: static int](pin: var RetireReady[MT], obj: Managed[T]) =
   ## Retire a `Managed[ref T]` inside an existing pinned epoch held by `pin`.
   ##
   ## Prefer the pointer-form overload (`retire(pin, p, destructor)`) plus
@@ -75,6 +75,7 @@ proc retire*[T: ref, MT: static int](
     import debra
     type Node = ref object
       value: int
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -94,7 +95,9 @@ proc retireBatch*[MT: static int](
   ## pin/unpin per object when freeing chains.
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -105,9 +108,7 @@ proc retireBatch*[MT: static int](
   for item in items:
     pin.retire(item[0], item[1])
 
-template withPin*[MT: static int](
-    th: ThreadHandle[MT], body: untyped
-) =
+template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
   ## Pin the calling thread, run `body`, unpin on exit (including raises).
   ##
   ## Injects `it` as a `var RetireReady[MT]` (matches the Nim convention
@@ -123,7 +124,9 @@ template withPin*[MT: static int](
   ## `retireBatch`_.
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -134,7 +137,7 @@ template withPin*[MT: static int](
     let h = th
     assert not h.manager.threads[h.idx].pinned.load(moAcquire),
       "withPin: thread is already pinned (handle slot " & $h.idx &
-      "). Nested pinning is forbidden."
+        "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
     var it {.inject.} = retireReady(pinnedGuard)
     try:
@@ -144,15 +147,15 @@ template withPin*[MT: static int](
       let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
       discard p.unpin()
 
-template withPin*[MT: static int](
-    th: ThreadHandle[MT], name, body: untyped
-) =
+template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
   ## `withPin` variant that injects a caller-supplied identifier `name`
   ## (instead of the default `it`). Use to disambiguate nested handles
   ## across multiple managers.
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -163,7 +166,7 @@ template withPin*[MT: static int](
     let h = th
     assert not h.manager.threads[h.idx].pinned.load(moAcquire),
       "withPin: thread is already pinned (handle slot " & $h.idx &
-      "). Nested pinning is forbidden."
+        "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
     var name {.inject.} = retireReady(pinnedGuard)
     try:
@@ -203,7 +206,9 @@ proc advanceEvery*[MT: static int](
   ## `epoch advancement guide<../guide/epoch-advancement.md>`_.
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -234,7 +239,9 @@ proc reclaimNow*[MT: static int](handle: ThreadHandle[MT]): int =
   ## See also: `debra/typestates/reclaim.tryReclaim`_, `advance`_.
   runnableExamples:
     import debra
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -279,7 +286,9 @@ proc retireAndReclaim*[MT: static int](
   ## low-level typestate API directly or call with eager=false.
   runnableExamples:
     import debra
-    proc destroyNode(p: pointer) {.nimcall.} = dealloc(p)
+    proc destroyNode(p: pointer) {.nimcall.} =
+      dealloc(p)
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
@@ -323,6 +332,7 @@ proc retireAndReclaim*[T: ref, MT: static int](
     import debra
     type Node = ref object
       value: int
+
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)

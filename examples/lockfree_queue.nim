@@ -23,6 +23,7 @@ type
   NodeObj[T] = object
     value: T
     next: Atomic[ptr NodeObj[T]]
+
   Node[T] = ref NodeObj[T]
 
   Queue*[T] = object
@@ -55,12 +56,13 @@ proc enqueue*[T](queue: var Queue[T], value: T) =
         if tail.next.compareExchangeStrong(expected, newNode, moRelease, moRelaxed):
           var observedTail = tail
           discard queue.tail.compareExchangeStrong(
-            observedTail, newNode, moRelease, moRelaxed)
+            observedTail, newNode, moRelease, moRelaxed
+          )
           break
       else:
         var observedTail = tail
-        discard queue.tail.compareExchangeStrong(
-          observedTail, next, moRelease, moRelaxed)
+        discard
+          queue.tail.compareExchangeStrong(observedTail, next, moRelease, moRelaxed)
 
 proc dequeue*[T](queue: var Queue[T]): Option[T] =
   result = none(T)
@@ -76,13 +78,12 @@ proc dequeue*[T](queue: var Queue[T]): Option[T] =
           if next == nil:
             break dequeueLoop
           var observedTail = tail
-          discard queue.tail.compareExchangeStrong(
-            observedTail, next, moRelease, moRelaxed)
+          discard
+            queue.tail.compareExchangeStrong(observedTail, next, moRelease, moRelaxed)
         else:
           let value = next.value
           var observedHead = head
-          if queue.head.compareExchangeStrong(
-              observedHead, next, moRelease, moRelaxed):
+          if queue.head.compareExchangeStrong(observedHead, next, moRelease, moRelaxed):
             # Retire old head (sentinel). The destructor will GC_unref it
             # once the epoch is safe, balancing the `retain` from newQueue
             # or the previous enqueue.
@@ -109,11 +110,11 @@ proc main() =
     echo "  Dequeued: ", item.get
 
   # Reclaim
-  for _ in 0..3:
+  for _ in 0 .. 3:
     manager.advance()
 
   let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
-  case reclaimResult.kind:
+  case reclaimResult.kind
   of rReclaimReady:
     let count = reclaimResult.reclaimready.tryReclaim()
     echo "Reclaimed ", count, " nodes"

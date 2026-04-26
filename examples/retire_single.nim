@@ -8,6 +8,7 @@ type
   NodeObj = object
     value: int
     next: Atomic[Managed[ref NodeObj]]
+
   Node = ref NodeObj
 
 proc main() =

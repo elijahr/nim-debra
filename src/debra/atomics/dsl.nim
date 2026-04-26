@@ -22,7 +22,7 @@ proc relaxed*[T](loc: var Atomic[T]): T {.inline.} =
   ## Load `loc` with moRelaxed.
   loc.load(moRelaxed)
 
-proc relaxed*[T](loc: var Atomic[T]; value: T) {.inline.} =
+proc relaxed*[T](loc: var Atomic[T], value: T) {.inline.} =
   ## Store `value` into `loc` with moRelaxed.
   loc.store(value, moRelaxed)
 
@@ -31,7 +31,7 @@ proc acquire*[T](loc: var Atomic[T]): T {.inline.} =
   ## a valid store order.
   loc.load(moAcquire)
 
-proc release*[T](loc: var Atomic[T]; value: T) {.inline.} =
+proc release*[T](loc: var Atomic[T], value: T) {.inline.} =
   ## Store `value` into `loc` with moRelease. Store-only by design:
   ## moRelease is not a valid load order.
   loc.store(value, moRelease)
@@ -40,6 +40,6 @@ proc sequential*[T](loc: var Atomic[T]): T {.inline.} =
   ## Load `loc` with moSequentiallyConsistent.
   loc.load(moSequentiallyConsistent)
 
-proc sequential*[T](loc: var Atomic[T]; value: T) {.inline.} =
+proc sequential*[T](loc: var Atomic[T], value: T) {.inline.} =
   ## Store `value` into `loc` with moSequentiallyConsistent.
   loc.store(value, moSequentiallyConsistent)

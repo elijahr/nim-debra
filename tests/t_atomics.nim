@@ -75,7 +75,11 @@ suite "load/store":
     check a.load()[] == 5
 
   test "enum roundtrip":
-    type Color = enum Red, Green, Blue
+    type Color = enum
+      Red
+      Green
+      Blue
+
     var a: Atomic[Color]
     a.store(Green)
     check a.load() == Green
@@ -149,7 +153,7 @@ suite "compareExchange":
     a.store(5)
     var expected = 5
     check a.compareExchangeStrong(expected, 10) == true
-    check expected == 5  # unchanged on success
+    check expected == 5 # unchanged on success
     check a.load() == 10
 
   test "compareExchangeStrong failure overwrites expected":
@@ -157,8 +161,8 @@ suite "compareExchange":
     a.store(5)
     var expected = 99
     check a.compareExchangeStrong(expected, 10) == false
-    check expected == 5  # overwritten with current value
-    check a.load() == 5  # unchanged on failure
+    check expected == 5 # overwritten with current value
+    check a.load() == 5 # unchanged on failure
 
   test "compareExchangeWeak two-order success":
     var a: Atomic[int]
@@ -166,7 +170,7 @@ suite "compareExchange":
     var expected = 5
     # Weak may fail spuriously, retry until success or value differs.
     var ok = false
-    for _ in 0..32:
+    for _ in 0 .. 32:
       if a.compareExchangeWeak(expected, 10, moAcquireRelease, moAcquire):
         ok = true
         break
@@ -188,7 +192,9 @@ suite "compareExchange":
     a.store(0)
     var current = a.load(moRelaxed)
     while not a.compareExchangeWeak(
-        current, current * 2 + 1, moAcquireRelease, moAcquire):
+      current, current * 2 + 1, moAcquireRelease, moAcquire
+    )
+    :
       discard
     # 0 -> 0*2+1 = 1
     check a.load() == 1
@@ -260,7 +266,8 @@ suite "static rejection":
     # are admitted. Wrappers around `Pthread` (e.g. ThreadId) and other
     # small PODs go through this path.
     type Pod = object
-      handle: int  # int is naturally word-aligned, mirrors ThreadId(handle: Pthread)
+      handle: int # int is naturally word-aligned, mirrors ThreadId(handle: Pthread)
+
     var a: Atomic[Pod]
     let v = Pod(handle: 0xDEADBEEF)
     a.store(v)
@@ -282,6 +289,7 @@ suite "static rejection":
       block:
         type WithRef = object
           r: ref int
+
         var a: Atomic[WithRef]
         discard a.load()
     )
@@ -337,8 +345,8 @@ suite "static rejection":
       block:
         var a: Atomic[int]
         var expected = 0
-        discard a.compareExchangeStrong(
-          expected, 1, moAcquire, moSequentiallyConsistent)
+        discard
+          a.compareExchangeStrong(expected, 1, moAcquire, moSequentiallyConsistent)
     )
 
   test "compareExchange failure=moRelease does not compile":
@@ -346,8 +354,8 @@ suite "static rejection":
       block:
         var a: Atomic[int]
         var expected = 0
-        discard a.compareExchangeStrong(
-          expected, 1, moSequentiallyConsistent, moRelease)
+        discard
+          a.compareExchangeStrong(expected, 1, moSequentiallyConsistent, moRelease)
     )
 
   test "compareExchange failure=moAcquireRelease does not compile":
@@ -356,7 +364,8 @@ suite "static rejection":
         var a: Atomic[int]
         var expected = 0
         discard a.compareExchangeStrong(
-          expected, 1, moSequentiallyConsistent, moAcquireRelease)
+          expected, 1, moSequentiallyConsistent, moAcquireRelease
+        )
     )
 
   test "valid store orders compile":

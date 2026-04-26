@@ -12,15 +12,9 @@ import debra/atomics
 
 static:
   var a: Atomic[int]
-  doAssert not compiles(a.relaxed()),
-    "relaxed() leaked into core debra/atomics"
-  doAssert not compiles(a.relaxed(1)),
-    "relaxed(v) leaked into core debra/atomics"
-  doAssert not compiles(a.acquire()),
-    "acquire() leaked into core debra/atomics"
-  doAssert not compiles(a.release(1)),
-    "release(v) leaked into core debra/atomics"
-  doAssert not compiles(a.sequential()),
-    "sequential() leaked into core debra/atomics"
-  doAssert not compiles(a.sequential(1)),
-    "sequential(v) leaked into core debra/atomics"
+  doAssert not compiles(a.relaxed()), "relaxed() leaked into core debra/atomics"
+  doAssert not compiles(a.relaxed(1)), "relaxed(v) leaked into core debra/atomics"
+  doAssert not compiles(a.acquire()), "acquire() leaked into core debra/atomics"
+  doAssert not compiles(a.release(1)), "release(v) leaked into core debra/atomics"
+  doAssert not compiles(a.sequential()), "sequential() leaked into core debra/atomics"
+  doAssert not compiles(a.sequential(1)), "sequential(v) leaked into core debra/atomics"

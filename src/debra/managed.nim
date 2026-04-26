@@ -46,6 +46,7 @@ proc managed*[T: ref](obj: T): Managed[T] =
   runnableExamples("-d:allowSpinlockManagedRef"):
     type Node = ref object
       value: int
+
     let m = managed Node(value: 99)
     doAssert not m.isNil
     doAssert m.value == 99 # field access via the dot template
@@ -71,6 +72,7 @@ proc inner*[T](m: Managed[T]): T {.inline.} =
   runnableExamples("-d:allowSpinlockManagedRef"):
     type Node = ref object
       value: int
+
     let m = managed Node(value: 7)
     let r: Node = m.inner
     doAssert r.value == 7

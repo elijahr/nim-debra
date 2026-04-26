@@ -19,27 +19,30 @@
 import std/sysatomics
 import std/typetraits
 
-when not (defined(gcc) or defined(llvm_gcc) or defined(clang) or
-          defined(nintendoswitch)):
-  {.error: "debra/atomics currently requires gcc, clang, llvm_gcc, or " &
-           "nintendoswitch (the GCC __atomic_* builtin family). MSVC " &
-           "fallback is a future item.".}
+when not (
+  defined(gcc) or defined(llvm_gcc) or defined(clang) or defined(nintendoswitch)
+):
+  {.
+    error:
+      "debra/atomics currently requires gcc, clang, llvm_gcc, or " &
+      "nintendoswitch (the GCC __atomic_* builtin family). MSVC " &
+      "fallback is a future item."
+  .}
 
 # ---------------------------------------------------------------------------
 # MemoryOrder
 # ---------------------------------------------------------------------------
 
-type
-  MemoryOrder* = enum
-    ## Specifies how non-atomic operations can be reordered around atomic
-    ## operations. Ordinals match GCC's `__ATOMIC_*` so `ord(order)` is
-    ## passed directly to the builtins.
-    moRelaxed              ## No ordering constraints.
-    moConsume              ## Accepted, mapped to moAcquire (mirrors std).
-    moAcquire              ## No reordering of subsequent loads/stores before.
-    moRelease              ## No reordering of preceding loads/stores after.
-    moAcquireRelease       ## Both acquire and release on RMW.
-    moSequentiallyConsistent ## Single total order across all SC ops.
+type MemoryOrder* = enum
+  ## Specifies how non-atomic operations can be reordered around atomic
+  ## operations. Ordinals match GCC's `__ATOMIC_*` so `ord(order)` is
+  ## passed directly to the builtins.
+  moRelaxed ## No ordering constraints.
+  moConsume ## Accepted, mapped to moAcquire (mirrors std).
+  moAcquire ## No reordering of subsequent loads/stores before.
+  moRelease ## No reordering of preceding loads/stores after.
+  moAcquireRelease ## Both acquire and release on RMW.
+  moSequentiallyConsistent ## Single total order across all SC ops.
 
 template toAtomMemModel(o: MemoryOrder): AtomMemModel =
   cast[AtomMemModel](cint(ord(o)))
@@ -71,12 +74,17 @@ template cacheLineAligned*(decl: untyped) =
 
 template assertAtomCompat(T: typedesc) =
   when T is ref:
-    {.error: "Atomic[ref T] is forbidden. Use Managed[T] " &
-             "(see debra/managed) or Atomic[ptr T] for raw pointers.".}
+    {.
+      error:
+        "Atomic[ref T] is forbidden. Use Managed[T] " &
+        "(see debra/managed) or Atomic[ptr T] for raw pointers."
+    .}
   elif not supportsCopyMem(T):
-    {.error: "Atomic[T] requires T to be trivially copyable (no " &
-             "GC-managed fields). For ref types, use Managed[T] or " &
-             "Atomic[ptr T].".}
+    {.
+      error:
+        "Atomic[T] requires T to be trivially copyable (no " &
+        "GC-managed fields). For ref types, use Managed[T] or " & "Atomic[ptr T]."
+    .}
 
 # ---------------------------------------------------------------------------
 # Lock-free enforcement
@@ -89,31 +97,34 @@ template assertLockFree(T: typedesc) =
   ## constant-folds the call. Bypass with
   ## `-d:debraAllowNonLockFreeAtomics`.
   when not defined(debraAllowNonLockFreeAtomics):
-    {.emit: [
-      "_Static_assert(__atomic_always_lock_free(sizeof(", T,
-      "), 0), \"Atomic[", $T,
-      "] is not lock-free on this target; pass " &
-        "-d:debraAllowNonLockFreeAtomics to override\");"
-    ].}
+    {.
+      emit: [
+        "_Static_assert(__atomic_always_lock_free(sizeof(",
+        T,
+        "), 0), \"Atomic[",
+        $T,
+        "] is not lock-free on this target; pass " &
+          "-d:debraAllowNonLockFreeAtomics to override\");",
+      ]
+    .}
 
 # ---------------------------------------------------------------------------
 # Atomic[T]
 # ---------------------------------------------------------------------------
 
-type
-  Atomic*[T] = object
-    ## Atomic wrapper for `T`. Lock-free on this target; rejects
-    ## `ref T`.
-    ##
-    ## Note on alignment: Nim's field-level `{.align: ...}` pragma
-    ## cannot reference `sizeof(T)` from a generic context (as of
-    ## Nim 2.2.6 it triggers `sizeof requires .importc types to be
-    ## .completeStruct`). Instead we rely on `T`'s natural alignment
-    ## (always >= sizeof(T) for primitives on 64-bit targets) and
-    ## guard via `static: assert alignof(Atomic[T]) >= sizeof(T)`
-    ## inside each op. If a 32-bit target ever trips that guard we
-    ## will emit a per-size dispatch.
-    value: T
+type Atomic*[T] = object
+  ## Atomic wrapper for `T`. Lock-free on this target; rejects
+  ## `ref T`.
+  ##
+  ## Note on alignment: Nim's field-level `{.align: ...}` pragma
+  ## cannot reference `sizeof(T)` from a generic context (as of
+  ## Nim 2.2.6 it triggers `sizeof requires .importc types to be
+  ## .completeStruct`). Instead we rely on `T`'s natural alignment
+  ## (always >= sizeof(T) for primitives on 64-bit targets) and
+  ## guard via `static: assert alignof(Atomic[T]) >= sizeof(T)`
+  ## inside each op. If a 32-bit target ever trips that guard we
+  ## will emit a per-size dispatch.
+  value: T
 
 # Compile-time gates fire when the type is referenced in a real
 # definition. Wrapping in a no-op proc forces instantiation.
@@ -122,8 +133,8 @@ template enforceAtomicConstraints(T: typedesc) =
   assertLockFree(T)
   static:
     assert alignof(Atomic[T]) >= sizeof(T),
-      "alignment guard for Atomic[" & $T & "] failed " &
-      "(alignof=" & $alignof(Atomic[T]) & ", sizeof=" & $sizeof(T) & ")"
+      "alignment guard for Atomic[" & $T & "] failed " & "(alignof=" &
+        $alignof(Atomic[T]) & ", sizeof=" & $sizeof(T) & ")"
 
 # ---------------------------------------------------------------------------
 # Memory-order validation per op
@@ -133,26 +144,24 @@ template validLoadOrder(order: MemoryOrder) =
   static:
     assert order != moRelease and order != moAcquireRelease,
       "moRelease / moAcquireRelease is not a valid memory order " &
-      "for load; use moRelaxed, moConsume, moAcquire, or " &
-      "moSequentiallyConsistent"
+        "for load; use moRelaxed, moConsume, moAcquire, or " & "moSequentiallyConsistent"
 
 template validStoreOrder(order: MemoryOrder) =
   static:
-    assert order != moAcquire and order != moAcquireRelease and
-           order != moConsume,
+    assert order != moAcquire and order != moAcquireRelease and order != moConsume,
       "moAcquire / moAcquireRelease / moConsume is not a valid " &
-      "memory order for store; use moRelaxed, moRelease, or " &
-      "moSequentiallyConsistent"
+        "memory order for store; use moRelaxed, moRelease, or " &
+        "moSequentiallyConsistent"
 
 template validCasFailureOrder(success, failure: MemoryOrder) =
   static:
     assert failure != moRelease and failure != moAcquireRelease,
       "compareExchange failure order moRelease / moAcquireRelease " &
-      "is invalid; failure must be moRelaxed, moConsume, " &
-      "moAcquire, or moSequentiallyConsistent"
+        "is invalid; failure must be moRelaxed, moConsume, " &
+        "moAcquire, or moSequentiallyConsistent"
     assert ord(failure) <= ord(success),
       "compareExchange failure order is stronger than success " &
-      "order; failure must be <= success"
+        "order; failure must be <= success"
 
 # ---------------------------------------------------------------------------
 # Loads and stores
@@ -163,45 +172,56 @@ template validCasFailureOrder(success, failure: MemoryOrder) =
 # values (enums, smaller bools) through the AtomType-typed builtins via
 # bitwise cast.
 template nonAtomicType*(T: typedesc): typedesc =
-  when sizeof(T) == 1: int8
-  elif sizeof(T) == 2: int16
-  elif sizeof(T) == 4: int32
-  elif sizeof(T) == 8: int64
+  when sizeof(T) == 1:
+    int8
+  elif sizeof(T) == 2:
+    int16
+  elif sizeof(T) == 4:
+    int32
+  elif sizeof(T) == 8:
+    int64
   else:
     {.error: "no nonAtomicType for " & $T.}
 
-proc load*[T](loc: var Atomic[T];
-              order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc load*[T](
+    loc: var Atomic[T], order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   validLoadOrder(order)
-  cast[T](atomicLoadN(
-    cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)))
+  cast[T](atomicLoadN(cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)))
 
-proc store*[T](loc: var Atomic[T]; desired: T;
-               order: static MemoryOrder = moSequentiallyConsistent) {.inline.} =
+proc store*[T](
+    loc: var Atomic[T], desired: T, order: static MemoryOrder = moSequentiallyConsistent
+) {.inline.} =
   enforceAtomicConstraints(T)
   validStoreOrder(order)
   atomicStoreN(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](desired),
-    toAtomMemModel(order))
+    toAtomMemModel(order),
+  )
 
 # ---------------------------------------------------------------------------
 # Read-modify-write
 # ---------------------------------------------------------------------------
 
-proc exchange*[T](loc: var Atomic[T]; desired: T;
-                  order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc exchange*[T](
+    loc: var Atomic[T], desired: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   cast[T](atomicExchangeN(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](desired),
-    toAtomMemModel(order)))
+    toAtomMemModel(order),
+  ))
 
-proc compareExchangeStrong*[T](loc: var Atomic[T]; expected: var T;
-                               desired: T;
-                               success: static MemoryOrder = moSequentiallyConsistent;
-                               failure: static MemoryOrder = moSequentiallyConsistent): bool {.inline.} =
+proc compareExchangeStrong*[T](
+    loc: var Atomic[T],
+    expected: var T,
+    desired: T,
+    success: static MemoryOrder = moSequentiallyConsistent,
+    failure: static MemoryOrder = moSequentiallyConsistent,
+): bool {.inline.} =
   ## Strong CAS. On success, swaps `desired` into `loc`. On failure,
   ## overwrites `expected` with the current value of `loc`.
   enforceAtomicConstraints(T)
@@ -212,12 +232,16 @@ proc compareExchangeStrong*[T](loc: var Atomic[T]; expected: var T;
     cast[nonAtomicType(T)](desired),
     weak = false,
     toAtomMemModel(success),
-    toAtomMemModel(failure))
+    toAtomMemModel(failure),
+  )
 
-proc compareExchangeWeak*[T](loc: var Atomic[T]; expected: var T;
-                             desired: T;
-                             success: static MemoryOrder = moSequentiallyConsistent;
-                             failure: static MemoryOrder = moSequentiallyConsistent): bool {.inline.} =
+proc compareExchangeWeak*[T](
+    loc: var Atomic[T],
+    expected: var T,
+    desired: T,
+    success: static MemoryOrder = moSequentiallyConsistent,
+    failure: static MemoryOrder = moSequentiallyConsistent,
+): bool {.inline.} =
   ## Weak CAS. May fail spuriously on platforms (notably ARM LL/SC)
   ## even when current value equals `expected`. Cheaper inside a loop.
   enforceAtomicConstraints(T)
@@ -228,51 +252,62 @@ proc compareExchangeWeak*[T](loc: var Atomic[T]; expected: var T;
     cast[nonAtomicType(T)](desired),
     weak = true,
     toAtomMemModel(success),
-    toAtomMemModel(failure))
+    toAtomMemModel(failure),
+  )
 
 # ---------------------------------------------------------------------------
 # Numeric (SomeInteger only)
 # ---------------------------------------------------------------------------
 
-proc fetchAdd*[T: SomeInteger](loc: var Atomic[T]; v: T;
-                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc fetchAdd*[T: SomeInteger](
+    loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   cast[T](atomicFetchAdd(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](v),
-    toAtomMemModel(order)))
+    toAtomMemModel(order),
+  ))
 
-proc fetchSub*[T: SomeInteger](loc: var Atomic[T]; v: T;
-                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc fetchSub*[T: SomeInteger](
+    loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   cast[T](atomicFetchSub(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](v),
-    toAtomMemModel(order)))
+    toAtomMemModel(order),
+  ))
 
-proc fetchAnd*[T: SomeInteger](loc: var Atomic[T]; v: T;
-                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc fetchAnd*[T: SomeInteger](
+    loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   cast[T](atomicFetchAnd(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](v),
-    toAtomMemModel(order)))
+    toAtomMemModel(order),
+  ))
 
-proc fetchOr*[T: SomeInteger](loc: var Atomic[T]; v: T;
-                              order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc fetchOr*[T: SomeInteger](
+    loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   cast[T](atomicFetchOr(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](v),
-    toAtomMemModel(order)))
+    toAtomMemModel(order),
+  ))
 
-proc fetchXor*[T: SomeInteger](loc: var Atomic[T]; v: T;
-                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+proc fetchXor*[T: SomeInteger](
+    loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
   enforceAtomicConstraints(T)
   cast[T](atomicFetchXor(
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](v),
-    toAtomMemModel(order)))
+    toAtomMemModel(order),
+  ))
 
 # ---------------------------------------------------------------------------
 # Fences
@@ -291,20 +326,21 @@ proc signalFence*(order: MemoryOrder) {.inline.} =
 # AtomicFlag
 # ---------------------------------------------------------------------------
 
-type
-  AtomicFlag* = distinct uint8
-    ## Boolean flag with `testAndSet` / `clear` semantics. Underlying
-    ## byte must be 0 or 1; `__atomic_test_and_set` is
-    ## implementation-defined for any other value, so do not poke the
-    ## raw uint8 directly.
+type AtomicFlag* = distinct uint8
+  ## Boolean flag with `testAndSet` / `clear` semantics. Underlying
+  ## byte must be 0 or 1; `__atomic_test_and_set` is
+  ## implementation-defined for any other value, so do not poke the
+  ## raw uint8 directly.
 
-proc testAndSet*(loc: var AtomicFlag;
-                 order: static MemoryOrder = moSequentiallyConsistent): bool {.inline.} =
+proc testAndSet*(
+    loc: var AtomicFlag, order: static MemoryOrder = moSequentiallyConsistent
+): bool {.inline.} =
   ## Atomically set the flag and return its previous value.
   atomicTestAndSet(cast[pointer](addr loc), toAtomMemModel(order))
 
-proc clear*(loc: var AtomicFlag;
-            order: static MemoryOrder = moSequentiallyConsistent) {.inline.} =
+proc clear*(
+    loc: var AtomicFlag, order: static MemoryOrder = moSequentiallyConsistent
+) {.inline.} =
   ## Atomically reset the flag to false. `order` must not be
   ## moAcquire / moAcquireRelease / moConsume.
   validStoreOrder(order)

@@ -9,6 +9,7 @@ type
   NodeObj = object
     value: int
     next: Atomic[Managed[ref NodeObj]]
+
   Node = ref NodeObj
 
 # Helper to perform one pin/unpin cycle with retirement
@@ -28,7 +29,7 @@ proc doCycle(handle: ThreadHandle[4], manager: var DebraManager[4], value: int) 
   let unpinResult = pinned.unpin()
 
   # Handle neutralization if it occurred
-  case unpinResult.kind:
+  case unpinResult.kind
   of uUnpinned:
     discard
   of uNeutralized:
@@ -43,7 +44,7 @@ proc main() =
   let handle = registerThread(manager)
 
   # 3. Simulate some operations
-  for i in 0..<10:
+  for i in 0 ..< 10:
     doCycle(handle, manager, i)
 
     # Advance epoch periodically
@@ -51,11 +52,9 @@ proc main() =
       manager.advance()
 
   # 4. Attempt reclamation
-  let reclaimResult = reclaimStart(addr manager)
-    .loadEpochs()
-    .checkSafe()
+  let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
 
-  case reclaimResult.kind:
+  case reclaimResult.kind
   of rReclaimReady:
     let count = reclaimResult.reclaimready.tryReclaim()
     echo "Reclaimed ", count, " objects"

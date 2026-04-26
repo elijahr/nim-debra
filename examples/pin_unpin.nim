@@ -8,6 +8,7 @@ type
   NodeObj = object
     value: int
     next: Atomic[Managed[ref NodeObj]]
+
   Node = ref NodeObj
 
 proc main() =
@@ -26,7 +27,7 @@ proc main() =
     echo "Created node: ", node.value
 
     let unpinResult = pinned.unpin()
-    case unpinResult.kind:
+    case unpinResult.kind
     of uUnpinned:
       echo "Normal unpin"
     of uNeutralized:
@@ -36,7 +37,7 @@ proc main() =
   # Multiple pin/unpin cycles
   echo ""
   echo "=== Multiple Cycles ==="
-  for i in 1..3:
+  for i in 1 .. 3:
     let pinned = unpinned(handle).pin()
     echo "Cycle ", i, ": pinned at epoch ", pinned.epoch
 
@@ -46,7 +47,7 @@ proc main() =
     discard ready.retire(node)
 
     let unpinResult = pinned.unpin()
-    case unpinResult.kind:
+    case unpinResult.kind
     of uUnpinned:
       echo "Cycle ", i, ": unpinned normally"
     of uNeutralized:

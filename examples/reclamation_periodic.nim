@@ -7,6 +7,7 @@ import debra/atomics
 type
   NodeObj = object
     value: int
+
   Node = ref NodeObj
 
 const ReclaimInterval = 10
@@ -20,9 +21,11 @@ proc doOperation(handle: ThreadHandle[64], i: int) =
   discard ready.retire(node)
 
   let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  case unpinResult.kind
+  of uUnpinned:
+    discard
+  of uNeutralized:
+    discard unpinResult.neutralized.acknowledge()
 
 proc periodicReclaimDemo() =
   var manager = initDebraManager[64]()
@@ -32,7 +35,7 @@ proc periodicReclaimDemo() =
   var totalReclaimed = 0
 
   # Perform operations with periodic reclamation
-  for i in 0..<50:
+  for i in 0 ..< 50:
     # Do one operation
     doOperation(handle, i)
 
@@ -42,11 +45,9 @@ proc periodicReclaimDemo() =
 
     # Attempt reclamation every ReclaimInterval operations
     if i mod ReclaimInterval == ReclaimInterval - 1:
-      let reclaimResult = reclaimStart(addr manager)
-        .loadEpochs()
-        .checkSafe()
+      let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
 
-      case reclaimResult.kind:
+      case reclaimResult.kind
       of rReclaimReady:
         let count = reclaimResult.reclaimready.tryReclaim()
         totalReclaimed += count
