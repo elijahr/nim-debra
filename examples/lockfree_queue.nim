@@ -1,18 +1,33 @@
 # examples/lockfree_queue.nim
 ## Lock-free Michael-Scott queue with DEBRA reclamation.
+##
+## ## Why `Atomic[ptr NodeObj[T]]` and not `Atomic[Managed[ref NodeObj[T]]]`
+##
+## `Managed[ref T]` is the right tool for non-atomic shared ownership: it
+## keeps a ref alive across DEBRA epochs and integrates with Nim's GC.
+## But `Atomic[ref T]` (and therefore `Atomic[Managed[ref T]]`) falls back
+## to spinlock-based atomics on arc/orc, which silently defeats lock-free
+## guarantees.
+##
+## For atomic pointer storage in lock-free code, this example uses the
+## explicit `retain` / `release` / `releaseDestructor` helpers from
+## `debra/refptr`: `retain` increments the GC ref count and hands back a
+## raw `ptr T`, `releaseDestructor[T]()` is a `Destructor` that DEBRA
+## calls at reclamation time to balance the retain.
 
 import debra
-import std/[atomics, options]
+import debra/atomics
+import std/options
 
 type
   NodeObj[T] = object
     value: T
-    next: Atomic[Managed[ref NodeObj[T]]]
+    next: Atomic[ptr NodeObj[T]]
   Node[T] = ref NodeObj[T]
 
   Queue*[T] = object
-    head: Atomic[Managed[ref NodeObj[T]]]
-    tail: Atomic[Managed[ref NodeObj[T]]]
+    head: Atomic[ptr NodeObj[T]]
+    tail: Atomic[ptr NodeObj[T]]
     manager: ptr DebraManager[64]
     handle: ThreadHandle[64]
 
@@ -20,52 +35,60 @@ proc newQueue*[T](manager: ptr DebraManager[64]): Queue[T] =
   result.manager = manager
   result.handle = registerThread(manager[])
 
-  # Create sentinel node
-  let sentinel = managed Node[T]()
+  # Create sentinel node. `retain` pins it in the GC and yields a ptr we
+  # can store atomically. The sentinel is balanced by the retire path
+  # the first time it gets dequeued.
+  let sentinel = retain Node[T]()
   result.head.store(sentinel, moRelaxed)
   result.tail.store(sentinel, moRelaxed)
 
 proc enqueue*[T](queue: var Queue[T], value: T) =
-  let pinned = unpinned(queue.handle).pin()
+  let newNode = retain Node[T](value: value)
 
-  let newNode = managed Node[T](value: value)
+  queue.handle.withPin:
+    while true:
+      let tail = queue.tail.load(moAcquire)
+      let next = tail.next.load(moAcquire)
 
-  while true:
-    var tail = queue.tail.load(moAcquire)
-    let next = tail.inner.next.load(moAcquire)
-
-    if next.isNil:
-      var expected: Managed[Node[T]]
-      if tail.inner.next.compareExchange(expected, newNode, moRelease, moRelaxed):
-        discard queue.tail.compareExchange(tail, newNode, moRelease, moRelaxed)
-        break
-    else:
-      discard queue.tail.compareExchange(tail, next, moRelease, moRelaxed)
-
-  discard pinned.unpin()
+      if next == nil:
+        var expected: ptr NodeObj[T] = nil
+        if tail.next.compareExchangeStrong(expected, newNode, moRelease, moRelaxed):
+          var observedTail = tail
+          discard queue.tail.compareExchangeStrong(
+            observedTail, newNode, moRelease, moRelaxed)
+          break
+      else:
+        var observedTail = tail
+        discard queue.tail.compareExchangeStrong(
+          observedTail, next, moRelease, moRelaxed)
 
 proc dequeue*[T](queue: var Queue[T]): Option[T] =
-  let pinned = unpinned(queue.handle).pin()
+  result = none(T)
 
-  while true:
-    var head = queue.head.load(moAcquire)
-    var tail = queue.tail.load(moAcquire)
-    let next = head.inner.next.load(moAcquire)
+  queue.handle.withPin:
+    block dequeueLoop:
+      while true:
+        let head = queue.head.load(moAcquire)
+        let tail = queue.tail.load(moAcquire)
+        let next = head.next.load(moAcquire)
 
-    if head == tail:
-      if next.isNil:
-        discard pinned.unpin()
-        return none(T)
-      discard queue.tail.compareExchange(tail, next, moRelease, moRelaxed)
-    else:
-      let value = next.value
-      if queue.head.compareExchange(head, next, moRelease, moRelaxed):
-        # Retire old head (sentinel)
-        let ready = retireReady(pinned)
-        discard ready.retire(head)
-
-        discard pinned.unpin()
-        return some(value)
+        if head == tail:
+          if next == nil:
+            break dequeueLoop
+          var observedTail = tail
+          discard queue.tail.compareExchangeStrong(
+            observedTail, next, moRelease, moRelaxed)
+        else:
+          let value = next.value
+          var observedHead = head
+          if queue.head.compareExchangeStrong(
+              observedHead, next, moRelease, moRelaxed):
+            # Retire old head (sentinel). The destructor will GC_unref it
+            # once the epoch is safe, balancing the `retain` from newQueue
+            # or the previous enqueue.
+            it.retire(cast[pointer](head), releaseDestructor[NodeObj[T]]())
+            result = some(value)
+            break dequeueLoop
 
 proc main() =
   var manager = initDebraManager[64]()
