@@ -31,21 +31,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        nim-version: ['latest:2']
+        nim-version: ['stable']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install asdf
-        uses: asdf-vm/actions/setup@v3
-
-      - name: Install asdf-nim plugin
-        run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
-
-      - name: Install Nim ${{ matrix.nim-version }}
-        run: |
-          asdf install nim ${{ matrix.nim-version }}
-          asdf global nim ${{ matrix.nim-version }}
+      - name: Setup Nim ${{ matrix.nim-version }}
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: ${{ matrix.nim-version }}
 
       - name: Cache Nimble packages
         uses: actions/cache@v4
