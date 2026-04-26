@@ -24,6 +24,23 @@
 ##   array contents are copied into the limbo bag during the call, so the
 ##   caller's array does not need to outlive the reclamation pass.
 ##
+## ## Naming convention
+##
+## This module is the **manager-level** layer: `retire`, `retireBatch`,
+## `reclaimNow`, `retireAndReclaim`, `withPin`, and `advanceEvery` coordinate
+## the epoch-based reclamation pipeline (deferred destruction until no thread
+## can observe an object). They take a `(pointer, Destructor)` pair and
+## decide *when* the destructor runs.
+##
+## The **object-lifetime** layer in `debra/refptr` uses different verbs
+## (`retain`, `release`, `releaseDestructor`) because it operates on a
+## single object's GC refcount and has no awareness of epochs or threads.
+## The two layers compose: `releaseDestructor[T]()` from `debra/refptr` is
+## the destructor handed to `pin.retire(p, dtor)` so that `release` runs at
+## safe-epoch reclamation time. The verbs differ because the layers differ;
+## do not expect `retire` and `retain` (or `reclaim` and `release`) to be
+## synonyms.
+##
 ## ## See also
 ##
 ## * `debra/typestates/guard`_ - explicit `pin` / `unpin` typestate transitions.

@@ -32,6 +32,22 @@
 ##   refcounts and are not affected. See `examples/reclamation_background.nim`
 ##   for the full investigation.
 ##
+## ## Naming convention
+##
+## This module is the **object-lifetime** layer: `retain` / `release` /
+## `releaseDestructor` operate on a single object's GC refcount and have no
+## awareness of epochs, threads, or limbo bags.
+##
+## The **manager-level** layer in `debra/convenience` and
+## `debra/typestates/{retire,reclaim}` uses different verbs (`retire`,
+## `reclaim`, `tryReclaim`, `retireAndReclaim`) because it operates on the
+## epoch-based reclamation pipeline: deferring destruction until no thread
+## can observe the object. The two layers compose: a `releaseDestructor[T]()`
+## value is the destructor handed to `pin.retire(p, dtor)` so that `release`
+## runs at safe-epoch reclamation time. The verbs differ because the layers
+## differ; do not expect `release` and `reclaim` (or `retain` and `retire`)
+## to be synonyms.
+##
 ## ## See also
 ##
 ## * `debra/typestates/retire`_ - underlying `pin.retire(p, dtor)` transition.
