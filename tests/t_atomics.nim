@@ -253,6 +253,39 @@ suite "static rejection":
         a.store(nil)
     )
 
+  test "Atomic[POD object] compiles and round-trips":
+    # T must satisfy `supportsCopyMem` (no GC-managed fields, recursively)
+    # AND pass the C-level lock-free check. POD object types up to the
+    # platform's lock-free word size with natural alignment >= sizeof
+    # are admitted. Wrappers around `Pthread` (e.g. ThreadId) and other
+    # small PODs go through this path.
+    type Pod = object
+      handle: int  # int is naturally word-aligned, mirrors ThreadId(handle: Pthread)
+    var a: Atomic[Pod]
+    let v = Pod(handle: 0xDEADBEEF)
+    a.store(v)
+    let r = a.load()
+    check r.handle == 0xDEADBEEF
+
+  test "Atomic[distinct uint64] compiles and round-trips":
+    type Tag = distinct uint64
+    proc `==`(a, b: Tag): bool {.borrow.}
+    var a: Atomic[Tag]
+    a.store(Tag(0x1234_5678'u64))
+    check a.load() == Tag(0x1234_5678'u64)
+
+  test "Atomic[object containing ref field] does not compile":
+    # supportsCopyMem rejects this even though the outer type is an
+    # object: any GC-managed field anywhere in the type makes it
+    # unsafe to copy bytewise.
+    check not compiles(
+      block:
+        type WithRef = object
+          r: ref int
+        var a: Atomic[WithRef]
+        discard a.load()
+    )
+
   test "Atomic[seq[T]] does not compile (not a Trivial type)":
     # Constraints fire at op site; trying to load forces it.
     check not compiles(

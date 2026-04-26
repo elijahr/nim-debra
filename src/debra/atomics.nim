@@ -17,6 +17,7 @@
 ## Nintendo Switch toolchain.
 
 import std/sysatomics
+import std/typetraits
 
 when not (defined(gcc) or defined(llvm_gcc) or defined(clang) or
           defined(nintendoswitch)):
@@ -70,12 +71,12 @@ template cacheLineAligned*(decl: untyped) =
 
 template assertAtomCompat(T: typedesc) =
   when T is ref:
-    {.error: "Atomic[ref T] is forbidden; use Managed[T] " &
-             "(debra/managed.nim) or Atomic[ptr T]".}
-  elif not (T is SomeInteger or T is ptr or T is bool or
-            T is enum or T is pointer or T is char):
-    {.error: "Atomic[T] only supports integers, ptr, bool, enum, " &
-             "pointer, or char (got " & $T & ")".}
+    {.error: "Atomic[ref T] is forbidden. Use Managed[T] " &
+             "(see debra/managed) or Atomic[ptr T] for raw pointers.".}
+  elif not supportsCopyMem(T):
+    {.error: "Atomic[T] requires T to be trivially copyable (no " &
+             "GC-managed fields). For ref types, use Managed[T] or " &
+             "Atomic[ptr T].".}
 
 # ---------------------------------------------------------------------------
 # Lock-free enforcement
