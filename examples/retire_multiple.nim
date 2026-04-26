@@ -2,7 +2,7 @@
 ## Multiple object retirement example.
 
 import debra
-import std/atomics
+import debra/atomics
 
 type
   NodeObj = object

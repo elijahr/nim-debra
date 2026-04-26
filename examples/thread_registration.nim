@@ -2,7 +2,7 @@
 ## Thread registration lifecycle: multiple threads registering and using DEBRA.
 
 import debra
-import std/atomics
+import debra/atomics
 
 var manager: DebraManager[4]
 

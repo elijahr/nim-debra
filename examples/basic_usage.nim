@@ -2,7 +2,7 @@
 ## Basic DEBRA+ usage: initialize manager, register thread, pin/unpin, retire, reclaim.
 
 import debra
-import std/atomics
+import debra/atomics
 
 # Node type using ref object pattern for self-reference
 type

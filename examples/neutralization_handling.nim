@@ -2,7 +2,7 @@
 ## Neutralization: handling signal-based interruption of stalled threads.
 
 import debra
-import std/atomics
+import debra/atomics
 
 when isMainModule:
   var manager = initDebraManager[4]()
