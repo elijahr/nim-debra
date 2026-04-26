@@ -22,6 +22,26 @@
 ## Each `retain` MUST be paired with exactly one `release` (typically via
 ## `releaseDestructor[T]()` handed to `pin.retire`). Double-release will
 ## free the underlying object early.
+##
+## ## Pitfalls
+##
+## * Every `retain` must be paired with exactly one `release`. Double-release
+##   will free the object early; missing release leaks the underlying GC cell.
+## * `release` is nil-safe (no-op on `nil`). Passing `nil` to `retain` is a
+##   programmer error and will likely crash inside `GC_ref`.
+## * Under `--mm:refc`, `release` (or any reclamation that runs the destructor
+##   produced by `releaseDestructor[T]()`) must occur on the same thread that
+##   called `retain`. refc has thread-local GC heaps; cross-thread `GC_unref`
+##   is undefined and crashes inside `decRef`. arc/orc use atomic shared
+##   refcounts and are not affected. See `examples/reclamation_background.nim`
+##   for the full investigation.
+## * `releaseDestructor[T]()` allocates a fresh closure on each call. Cache the
+##   result per type if you retire many objects in a hot loop.
+##
+## ## See also
+##
+## * `debra/managed`_ - higher-level wrapper using a `distinct ref` (non-atomic).
+## * `debra/typestates/retire`_ - underlying `pin.retire(p, dtor)` transition.
 
 import ./limbo
 
@@ -33,6 +53,8 @@ proc retain*[T: ref](obj: T): ptr typeof(obj[]) {.inline.} =
   ##
   ## Passing nil is a programmer error and will likely crash inside
   ## `GC_ref`. The result is never nil.
+  ##
+  ## See also: `release`_, `releaseDestructor`_, `Managed`_.
   runnableExamples:
     type Node = ref object
       value: int
@@ -49,6 +71,8 @@ proc release*[T](p: ptr T) {.inline.} =
   ## Safe to call on `nil` (no-op).
   ##
   ## Note: takes `ptr T` (the value type), matching what `retain` returns.
+  ##
+  ## See also: `retain`_, `releaseDestructor`_.
   runnableExamples:
     type Node = ref object
       value: int
@@ -67,6 +91,8 @@ proc releaseDestructor*[T](): Destructor =
   ##
   ## Each instantiation produces an identical closure; cache the result
   ## per type if you retire many objects in a hot loop.
+  ##
+  ## See also: `retain`_, `release`_.
   runnableExamples:
     import debra
     type Node = ref object

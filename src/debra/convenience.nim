@@ -2,6 +2,33 @@
 ##
 ## These procs compose the low-level typestate API for frequent use cases.
 ## For fine-grained control or batching, use the typestate API directly.
+##
+## ## Pitfalls
+##
+## * `withPin` does not allow re-pinning the same handle inside its body.
+##   A debug `assert` catches direct nesting; under `-d:release` the assert
+##   is a no-op and the second `pin` will corrupt the pinned-flag on the
+##   thread's slot. Different handles (multi-manager) are independent.
+## * Do not invoke explicit typestate transitions
+##   (`unpinned`/`pin`/`unpin`/`acknowledge`) inside a `withPin` body. The
+##   `try`/`finally` already manages the lifecycle; manual transitions on the
+##   same handle desync the slot's `pinned` flag.
+## * `it` injected by `withPin` is a `var RetireReady[MT]`; it is only valid
+##   inside the body. Items retired via `it.retire(...)` and `it.retireBatch(...)`
+##   are added to the thread's limbo bag at the pinned epoch and are not
+##   reclaimed until a later reclamation pass observes a safe epoch.
+## * `reclaimNow` returns 0 when no epoch is safe to reclaim yet. That is
+##   normal at startup or when no thread has advanced the epoch since the
+##   last retire. It is not an error; reclamation is best-effort.
+## * `retireBatch` retires from the supplied `openArray` synchronously. The
+##   array contents are copied into the limbo bag during the call, so the
+##   caller's array does not need to outlive the reclamation pass.
+##
+## ## See also
+##
+## * `debra/typestates/guard`_ - explicit `pin` / `unpin` typestate transitions.
+## * `debra/typestates/retire`_ - typestate `retire` (sink form).
+## * `debra/typestates/reclaim`_ - typestate `reclaimStart` / `tryReclaim`.
 
 import ./atomics
 import ./types
@@ -91,6 +118,9 @@ template withPin*[MT: static int](
   ## Under debug builds, asserts the thread is not already pinned on the
   ## given handle. Under `-d:release`/`-d:danger` the assertion is a no-op.
   ## Different-handle nesting (multi-manager) is independent and legal.
+  ##
+  ## See also: `debra/typestates/guard.pin`_ (explicit transition), `retire`_,
+  ## `retireBatch`_.
   runnableExamples:
     import debra
     proc dtor(p: pointer) {.nimcall.} = dealloc(p)
@@ -150,6 +180,8 @@ proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
   ## Pinning is not required: reclamation only inspects per-thread epochs.
   ## Named distinctly from the typestate-level `tryReclaim` on `ReclaimReady`
   ## (`reclaim.nim`) to avoid reader confusion.
+  ##
+  ## See also: `debra/typestates/reclaim.tryReclaim`_, `advance`_.
   runnableExamples:
     import debra
     var manager = initDebraManager[4]()
