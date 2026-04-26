@@ -56,3 +56,24 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
     result.threads[i].limboBagHead = nil
     result.threads[i].limboBagTail = nil
     result.threads[i].advanceCounter = 0'u64
+
+proc `=destroy`*[MaxThreads: static int](manager: var DebraManager[MaxThreads]) =
+  ## Drain all per-thread limbo bags when the manager goes out of scope.
+  ##
+  ## Worker threads must have joined before the manager is destroyed (the
+  ## bag lists are owned by their respective slots without synchronization,
+  ## so concurrent retire during destruction is undefined). Process-exit
+  ## and end-of-scope cleanup is the typical caller.
+  ##
+  ## Without this, retire-but-not-yet-reclaimed objects (and the limbo bags
+  ## that hold them) leak under ASAN at exit. With aggressive Manual
+  ## strategies or short-lived managers, the leak is observable.
+  for i in 0 ..< MaxThreads:
+    var bag = manager.threads[i].limboBagTail
+    while bag != nil:
+      let nextBag = bag.next
+      reclaimBag(bag)
+      bag = nextBag
+    manager.threads[i].currentBag = nil
+    manager.threads[i].limboBagHead = nil
+    manager.threads[i].limboBagTail = nil
