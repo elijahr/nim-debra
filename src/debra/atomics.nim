@@ -92,21 +92,39 @@ template assertAtomCompat(T: typedesc) =
 
 template assertLockFree(T: typedesc) =
   ## C-compile-time check that `Atomic[T]` ops are lock-free. Emits a
-  ## `_Static_assert` invoking `__atomic_always_lock_free`. Cannot run
+  ## static-assertion invoking `__atomic_always_lock_free`. Cannot run
   ## in the Nim VM (importc is unavailable there); the C compiler
   ## constant-folds the call. Bypass with
   ## `-d:debraAllowNonLockFreeAtomics`.
+  ##
+  ## Form depends on the active backend: `_Static_assert` is the C11
+  ## keyword and is rejected by GCC's C++ frontend; `static_assert` is
+  ## the C++11 keyword and is rejected by older C frontends. (Apple's
+  ## clang accepts both in either mode, which is why this divergence
+  ## only surfaces on Linux g++.)
   when not defined(debraAllowNonLockFreeAtomics):
-    {.
-      emit: [
-        "_Static_assert(__atomic_always_lock_free(sizeof(",
-        T,
-        "), 0), \"Atomic[",
-        $T,
-        "] is not lock-free on this target; pass " &
-          "-d:debraAllowNonLockFreeAtomics to override\");",
-      ]
-    .}
+    when defined(cpp):
+      {.
+        emit: [
+          "static_assert(__atomic_always_lock_free(sizeof(",
+          T,
+          "), 0), \"Atomic[",
+          $T,
+          "] is not lock-free on this target; pass " &
+            "-d:debraAllowNonLockFreeAtomics to override\");",
+        ]
+      .}
+    else:
+      {.
+        emit: [
+          "_Static_assert(__atomic_always_lock_free(sizeof(",
+          T,
+          "), 0), \"Atomic[",
+          $T,
+          "] is not lock-free on this target; pass " &
+            "-d:debraAllowNonLockFreeAtomics to override\");",
+        ]
+      .}
 
 # ---------------------------------------------------------------------------
 # Atomic[T]
