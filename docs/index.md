@@ -8,13 +8,14 @@ DEBRA+ safe memory reclamation for lock-free data structures in Nim.
 
 ```nim
 import debra
-import std/atomics
+import debra/atomics
 
-# Define your node type using ref Obj pattern
+# Self-referential node: `Atomic[ptr NodeObj]` keeps the type checker
+# happy and stays lock-free under arc/orc/refc.
 type
   NodeObj = object
     value: int
-    next: Atomic[Managed[ref NodeObj]]
+    next: Atomic[ptr NodeObj]
   Node = ref NodeObj
 
 # Initialize manager (one per process)
@@ -26,14 +27,15 @@ let handle = registerThread(manager)
 
 # Critical section - pin to protect memory access
 let pinned = unpinned(handle).pin()
-# Create a managed node - GC won't collect until retired
-let node = managed Node(value: 42)
+# `retain` GC-pins the ref and yields a raw ptr for atomic storage.
+let node = retain Node(value: 42)
 # ... safely access lock-free data structures ...
-discard pinned.unpin()
 
-# Retire objects when they're no longer needed
+# Retire the pointer; `releaseDestructor[NodeObj]()` balances the retain
+# at safe-reclamation time.
 let ready = retireReady(pinned)
-let retired = ready.retire(node)
+let retired = ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
+discard pinned.unpin()
 ```
 
 The typestate system ensures you cannot accidentally access memory outside a critical section, retire objects without being pinned, or perform operations in the wrong order. If it compiles, the protocol is correct.
@@ -67,7 +69,7 @@ let handle = registerThread(manager)
 # This is correct:
 let pinned = unpinned(handle).pin()
 let ready = retireReady(pinned)
-let retired = ready.retire(node)
+let retired = ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 ```
 
 ## Key Features
@@ -75,7 +77,7 @@ let retired = ready.retire(node)
 - **Typestate-enforced API** - Invalid operation sequences fail at compile time
 - **Signal-based neutralization** - Handles stalled threads for bounded memory usage
 - **Limbo bags** - Thread-local retire queues organized in 64-object batches
-- **Managed[T] wrapper** - Works with any `ref` type, integrates with Nim's GC
+- **`retain` / `release` bridge** - Stores `ref` types in `Atomic[ptr T]` slots without spinlock fallback under arc/orc
 - **O(mn) memory bound** - Where m = threads, n = objects per epoch
 - **Zero runtime overhead** - Typestate validation happens at compile time
 

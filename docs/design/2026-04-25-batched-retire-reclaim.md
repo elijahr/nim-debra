@@ -286,7 +286,7 @@ without introducing a new `when` gate. Different-handle nesting
 - Replacing the typestate API. It is the safety floor.
 - Auto-reclamation policy (background thread, threshold-driven). Caller
   decides when to call `tryReclaim`.
-- `Managed[T]`-only variants; `withPin` supports both retire overloads.
+- Wrapper-only retire variants; `withPin` supports the available retire overloads.
 - Cross-manager single-body `withPin`. Compose by nesting different handles.
 - Suppressing `discard` on retire inside the body. Template wraps so that
   `it.retire(...)` is statement-form; spec detail for implementation.

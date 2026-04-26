@@ -13,68 +13,64 @@ nim-debra implements the DEBRA+ algorithm (Distributed Epoch-Based Reclamation w
 
 ## Features
 
-- **Managed[T] wrapper** - Works with any `ref` type, integrates with Nim's GC
+- **`retain` / `release` bridge** - Stores `ref` types in `Atomic[ptr T]` slots without falling back to spinlocks
 - **Typestate-enforced** - Correct operation sequencing validated at compile-time
 - **Signal-based neutralization** - Handles stalled threads for bounded memory
 - **O(mn) memory bound** - Where m = threads, n = hazardous pointers per thread
 
 ## Lock-Free Guarantees
 
-nim-debra is designed for lock-free concurrent data structures. To ensure your code is truly lock-free:
+nim-debra is designed for lock-free concurrent data structures. The library's
+own atomics module (`debra/atomics`) refuses to compile `Atomic[ref T]` and
+any type that is not trivially copyable, eliminating the most common
+spinlock-fallback footgun at compile time. Rationale and full design notes
+live in [`docs/design/2026-04-25-custom-atomics.md`](docs/design/2026-04-25-custom-atomics.md).
 
-### Compile-Time Checks
-
-Nim's atomics module supports `-d:nimEnforceLockFreeAtomics` to emit compile-time errors when using types that would fall back to spinlocks.
-
-nim-debra adds additional checks by default:
-
-- **Managed[ref T] on arc/orc**: Errors by default since `Atomic[ref T]` uses spinlocks. Use `-d:allowSpinlockManagedRef` to allow.
-- **Generic lock-free enforcement**: Use `-d:nimEnforceLockFreeAtomics` to catch other spinlock fallbacks.
+To store a `ref T` atomically, convert it to `ptr T` with `retain` and pair
+each `retain` with exactly one `release` (typically via the destructor returned
+by `releaseDestructor[T]()` handed to `retire`).
 
 ### Verifying Lock-Free Status
 
-Use `isLockFree` to check types at compile-time:
+`debra/atomics` exposes `isLockFree` for compile-time checks:
 
 ```nim
-import std/atomics
+import debra/atomics
 
 static:
   assert int.isLockFree           # true on all platforms
   assert pointer.isLockFree       # true on all platforms
   assert uint64.isLockFree        # true on 64-bit platforms
-
-  # ref types are NOT lock-free on arc/orc!
-  when defined(gcArc) or defined(gcOrc):
-    doAssert not (ref object).isLockFree
 ```
+
+`Atomic[ref T]` does not compile at all; the error message points you at
+`Atomic[ptr T]` plus `retain`/`release`.
 
 ### Recommended Patterns for Lock-Free Code
 
-For maximum portability and guaranteed lock-free operation:
-
-- **Use `ptr T`** with `alloc0`/`dealloc` for data structure nodes
-- **Use pointer-based retire**: `retire(ptr, destructor)` instead of `retire(Managed[ref T])`
-- **Test with multiple memory managers**: Test with both `--mm:arc` and `--mm:refc`
-- **Enable enforcement in CI**: Use `-d:nimEnforceLockFreeAtomics` in continuous integration
+- **Store `Atomic[ptr T]`** in node fields, not `Atomic[ref T]`
+- **Use `retain` to GC-pin a `ref`** and obtain a raw pointer for atomic storage
+- **Pair every `retain` with `releaseDestructor[T]()`** when you `retire(p, dtor)`
+- **Test with multiple memory managers**: Test with both `--mm:arc`, `--mm:orc`, and `--mm:refc`
 
 Example lock-free node:
 
 ```nim
+import debra
+import debra/atomics
+
 type
   NodeObj = object
     value: int
     next: Atomic[ptr NodeObj]
+  Node = ref NodeObj
 
-# Allocate
-let node = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
-node.value = 42
-
-# Retire with custom destructor
-proc destroyNode(p: pointer) {.nimcall.} =
-  dealloc(p)
+# `retain` increments the GC ref count and returns a raw ptr suitable
+# for atomic storage. Pair it with `releaseDestructor[NodeObj]()` at retire.
+let node = retain Node(value: 42)
 
 let ready = retireReady(pinned)
-discard ready.retire(node, destroyNode)
+discard ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 ```
 
 ## Documentation
@@ -133,13 +129,14 @@ For batching operations or fine-grained control:
 
 ```nim
 import debra
-import std/atomics
+import debra/atomics
 
-# Define node type using ref Obj pattern for self-reference
+# Self-referential node: `Atomic[ptr NodeObj]` lets the type checker
+# resolve the recursive shape (`ptr` is opaque to it).
 type
   NodeObj = object
     value: int
-    next: Atomic[Managed[ref NodeObj]]
+    next: Atomic[ptr NodeObj]
   Node = ref NodeObj
 
 # Initialize manager (one per process)
@@ -152,12 +149,13 @@ let handle = registerThread(manager)
 # Pin for critical section
 let pinned = unpinned(handle).pin()
 
-# Create managed objects - GC won't collect until retired
-let node = managed Node(value: 42)
+# Retain a ref to GC-pin it and get a raw pointer for atomic storage.
+let node = retain Node(value: 42)
 
-# Retire objects for later reclamation
+# Retire the pointer; `releaseDestructor[NodeObj]()` will GC_unref it
+# once the epoch is safe.
 let ready = retireReady(pinned)
-discard ready.retire(node)
+discard ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 
 # Unpin when leaving critical section
 discard pinned.unpin()

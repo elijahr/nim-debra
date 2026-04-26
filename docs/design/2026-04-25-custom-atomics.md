@@ -134,12 +134,12 @@ moRelease or moAcquireRelease
 
 **Two compile-time gates, no concept.**
 
-1. `when T is ref: {.error: "Atomic[ref T] is forbidden. Use Managed[T] (see debra/managed) or Atomic[ptr T] for raw pointers.".}`. Targeted message for the most common footgun.
-2. `when not supportsCopyMem(T): {.error: "Atomic[T] requires T to be trivially copyable (no GC-managed fields). For ref types, use Managed[T] or Atomic[ptr T].".}`. Catches any type whose representation transitively includes GC-managed fields (`seq`, `string`, object with a `ref` field).
+1. `when T is ref: {.error: "Atomic[ref T] is forbidden. Use Atomic[ptr T] with retain/release/releaseDestructor (see debra/refptr).".}`. Targeted message for the most common footgun.
+2. `when not supportsCopyMem(T): {.error: "Atomic[T] requires T to be trivially copyable (no GC-managed fields). For ref types, use Atomic[ptr T].".}`. Catches any type whose representation transitively includes GC-managed fields (`seq`, `string`, object with a `ref` field).
 
 `supportsCopyMem` (`std/typetraits`) is exactly Nim's "can `copyMem` this safely" predicate, which is what `__atomic_*_n` does under the hood. The C-level `_Static_assert(__atomic_always_lock_free(sizeof(T), 0), ...)` is the second gate.
 
-Together they admit primitive integers, `ptr`/`pointer`, `bool`, `char`, `enum`, `distinct` types over any of the above, and POD `object` types like `ThreadId` (wraps `Pthread`) provided natural alignment is at least size and the lock-free builtin accepts the size. Refs, seqs, strings, and objects with transitive GC fields are rejected. Largest UX win over `std/atomics`: warnings in `unbounded_*.nim:56,98,101,106` / `convenience.nim:56` become a clear compile error. `Managed[T]` dodges the `=destroy`/cycle-collection/refcount swamp.
+Together they admit primitive integers, `ptr`/`pointer`, `bool`, `char`, `enum`, `distinct` types over any of the above, and POD `object` types like `ThreadId` (wraps `Pthread`) provided natural alignment is at least size and the lock-free builtin accepts the size. Refs, seqs, strings, and objects with transitive GC fields are rejected. Largest UX win over `std/atomics`: warnings in `unbounded_*.nim:56,98,101,106` / `convenience.nim:56` become a clear compile error. (Historical note: at the time of writing, a `Managed` wrapper around `ref T` was the suggested escape hatch; it was later deleted in favor of `Atomic[ptr T]` + `retain`/`release`/`releaseDestructor` from `debra/refptr`.)
 
 A strict whitelist would reject `Atomic[ThreadId]` and force wrappers to `distinct uint64`. `supportsCopyMem` is the right predicate; lock-free static assert rejects oversized PODs.
 

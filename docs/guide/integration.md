@@ -87,18 +87,22 @@ Combine stack states, DEBRA states, and bridges to the item processing pipeline:
 
 ### Self-Referential Types Pattern
 
-For types that reference themselves (linked lists, trees), use the `ref Obj` pattern:
+For types that reference themselves (linked lists, trees), use the `ref Obj`
+pattern with `Atomic[ptr NodeObj[T]]`:
 
 ```nim
-# The ref Obj pattern for self-referential Managed types
 type
   NodeObj[T] = object
     value: T
-    next: Atomic[Managed[ref NodeObj[T]]]
+    next: Atomic[ptr NodeObj[T]]
   Node[T] = ref NodeObj[T]
 ```
 
-This pattern is required because Nim's type system cannot resolve `Managed[Node]` inside `Node`'s definition when `Node = ref object`.
+`ptr` is opaque to Nim's type checker, so the recursive shape resolves
+without forward-declaration gymnastics. Use `retain` to GC-pin a `ref` and
+hand back a raw pointer for atomic storage; pair it with
+`releaseDestructor[NodeObj[T]]()` at retire time. See `examples/lockfree_queue.nim`
+for the canonical pattern.
 
 ## Best Practices
 
