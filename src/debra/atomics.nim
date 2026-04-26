@@ -177,3 +177,91 @@ proc store*[T](loc: var Atomic[T]; desired: T;
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](desired),
     toAtomMemModel(order))
+
+# ---------------------------------------------------------------------------
+# Read-modify-write
+# ---------------------------------------------------------------------------
+
+proc exchange*[T](loc: var Atomic[T]; desired: T;
+                  order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+  enforceAtomicConstraints(T)
+  cast[T](atomicExchangeN(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[nonAtomicType(T)](desired),
+    toAtomMemModel(order)))
+
+proc compareExchangeStrong*[T](loc: var Atomic[T]; expected: var T;
+                               desired: T;
+                               success: static MemoryOrder = moSequentiallyConsistent;
+                               failure: static MemoryOrder = moSequentiallyConsistent): bool {.inline.} =
+  ## Strong CAS. On success, swaps `desired` into `loc`. On failure,
+  ## overwrites `expected` with the current value of `loc`.
+  enforceAtomicConstraints(T)
+  validCasFailureOrder(success, failure)
+  atomicCompareExchangeN(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[ptr nonAtomicType(T)](addr expected),
+    cast[nonAtomicType(T)](desired),
+    weak = false,
+    toAtomMemModel(success),
+    toAtomMemModel(failure))
+
+proc compareExchangeWeak*[T](loc: var Atomic[T]; expected: var T;
+                             desired: T;
+                             success: static MemoryOrder = moSequentiallyConsistent;
+                             failure: static MemoryOrder = moSequentiallyConsistent): bool {.inline.} =
+  ## Weak CAS. May fail spuriously on platforms (notably ARM LL/SC)
+  ## even when current value equals `expected`. Cheaper inside a loop.
+  enforceAtomicConstraints(T)
+  validCasFailureOrder(success, failure)
+  atomicCompareExchangeN(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[ptr nonAtomicType(T)](addr expected),
+    cast[nonAtomicType(T)](desired),
+    weak = true,
+    toAtomMemModel(success),
+    toAtomMemModel(failure))
+
+# ---------------------------------------------------------------------------
+# Numeric (SomeInteger only)
+# ---------------------------------------------------------------------------
+
+proc fetchAdd*[T: SomeInteger](loc: var Atomic[T]; v: T;
+                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+  enforceAtomicConstraints(T)
+  cast[T](atomicFetchAdd(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[nonAtomicType(T)](v),
+    toAtomMemModel(order)))
+
+proc fetchSub*[T: SomeInteger](loc: var Atomic[T]; v: T;
+                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+  enforceAtomicConstraints(T)
+  cast[T](atomicFetchSub(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[nonAtomicType(T)](v),
+    toAtomMemModel(order)))
+
+proc fetchAnd*[T: SomeInteger](loc: var Atomic[T]; v: T;
+                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+  enforceAtomicConstraints(T)
+  cast[T](atomicFetchAnd(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[nonAtomicType(T)](v),
+    toAtomMemModel(order)))
+
+proc fetchOr*[T: SomeInteger](loc: var Atomic[T]; v: T;
+                              order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+  enforceAtomicConstraints(T)
+  cast[T](atomicFetchOr(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[nonAtomicType(T)](v),
+    toAtomMemModel(order)))
+
+proc fetchXor*[T: SomeInteger](loc: var Atomic[T]; v: T;
+                               order: static MemoryOrder = moSequentiallyConsistent): T {.inline.} =
+  enforceAtomicConstraints(T)
+  cast[T](atomicFetchXor(
+    cast[ptr nonAtomicType(T)](addr loc.value),
+    cast[nonAtomicType(T)](v),
+    toAtomMemModel(order)))
