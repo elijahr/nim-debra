@@ -47,10 +47,17 @@ template toAtomMemModel(o: MemoryOrder): AtomMemModel =
 # Cache line constants
 # ---------------------------------------------------------------------------
 
-const CacheLineBytes* {.intdefine.} =
-  when defined(powerpc): 128 else: 64
-  ## Bytes per L1 cache line. 128 on PowerPC, 64 elsewhere. Override
-  ## with `-d:CacheLineBytes=N`.
+# Phase A note (delete in Phase B): nim-debra's existing `types.nim`
+# imports both `atomics` (this file) and `./constants` (which already
+# defines `CacheLineBytes` with the same `{.intdefine.}` shape). To
+# avoid an ambiguous-identifier error during Phase A, we re-export
+# the existing `constants.CacheLineBytes` rather than redefining it
+# here. Phase B drops `constants.nim` and lets this module own the
+# definition outright.
+## `CacheLineBytes`: bytes per L1 cache line. 128 on PowerPC, 64
+## elsewhere. Override with `-d:CacheLineBytes=N`.
+import ./constants
+export constants.CacheLineBytes
 
 template cacheLineAligned*(decl: untyped) =
   ## Drop-in `{.align: CacheLineBytes.}` shorthand.
