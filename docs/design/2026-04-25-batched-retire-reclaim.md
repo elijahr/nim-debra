@@ -49,18 +49,22 @@ Two overloaded forms, both implemented as templates. Nim resolves on arity.
 
 ```nim
 template withPin*[MT: static int](
-    handle: ThreadHandle[MT], body: untyped
+    th: ThreadHandle[MT], body: untyped
 ): untyped
-  ## Default form: injects `pin` as `var RetireReady[MT]`.
-  ## Pins the calling thread, runs body, unpins on exit including
-  ## exception paths. Body may call `pin.retire(p, dtor)` zero or more times.
+  ## Default form: injects `it` as `var RetireReady[MT]` (matches the
+  ## Nim convention used by `filterIt`/`mapIt`). Pins the calling thread,
+  ## runs body, unpins on exit including exception paths. Body may call
+  ## `it.retire(p, dtor)` zero or more times.
 
 template withPin*[MT: static int](
-    handle: ThreadHandle[MT], name, body: untyped
+    th: ThreadHandle[MT], name, body: untyped
 ): untyped
   ## Named form: injects `name` (caller-supplied identifier) as
   ## `var RetireReady[MT]`. Use to disambiguate nested handles.
 ```
+
+The template parameter is named `th` (not `handle`) to avoid colliding
+with `EpochGuardContext.handle` field references inside the template body.
 
 Call sites (sipmuc retire site, default and named forms):
 
@@ -68,7 +72,7 @@ Call sites (sipmuc retire site, default and named forms):
 self.handle.withPin:
   # ... CAS loop using moAcquire/moRelaxed as today ...
   if mySlot == S - 1 and self.queue.strategy != Manual:
-    pin.retire(cast[pointer](seg), segmentDestructor)
+    it.retire(cast[pointer](seg), segmentDestructor)
     discard self.queue.segments.fetchSub(1, moRelaxed)
 
 # Or with a custom name (multi-handle scenarios):
@@ -78,11 +82,11 @@ outer.withPin(outerPin):
     innerPin.retire(p2, dtor)
 ```
 
-Compile-time guarantees that survive: `pin` is a `var RetireReady[MT]`,
+Compile-time guarantees that survive: `it` is a `var RetireReady[MT]`,
 which means `retire` returns `Retired` and we re-derive `RetireReady` for
 the next call (the template handles this internally via
 `retireReadyFromRetired`, `retire.nim:32-36`). The body cannot accidentally
-escape `pin` because templates expand inline and `pin` is a local symbol.
+escape `it` because templates expand inline and `it` is a local symbol.
 The body cannot start a second pin on the same handle without nesting (see
 section 5.3). Exception safety is provided by `try/finally` (section 3b).
 
@@ -106,7 +110,7 @@ self.handle.withPin:
   while seg != nil:
     batch.add((cast[pointer](seg), segmentDestructor))
     seg = seg.next.load(moAcquire)
-  pin.retireBatch(batch)
+  it.retireBatch(batch)
 ```
 
 ### 2.3 `reclaimNow` proc: standalone reclamation pass
@@ -146,12 +150,12 @@ no body capture, plain procs compile cleaner.
 **b) Exception safety.** `withPin` wraps body in `try/finally`. Pattern:
 
 ```
-let pinned = unpinned(handle).pin()
-var pin {.inject.} = retireReady(pinned)
+let pinned = unpinned(th).pin()
+var it {.inject.} = retireReady(pinned)
 try:
   body
 finally:
-  let ctx = RetireContext[MT](pin)
+  let ctx = RetireContext[MT](it)
   let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
   discard p.unpin()
 ```
@@ -168,9 +172,12 @@ for users. If the file grows past ~200 lines, split later.
 **d) Naming.** `withPin` matches `withLock`/`withValue` and beats
 considered alternatives (`pinScope` less idiomatic; `pinned` collides
 with the state; `inEpoch` opaque; `protect` carries hazard-pointer
-baggage). Default injected identifier is `pin` (a `var RetireReady[MT]`);
+baggage). Default injected identifier is `it` (a `var RetireReady[MT]`),
+matching the convention used by `filterIt`/`mapIt` in the Nim stdlib;
 the named overload takes a user-supplied identifier for nested-handle
-disambiguation. Batched proc: `retireBatch`. Reclaim helper: `reclaimNow`,
+disambiguation. The template parameter is `th` rather than `handle` to
+avoid colliding with `EpochGuardContext.handle` field references inside
+the template body. Batched proc: `retireBatch`. Reclaim helper: `reclaimNow`,
 named distinctly from the typestate-level `tryReclaim` to avoid reader
 confusion despite arg-type uniqueness.
 
@@ -185,10 +192,10 @@ single-object case; for CAS loops or batches, prefer `withPin`."
 
 ```nim
 # AFTER (4 lines of retire/reclaim plumbing):
-self.handle.withPin(pin):
+self.handle.withPin:
   # ... CAS loop body unchanged ...
   if mySlot == S - 1 and self.queue.strategy != Manual:
-    pin.retire(cast[pointer](seg), segmentDestructor)
+    it.retire(cast[pointer](seg), segmentDestructor)
     discard self.queue.segments.fetchSub(1, moRelaxed)
 if self.queue.strategy == Eager: discard reclaimNow(self.queue.manager[])
 ```
@@ -197,12 +204,12 @@ if self.queue.strategy == Eager: discard reclaimNow(self.queue.manager[])
 
 ```nim
 # AFTER:
-self.handle.withPin(pin):
+self.handle.withPin:
   var seg = self.headSegment
   while true:
     # ... existing logic ...
     if self.strategy != Manual:
-      pin.retire(cast[pointer](seg), segmentDestructor)
+      it.retire(cast[pointer](seg), segmentDestructor)
       discard self.segments.fetchSub(1, moRelaxed)
     self.headSegment = nextSeg
     seg = nextSeg
@@ -266,9 +273,9 @@ without introducing a new `when` gate. Different-handle nesting
 ## 8. Open Questions (Resolved)
 
 1. **`withPin` identifier**: RESOLVED. Support both forms via overloaded
-   templates: default `withPin(handle): body` injects `pin`, named
-   `withPin(handle, name): body` injects the caller's identifier. Nim's
-   template-arity overloading dispatches.
+   templates: default `withPin(th): body` injects `it` (Nim convention,
+   matches `filterIt`/`mapIt`), named `withPin(th, name): body` injects
+   the caller's identifier. Nim's template-arity overloading dispatches.
 2. **`reclaimNow` out-param for `safeEpoch`**: deferred. Add when a
    consumer needs it.
 3. **Naming overlap**: RESOLVED. New helper named `reclaimNow` to avoid
@@ -282,4 +289,4 @@ without introducing a new `when` gate. Different-handle nesting
 - `Managed[T]`-only variants; `withPin` supports both retire overloads.
 - Cross-manager single-body `withPin`. Compose by nesting different handles.
 - Suppressing `discard` on retire inside the body. Template wraps so that
-  `pin.retire(...)` is statement-form; spec detail for implementation.
+  `it.retire(...)` is statement-form; spec detail for implementation.
