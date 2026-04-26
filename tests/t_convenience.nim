@@ -52,16 +52,20 @@ suite "DEBRA Convenience API":
     # All retirements should succeed
     check destroyedCount >= 0
 
-  test "retireAndReclaim with Managed[ref T] on refc":
-    when defined(gcRefc):
-      type Node = ref object
-        value: int
+  test "retireAndReclaim with retain'd ref via releaseDestructor":
+    type RefNodeObj = object
+      value: int
 
-      let node = managed Node(value: 123)
-      retireAndReclaim(handle, node, eager = true)
+    type RefNode = ref RefNodeObj
 
-      # Should work without error on refc
-      check true
+    let n = RefNode(value: 123)
+    let raw = retain(n)
+    retireAndReclaim(
+      handle, cast[pointer](raw), releaseDestructor[RefNodeObj](), eager = true
+    )
+
+    # The retain is balanced by releaseDestructor at reclamation time.
+    check true
 
 # ---------------------------------------------------------------------------
 # Batched retire/reclaim API tests

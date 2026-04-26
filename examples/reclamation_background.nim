@@ -11,30 +11,30 @@
 ## ## refc compatibility
 ##
 ## This example is **incompatible with `--mm:refc`** and will skip with a
-## diagnostic message under that GC. The reason is a fundamental refc design
-## constraint, not a debra bug:
+## diagnostic message under that GC. The reason is a refc design constraint,
+## not a debra bug:
 ##
-## * The worker threads allocate `Node` (a `ref`) and call `GC_ref` via
-##   `managed`. The refc heap (`gch`) is thread-local
-##   (`{.rtlThreadVar.}` in `system/gc.nim`), so the cell metadata lives on
-##   the worker's heap.
-## * If a different thread later called the `GC_unref` destructor stored in
-##   the limbo bag, it would reach into a foreign `gch`, mutate a refcount on
-##   a cell that doesn't belong to it, and crash inside `decRef`.
+## * The worker threads allocate `Node` (a `ref`) and `retain` it, which calls
+##   `GC_ref`. The refc heap (`gch`) is thread-local (`{.rtlThreadVar.}` in
+##   `system/gc.nim`), so the cell metadata lives on the worker's heap.
+## * If a different thread later ran the destructor (which does `GC_unref` via
+##   `releaseDestructor`), it would mutate a refcount on a cell that doesn't
+##   belong to it, and crash inside `decRef`.
 ## * refc has no public API for cross-thread `ref` release. arc and orc use
 ##   atomic, shared refcounts and tolerate cross-thread `=destroy` /
 ##   `GC_unref`.
 ##
 ## Per-thread reclamation avoids the cross-thread `GC_unref` problem because
-## the same worker thread that allocated a node also frees it. We still skip
-## under refc here for consistency with the historical example.
+## the same worker thread that allocated a node also frees it. Under refc the
+## example would still run safely as long as we never crossed threads, but we
+## skip here for consistency.
 ##
 ## See also: `examples/reclamation_periodic.nim` for a single-threaded
 ## reclamation pattern.
 
 when defined(gcRefc):
   echo "reclamation_background: skipped under --mm:refc"
-  echo "  Use --mm:arc or --mm:orc for the Managed[ref T] worker pattern."
+  echo "  Use --mm:arc or --mm:orc for the cross-thread retain/release pattern."
 else:
   import debra
   import std/[atomics, os]
@@ -65,11 +65,12 @@ else:
     ## Worker thread that retires and reclaims its own objects.
     {.cast(gcsafe).}:
       let handle = registerThread(manager)
+      let dtor = releaseDestructor[NodeObj]()
 
       for i in 0 ..< 100:
         withPin(handle):
-          let node = managed Node(value: i)
-          it.retire(node)
+          let node = retain Node(value: i)
+          it.retire(cast[pointer](node), dtor)
 
         # Reclaim our own bag occasionally. The background thread keeps the
         # global epoch advancing, so most of these passes find work.

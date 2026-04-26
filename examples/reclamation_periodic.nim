@@ -2,7 +2,6 @@
 ## Periodic reclamation: attempt reclamation every N operations.
 
 import debra
-import debra/atomics
 
 type
   NodeObj = object
@@ -12,32 +11,22 @@ type
 
 const ReclaimInterval = 10
 
-proc doOperation(handle: ThreadHandle[64], i: int) =
-  let u = unpinned(handle)
-  let pinned = u.pin()
-
-  let node = managed Node(value: i)
-  let ready = retireReady(pinned)
-  discard ready.retire(node)
-
-  let unpinResult = pinned.unpin()
-  case unpinResult.kind
-  of uUnpinned:
-    discard
-  of uNeutralized:
-    discard unpinResult.neutralized.acknowledge()
+proc doOperation(handle: ThreadHandle[64], dtor: Destructor, i: int) =
+  handle.withPin:
+    let node = retain Node(value: i)
+    it.retire(cast[pointer](node), dtor)
 
 proc periodicReclaimDemo() =
   var manager = initDebraManager[64]()
   setGlobalManager(addr manager)
 
   let handle = registerThread(manager)
+  let dtor = releaseDestructor[NodeObj]()
   var totalReclaimed = 0
 
   # Perform operations with periodic reclamation
   for i in 0 ..< 50:
-    # Do one operation
-    doOperation(handle, i)
+    doOperation(handle, dtor, i)
 
     # Advance epoch periodically
     if i mod 5 == 0:

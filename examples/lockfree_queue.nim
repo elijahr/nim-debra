@@ -1,19 +1,11 @@
 # examples/lockfree_queue.nim
 ## Lock-free Michael-Scott queue with DEBRA reclamation.
 ##
-## ## Why `Atomic[ptr NodeObj[T]]` and not `Atomic[Managed[ref NodeObj[T]]]`
-##
-## `Managed[ref T]` is the right tool for non-atomic shared ownership: it
-## keeps a ref alive across DEBRA epochs and integrates with Nim's GC.
-## But `Atomic[ref T]` (and therefore `Atomic[Managed[ref T]]`) falls back
-## to spinlock-based atomics on arc/orc, which silently defeats lock-free
-## guarantees.
-##
-## For atomic pointer storage in lock-free code, this example uses the
-## explicit `retain` / `release` / `releaseDestructor` helpers from
-## `debra/refptr`: `retain` increments the GC ref count and hands back a
-## raw `ptr T`, `releaseDestructor[T]()` is a `Destructor` that DEBRA
-## calls at reclamation time to balance the retain.
+## Atomic node slots use `ptr NodeObj[T]`, not `ref NodeObj[T]`:
+## `Atomic[ref T]` falls back to spinlock-based atomics on arc/orc, which
+## silently defeats lock-free guarantees. `retain` / `releaseDestructor`
+## from `debra/refptr` bridge a Nim `ref` into a raw pointer with explicit
+## GC tracking.
 
 import debra
 import debra/atomics

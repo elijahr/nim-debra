@@ -36,10 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **BREAKING**: `tryReclaim` and `reclaimNow` are now scoped to the calling thread's own limbo bags. Cross-thread reclamation has been removed. Stalled threads are still handled via `neutralizeStalled`. Callers that relied on one thread reclaiming another thread's retired objects must now invoke reclamation on each thread, or rely on the neutralization path for unresponsive threads.
 - Three lock-free examples (`lockfree_queue`, `lockfree_stack`, `lockfree_stack_typestates`) rewritten from `Atomic[Managed[ref T]]` to `Atomic[ptr T]` with `retain` / `release`, removing the spinlock fallback hazard that `Atomic[ref T]` carries on arc/orc.
+- **BREAKING**: Removed `Managed[ref T]` and the `allowSpinlockManagedRef` opt-in flag. The lock-free `Atomic[ptr T]` + `retain`/`release`/`releaseDestructor` pattern is the only supported path. Migrate by replacing `Atomic[Managed[ref T]]` with `Atomic[ptr T]` and using manual `retain`/`release` calls.
 
 ### Removed
 
 - `std/atomics` dependency from nim-debra source code. All atomic operations now go through `debra/atomics`.
+- `Managed[ref T]` type, `managed()`, `inner()`, `Managed[T]` overloads of `retire` and `retireAndReclaim`, and the `-d:allowSpinlockManagedRef` opt-in flag. See the breaking-change note above for migration.
 
 ### Fixed
 

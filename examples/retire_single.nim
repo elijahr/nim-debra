@@ -1,13 +1,15 @@
 # examples/retire_single.nim
-## Single object retirement example.
+## Single object retirement: the minimal pin -> retire -> unpin flow.
+##
+## Uses the `Atomic[ptr T]` lock-free pattern: `retain` to GC-pin a `ref` and
+## hand back a raw pointer, `releaseDestructor[T]()` to balance the retain at
+## reclamation time.
 
 import debra
-import debra/atomics
 
 type
   NodeObj = object
     value: int
-    next: Atomic[Managed[ref NodeObj]]
 
   Node = ref NodeObj
 
@@ -19,13 +21,15 @@ proc main() =
   # Enter critical section
   let pinned = unpinned(handle).pin()
 
-  # Create a managed node
-  let node = managed Node(value: 42)
+  # Retain a ref so it survives until DEBRA reclamation. `retain` returns a
+  # raw `ptr NodeObj` suitable for atomic storage.
+  let node = retain Node(value: 42)
   echo "Created node with value: ", node.value
 
-  # Retire the node
+  # Retire the node. The destructor (releaseDestructor) will GC_unref the
+  # underlying ref once the epoch is safe.
   let ready = retireReady(pinned)
-  discard ready.retire(node)
+  discard ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
   echo "Node retired for later reclamation"
 
   # Exit critical section

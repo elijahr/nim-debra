@@ -25,7 +25,6 @@ import typestates
 
 import ../types
 import ../limbo
-import ../managed
 import ./guard
 
 type
@@ -53,61 +52,6 @@ proc retireReadyFromRetired*[MaxThreads: static int](
 ): RetireReady[MaxThreads] =
   ## Get back to RetireReady after retiring (for multiple retires).
   RetireReady[MaxThreads](RetireContext[MaxThreads](r))
-
-proc retire*[T: ref, MaxThreads: static int](
-    r: sink RetireReady[MaxThreads], obj: Managed[T]
-): Retired[MaxThreads] {.transition.} =
-  ## Retire a managed object for epoch-based reclamation.
-  ##
-  ## The object will be freed (via GC_unref) when its epoch
-  ## becomes safe for reclamation.
-  runnableExamples("-d:allowSpinlockManagedRef"):
-    import debra
-    type Node = ref object
-      value: int
-
-    var manager = initDebraManager[4]()
-    setGlobalManager(addr manager)
-    let handle = registerThread(manager)
-    let pinned = unpinned(handle).pin()
-    let n = managed Node(value: 1)
-    let retired = retireReady(pinned).retire(n)
-    let pinnedAgain = Pinned[4](
-      EpochGuardContext[4](
-        handle: RetireContext[4](retired).handle, epoch: RetireContext[4](retired).epoch
-      )
-    )
-    discard pinnedAgain.unpin()
-
-  # Extract values we need before consuming r
-  let handle = RetireContext[MaxThreads](r).handle
-  let epoch = RetireContext[MaxThreads](r).epoch
-  let state = addr handle.manager.threads[handle.idx]
-
-  # Ensure we have a bag with space. The bag list is a singly-linked FIFO:
-  # `limboBagTail` is the oldest unfreed bag, `currentBag` is the newest, and
-  # `next` chains oldest -> newer -> newest. Reclamation walks from tail.
-  if state.currentBag == nil or state.currentBag.count >= LimboBagSize:
-    let newBag = allocLimboBag()
-    newBag.epoch = epoch
-    newBag.next = nil
-    if state.currentBag != nil:
-      state.currentBag.next = newBag
-    state.currentBag = newBag
-    if state.limboBagTail == nil:
-      state.limboBagTail = newBag
-    # `limboBagHead` is no longer used; reclaim walks from tail. Retained on
-    # the type for now to keep the struct layout stable; do not read it.
-    state.limboBagHead = newBag
-
-  # Add object to bag with type-specific unreffer
-  let bag = state.currentBag
-  bag.objects[bag.count] =
-    RetiredObject(data: cast[pointer](obj.inner), destructor: unreffer[T]())
-  inc bag.count
-
-  # Consume r to create result
-  Retired[MaxThreads](RetireContext[MaxThreads](r))
 
 proc retire*[MaxThreads: static int](
     r: sink RetireReady[MaxThreads], p: pointer, destructor: Destructor

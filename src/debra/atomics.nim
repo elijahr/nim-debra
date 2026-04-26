@@ -76,14 +76,14 @@ template assertAtomCompat(T: typedesc) =
   when T is ref:
     {.
       error:
-        "Atomic[ref T] is forbidden. Use Managed[T] " &
-        "(see debra/managed) or Atomic[ptr T] for raw pointers."
+        "Atomic[ref T] is forbidden. Use Atomic[ptr T] with " &
+        "retain/release/releaseDestructor (see debra/refptr)."
     .}
   elif not supportsCopyMem(T):
     {.
       error:
         "Atomic[T] requires T to be trivially copyable (no " &
-        "GC-managed fields). For ref types, use Managed[T] or " & "Atomic[ptr T]."
+        "GC-managed fields). For ref types, use Atomic[ptr T]."
     .}
 
 # ---------------------------------------------------------------------------

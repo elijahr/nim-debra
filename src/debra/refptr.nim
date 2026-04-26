@@ -2,13 +2,9 @@
 ##
 ## ## Why
 ##
-## `Managed[ref T]` integrates with Nim's GC by holding a strong reference
-## inside a `distinct ref`. That works for non-atomic shared ownership, but
-## `Atomic[Managed[ref T]]` falls back to spinlock-based atomics on arc/orc
-## (any atomic over a `ref` does), which defeats lock-free guarantees.
-##
-## For atomic pointer storage in lock-free data structures, the cleaner
-## pattern is to convert the `ref` into a raw `ptr T`, increment the GC
+## `Atomic[ref T]` falls back to spinlock-based atomics on arc/orc, which
+## defeats lock-free guarantees. For atomic pointer storage in lock-free
+## data structures, convert the `ref` into a raw `ptr T`, increment the GC
 ## ref count manually so the object survives, and decrement it from the
 ## DEBRA destructor at retire-reclaim time.
 ##
@@ -40,7 +36,6 @@
 ##
 ## ## See also
 ##
-## * `debra/managed`_ - higher-level wrapper using a `distinct ref` (non-atomic).
 ## * `debra/typestates/retire`_ - underlying `pin.retire(p, dtor)` transition.
 
 import ./limbo
@@ -54,7 +49,7 @@ proc retain*[T: ref](obj: T): ptr typeof(obj[]) {.inline.} =
   ## Passing nil is a programmer error and will likely crash inside
   ## `GC_ref`. The result is never nil.
   ##
-  ## See also: `release`_, `releaseDestructor`_, `Managed`_.
+  ## See also: `release`_, `releaseDestructor`_.
   runnableExamples:
     type Node = ref object
       value: int

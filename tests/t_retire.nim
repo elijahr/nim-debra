@@ -1,12 +1,16 @@
 import unittest2
-import debra/atomics
 
 import debra/types
 import debra/limbo
-import debra/managed
 import debra/typestates/manager
 import debra/typestates/guard
 import debra/typestates/retire
+
+type NodeObj = object
+  value: int
+
+proc dtor(p: pointer) {.nimcall.} =
+  dealloc(p)
 
 suite "Retire typestate":
   var mgr: DebraManager[4]
@@ -21,47 +25,41 @@ suite "Retire typestate":
     let ready = retireReady(p)
     check ready is RetireReady[4]
 
-  test "retire accepts Managed[T]":
-    type Node = ref object
-      value: int
-
+  test "retire accepts pointer + destructor":
     let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     let ready = retireReady(p)
 
-    let node = managed Node(value: 42)
-    let retired = ready.retire(node)
+    let raw = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
+    raw.value = 42
+    let retired = ready.retire(cast[pointer](raw), dtor)
 
     check retired is Retired[4]
     check mgr.threads[0].currentBag != nil
     check mgr.threads[0].currentBag.count == 1
 
-  test "retire multiple Managed objects fills bag":
-    type Node = ref object
-      value: int
-
+  test "retire multiple pointers fills bag":
     let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
 
     for i in 0 ..< LimboBagSize:
-      let node = managed Node(value: i)
-      let retired = ready.retire(node)
+      let raw = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
+      raw.value = i
+      let retired = ready.retire(cast[pointer](raw), dtor)
       ready = retireReadyFromRetired(retired)
 
     check mgr.threads[0].currentBag.count == LimboBagSize
 
   test "retireReadyFromRetired allows chaining":
-    type Node = ref object
-      value: int
-
     let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
 
     for i in 0 ..< 3:
-      let node = managed Node(value: i)
-      let retired = ready.retire(node)
+      let raw = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
+      raw.value = i
+      let retired = ready.retire(cast[pointer](raw), dtor)
       ready = retireReadyFromRetired(retired)
 
     check mgr.threads[0].currentBag.count == 3

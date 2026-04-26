@@ -3,17 +3,21 @@ import debra/atomics
 
 import debra/types
 import debra/limbo
-import debra/managed
 import debra/typestates/manager
 import debra/typestates/guard
 import debra/typestates/retire
 import debra/typestates/reclaim
 
-type
-  TestNodeObj = object
-    value: int
+type TestNodeObj = object
+  value: int
 
-  TestNode = ref TestNodeObj
+proc dtor(p: pointer) {.nimcall.} =
+  dealloc(p)
+
+proc allocNode(value: int): pointer =
+  let n = cast[ptr TestNodeObj](alloc0(sizeof(TestNodeObj)))
+  n.value = value
+  cast[pointer](n)
 
 suite "Reclaim typestate":
   var mgr: DebraManager[4]
@@ -47,8 +51,7 @@ suite "Reclaim typestate":
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
     for i in 0 ..< 5:
-      let node = managed TestNode(value: i)
-      let retired = ready.retire(node)
+      let retired = ready.retire(allocNode(i), dtor)
       ready = retireReadyFromRetired(retired)
     discard p.unpin()
 
@@ -77,8 +80,7 @@ suite "Reclaim typestate":
     check p0.epoch == 1
     var ready0 = retireReady(p0)
     for i in 0 ..< 3:
-      let node = managed TestNode(value: i)
-      let retired = ready0.retire(node)
+      let retired = ready0.retire(allocNode(i), dtor)
       ready0 = retireReadyFromRetired(retired)
     discard p0.unpin()
 
@@ -91,8 +93,7 @@ suite "Reclaim typestate":
     check p1.epoch == 2
     var ready1 = retireReady(p1)
     for i in 0 ..< 4:
-      let node = managed TestNode(value: i)
-      let retired = ready1.retire(node)
+      let retired = ready1.retire(allocNode(i), dtor)
       ready1 = retireReadyFromRetired(retired)
     discard p1.unpin()
 
@@ -105,8 +106,7 @@ suite "Reclaim typestate":
     check p2.epoch == 3
     var ready2 = retireReady(p2)
     for i in 0 ..< 5:
-      let node = managed TestNode(value: i)
-      let retired = ready2.retire(node)
+      let retired = ready2.retire(allocNode(i), dtor)
       ready2 = retireReadyFromRetired(retired)
     discard p2.unpin()
 
@@ -170,8 +170,7 @@ suite "Reclaim typestate":
     let p0 = unpinned(h0).pin()
     var ready0 = retireReady(p0)
     for i in 0 ..< 3:
-      let node = managed TestNode(value: i)
-      let retired = ready0.retire(node)
+      let retired = ready0.retire(allocNode(i), dtor)
       ready0 = retireReadyFromRetired(retired)
     discard p0.unpin()
 
@@ -203,8 +202,7 @@ suite "Reclaim typestate":
     var ready = retireReady(p)
     let totalObjects = LimboBagSize * 2 + 5 # 133 objects -> 3 bags
     for i in 0 ..< totalObjects:
-      let node = managed TestNode(value: i)
-      let retired = ready.retire(node)
+      let retired = ready.retire(allocNode(i), dtor)
       ready = retireReadyFromRetired(retired)
     discard p.unpin()
 

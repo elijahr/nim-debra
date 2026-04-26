@@ -33,7 +33,6 @@
 import ./atomics
 import ./types
 import ./limbo
-import ./managed
 import ./typestates/guard
 import ./typestates/retire
 import ./typestates/reclaim
@@ -62,27 +61,6 @@ proc retire*[MT: static int](
       let p = alloc0(8)
       it.retire(p, dtor)
   let retired = retire(move(pin), p, destructor)
-  pin = retireReadyFromRetired(retired)
-
-proc retire*[T: ref, MT: static int](pin: var RetireReady[MT], obj: Managed[T]) =
-  ## Retire a `Managed[ref T]` inside an existing pinned epoch held by `pin`.
-  ##
-  ## Prefer the pointer-form overload (`retire(pin, p, destructor)`) plus
-  ## `retain`/`releaseDestructor` from `debra/refptr` for atomic node
-  ## pointers. `Atomic[Managed[ref T]]` falls back to spinlocks under
-  ## arc/orc, defeating lock-free guarantees.
-  runnableExamples("-d:allowSpinlockManagedRef"):
-    import debra
-    type Node = ref object
-      value: int
-
-    var manager = initDebraManager[4]()
-    setGlobalManager(addr manager)
-    let handle = registerThread(manager)
-    withPin(handle):
-      let n = managed Node(value: 7)
-      it.retire(n)
-  let retired = retire(move(pin), obj)
   pin = retireReadyFromRetired(retired)
 
 proc retireBatch*[MT: static int](
@@ -301,47 +279,6 @@ proc retireAndReclaim*[MT: static int](
   let pinned = unpinned(handle).pin()
   let ready = retireReady(pinned)
   let retired = ready.retire(p, destructor)
-
-  # Convert Retired back to Pinned for unpinning
-  let ctx = RetireContext[MT](retired)
-  let pinnedAgain =
-    Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
-  discard pinnedAgain.unpin()
-
-  # Optional eager reclamation (per-thread, scoped to this handle's slot).
-  if eager:
-    let reclaim = reclaimStart(handle).loadEpochs().checkSafe()
-    if reclaim.kind == rReclaimReady:
-      discard reclaim.reclaimready.tryReclaim()
-
-proc retireAndReclaim*[T: ref, MT: static int](
-    handle: ThreadHandle[MT], obj: Managed[T], eager: bool = true
-) =
-  ## Retire a Managed[ref T] and optionally attempt immediate reclamation.
-  ##
-  ## WARNING: Managed[ref T] uses spinlock-based atomics on arc/orc memory
-  ## managers, defeating lock-free guarantees. Prefer pointer-based
-  ## retire(ptr, destructor) for lock-free code.
-  ##
-  ## This convenience wrapper:
-  ## 1. Pins the current thread
-  ## 2. Retires the managed object
-  ## 3. Unpins the thread
-  ## 4. If eager=true (default), attempts to reclaim retired objects
-  runnableExamples("-d:allowSpinlockManagedRef"):
-    import debra
-    type Node = ref object
-      value: int
-
-    var manager = initDebraManager[4]()
-    setGlobalManager(addr manager)
-    let handle = registerThread(manager)
-    let node = managed Node(value: 42)
-    retireAndReclaim(handle, node)
-  # Pin, retire, unpin
-  let pinned = unpinned(handle).pin()
-  let ready = retireReady(pinned)
-  let retired = ready.retire(obj)
 
   # Convert Retired back to Pinned for unpinning
   let ctx = RetireContext[MT](retired)

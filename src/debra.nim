@@ -20,7 +20,6 @@ import ./debra/typestates/reclaim
 import ./debra/typestates/neutralize
 import ./debra/typestates/advance
 import ./debra/typestates/slot
-import ./debra/managed
 import ./debra/refptr
 import ./debra/convenience
 
@@ -37,7 +36,6 @@ export reclaim
 export neutralize
 export advance
 export slot
-export managed
 export refptr
 export convenience
 
