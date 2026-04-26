@@ -33,6 +33,14 @@ proc retain*[T: ref](obj: T): ptr typeof(obj[]) {.inline.} =
   ##
   ## Passing nil is a programmer error and will likely crash inside
   ## `GC_ref`. The result is never nil.
+  runnableExamples:
+    type Node = ref object
+      value: int
+    let r = Node(value: 5)
+    let p = retain(r)
+    doAssert p != nil
+    doAssert p.value == 5
+    release(p) # balance the retain
   GC_ref(obj)
   cast[ptr typeof(obj[])](obj)
 
@@ -41,6 +49,14 @@ proc release*[T](p: ptr T) {.inline.} =
   ## Safe to call on `nil` (no-op).
   ##
   ## Note: takes `ptr T` (the value type), matching what `retain` returns.
+  runnableExamples:
+    type Node = ref object
+      value: int
+    var p: ptr Node = nil
+    release(p) # nil-safe no-op
+    let r = Node(value: 1)
+    let q = retain(r)
+    release(q) # pairs the retain
   if p != nil:
     GC_unref(cast[ref T](p))
 
@@ -51,6 +67,18 @@ proc releaseDestructor*[T](): Destructor =
   ##
   ## Each instantiation produces an identical closure; cache the result
   ## per type if you retire many objects in a hot loop.
+  runnableExamples:
+    import debra
+    type Node = ref object
+      value: int
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    # Cache the destructor once per type, retire many pointers with it.
+    let dtor = releaseDestructor[Node]()
+    withPin(handle):
+      let raw = retain(Node(value: 1))
+      it.retire(raw, dtor)
   result = proc(p: pointer) {.nimcall.} =
     if p != nil:
       GC_unref(cast[ref T](p))

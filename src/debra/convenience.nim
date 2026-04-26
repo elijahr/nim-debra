@@ -23,6 +23,15 @@ proc retire*[MT: static int](
   ## Wraps the sink-form `retire` from typestates/retire.nim so the caller
   ## can chain `it.retire(...)` repeatedly inside a `withPin` body without
   ## manually rebuilding `RetireReady` from `Retired`.
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    withPin(handle):
+      let p = alloc0(8)
+      it.retire(p, dtor)
   let retired = retire(move(pin), p, destructor)
   pin = retireReadyFromRetired(retired)
 
@@ -30,6 +39,21 @@ proc retire*[T: ref, MT: static int](
     pin: var RetireReady[MT], obj: Managed[T]
 ) =
   ## Retire a `Managed[ref T]` inside an existing pinned epoch held by `pin`.
+  ##
+  ## Prefer the pointer-form overload (`retire(pin, p, destructor)`) plus
+  ## `retain`/`releaseDestructor` from `debra/refptr` for atomic node
+  ## pointers. `Atomic[Managed[ref T]]` falls back to spinlocks under
+  ## arc/orc, defeating lock-free guarantees.
+  runnableExamples("-d:allowSpinlockManagedRef"):
+    import debra
+    type Node = ref object
+      value: int
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    withPin(handle):
+      let n = managed Node(value: 7)
+      it.retire(n)
   let retired = retire(move(pin), obj)
   pin = retireReadyFromRetired(retired)
 
@@ -41,6 +65,16 @@ proc retireBatch*[MT: static int](
   ## Must be called from within `withPin` body (or any other holder of a
   ## `var RetireReady[MT]`). No pinning, no reclamation. Avoids one
   ## pin/unpin per object when freeing chains.
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let a = alloc0(8)
+    let b = alloc0(8)
+    withPin(handle):
+      it.retireBatch([(a, dtor), (b, dtor)])
   for item in items:
     pin.retire(item[0], item[1])
 
@@ -57,6 +91,15 @@ template withPin*[MT: static int](
   ## Under debug builds, asserts the thread is not already pinned on the
   ## given handle. Under `-d:release`/`-d:danger` the assertion is a no-op.
   ## Different-handle nesting (multi-manager) is independent and legal.
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    withPin(handle):
+      let p = alloc0(8)
+      it.retire(p, dtor)
   block:
     let h = th
     assert not h.manager.threads[h.idx].pinned.load(moAcquire),
@@ -77,6 +120,15 @@ template withPin*[MT: static int](
   ## `withPin` variant that injects a caller-supplied identifier `name`
   ## (instead of the default `it`). Use to disambiguate nested handles
   ## across multiple managers.
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    withPin(handle, slot):
+      let p = alloc0(8)
+      slot.retire(p, dtor)
   block:
     let h = th
     assert not h.manager.threads[h.idx].pinned.load(moAcquire),
@@ -98,6 +150,20 @@ proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
   ## Pinning is not required: reclamation only inspects per-thread epochs.
   ## Named distinctly from the typestate-level `tryReclaim` on `ReclaimReady`
   ## (`reclaim.nim`) to avoid reader confusion.
+  runnableExamples:
+    import debra
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    # Brand-new manager: no retired objects, returns 0 (not an error).
+    doAssert reclaimNow(manager) == 0
+    # Retire something, advance the epoch a few times, then reclaim.
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    withPin(handle):
+      it.retire(alloc0(8), dtor)
+    manager.advance()
+    manager.advance()
+    discard reclaimNow(manager)
   let op = reclaimStart(addr manager).loadEpochs().checkSafe()
   if op.kind == rReclaimReady:
     op.reclaimready.tryReclaim()
@@ -117,14 +183,17 @@ proc retireAndReclaim*[MT: static int](
   ##
   ## For batching multiple retirements before reclaiming, use the
   ## low-level typestate API directly or call with eager=false.
-  ##
-  ## Example:
-  ##   proc destroyNode(p: pointer) {.nimcall.} =
-  ##     dealloc(p)
-  ##
-  ##   let node = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
-  ##   retireAndReclaim(handle, node, destroyNode)
-
+  runnableExamples:
+    import debra
+    proc destroyNode(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let node = alloc0(16)
+    retireAndReclaim(handle, node, destroyNode)
+    # Or skip the eager pass when batching many retires:
+    let other = alloc0(16)
+    retireAndReclaim(handle, other, destroyNode, eager = false)
   # Pin, retire, unpin
   let pinned = unpinned(handle).pin()
   let ready = retireReady(pinned)
@@ -156,14 +225,15 @@ proc retireAndReclaim*[T: ref, MT: static int](
   ## 2. Retires the managed object
   ## 3. Unpins the thread
   ## 4. If eager=true (default), attempts to reclaim retired objects
-  ##
-  ## Example:
-  ##   type Node = ref object
-  ##     value: int
-  ##
-  ##   let node = managed Node(value: 42)
-  ##   retireAndReclaim(handle, node)
-
+  runnableExamples("-d:allowSpinlockManagedRef"):
+    import debra
+    type Node = ref object
+      value: int
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let node = managed Node(value: 42)
+    retireAndReclaim(handle, node)
   # Pin, retire, unpin
   let pinned = unpinned(handle).pin()
   let ready = retireReady(pinned)
