@@ -32,6 +32,17 @@ proc retire*[T: ref, MT: static int](
   let retired = retire(move(pin), obj)
   pin = retireReadyFromRetired(retired)
 
+proc retireBatch*[MT: static int](
+    pin: var RetireReady[MT], items: openArray[(pointer, Destructor)]
+) =
+  ## Retire each `(p, dtor)` in `items` inside an existing pinned epoch.
+  ##
+  ## Must be called from within `withPin` body (or any other holder of a
+  ## `var RetireReady[MT]`). No pinning, no reclamation. Avoids one
+  ## pin/unpin per object when freeing chains.
+  for item in items:
+    pin.retire(item[0], item[1])
+
 template withPin*[MT: static int](
     handle: ThreadHandle[MT], body: untyped
 ) =
