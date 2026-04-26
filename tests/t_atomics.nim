@@ -195,3 +195,45 @@ suite "compareExchange":
     var expected = addr x
     check a.compareExchangeStrong(expected, addr y) == true
     check a.load() == addr y
+
+suite "fences":
+  test "threadFence compiles and executes for each order":
+    threadFence(moRelaxed)
+    threadFence(moAcquire)
+    threadFence(moRelease)
+    threadFence(moAcquireRelease)
+    threadFence(moSequentiallyConsistent)
+    check true
+
+  test "signalFence compiles and executes for each order":
+    signalFence(moRelaxed)
+    signalFence(moAcquire)
+    signalFence(moRelease)
+    signalFence(moAcquireRelease)
+    signalFence(moSequentiallyConsistent)
+    check true
+
+suite "AtomicFlag":
+  test "testAndSet on a fresh flag returns false then true":
+    var flag: AtomicFlag
+    check flag.testAndSet() == false
+    check flag.testAndSet() == true
+
+  test "clear resets the flag":
+    var flag: AtomicFlag
+    discard flag.testAndSet()
+    flag.clear()
+    check flag.testAndSet() == false
+
+  test "clear with explicit memory order":
+    var flag: AtomicFlag
+    discard flag.testAndSet(moAcquire)
+    flag.clear(moRelease)
+    check flag.testAndSet(moAcquire) == false
+
+suite "CacheLineBytes":
+  test "is exported and a sensible value":
+    when defined(powerpc):
+      check CacheLineBytes == 128
+    else:
+      check CacheLineBytes == 64

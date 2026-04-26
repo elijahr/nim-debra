@@ -265,3 +265,39 @@ proc fetchXor*[T: SomeInteger](loc: var Atomic[T]; v: T;
     cast[ptr nonAtomicType(T)](addr loc.value),
     cast[nonAtomicType(T)](v),
     toAtomMemModel(order)))
+
+# ---------------------------------------------------------------------------
+# Fences
+# ---------------------------------------------------------------------------
+
+proc threadFence*(order: MemoryOrder) {.inline.} =
+  ## Full memory fence between threads. All memory orders are valid.
+  atomicThreadFence(toAtomMemModel(order))
+
+proc signalFence*(order: MemoryOrder) {.inline.} =
+  ## Compiler-only fence. Prevents the compiler from reordering across
+  ## the fence; emits no CPU instructions. All memory orders are valid.
+  atomicSignalFence(toAtomMemModel(order))
+
+# ---------------------------------------------------------------------------
+# AtomicFlag
+# ---------------------------------------------------------------------------
+
+type
+  AtomicFlag* = distinct uint8
+    ## Boolean flag with `testAndSet` / `clear` semantics. Underlying
+    ## byte must be 0 or 1; `__atomic_test_and_set` is
+    ## implementation-defined for any other value, so do not poke the
+    ## raw uint8 directly.
+
+proc testAndSet*(loc: var AtomicFlag;
+                 order: static MemoryOrder = moSequentiallyConsistent): bool {.inline.} =
+  ## Atomically set the flag and return its previous value.
+  atomicTestAndSet(cast[pointer](addr loc), toAtomMemModel(order))
+
+proc clear*(loc: var AtomicFlag;
+            order: static MemoryOrder = moSequentiallyConsistent) {.inline.} =
+  ## Atomically reset the flag to false. `order` must not be
+  ## moAcquire / moAcquireRelease / moConsume.
+  validStoreOrder(order)
+  atomicClear(cast[pointer](addr loc), toAtomMemModel(order))
