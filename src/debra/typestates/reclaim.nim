@@ -108,6 +108,19 @@ proc loadEpochs*[MaxThreads: static int](
     s: ReclaimStart[MaxThreads]
 ): EpochsLoaded[MaxThreads] {.transition.} =
   ## Load global epoch and compute minimum epoch across pinned threads.
+  ##
+  ## Subscription fence: pairs with the publication fence in `pin` to give EBR
+  ## its StoreLoad ordering across threads. Without this, a reclaimer can read
+  ## another thread's `pinned=false` even when that thread's pin store has
+  ## already been issued, then proceed to free an object the still-pinning
+  ## thread is about to read. The fence ensures that for every concurrently
+  ## pinning thread T, either (a) T's pin store is visible here (we observe
+  ## `pinned=true`), or (b) T's subsequent load of the protected pointer
+  ## happens after our prior writes — so T cannot have observed a still-live
+  ## pointer to an object we are about to free. Matches the Crossbeam EBR
+  ## subscription fence in `Collector::collect`/`try_advance`.
+  threadFence(moSequentiallyConsistent)
+
   var ctx = ReclaimContext[MaxThreads](s)
   ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
   ctx.safeEpoch = ctx.globalEpoch
