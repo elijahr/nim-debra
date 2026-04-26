@@ -81,16 +81,21 @@ proc retire*[T: ref, MaxThreads: static int](
   let epoch = RetireContext[MaxThreads](r).epoch
   let state = addr handle.manager.threads[handle.idx]
 
-  # Ensure we have a bag with space
+  # Ensure we have a bag with space. The bag list is a singly-linked FIFO:
+  # `limboBagTail` is the oldest unfreed bag, `currentBag` is the newest, and
+  # `next` chains oldest -> newer -> newest. Reclamation walks from tail.
   if state.currentBag == nil or state.currentBag.count >= LimboBagSize:
     let newBag = allocLimboBag()
     newBag.epoch = epoch
-    newBag.next = state.currentBag
-    if state.limboBagHead == nil:
-      state.limboBagHead = newBag
+    newBag.next = nil
+    if state.currentBag != nil:
+      state.currentBag.next = newBag
     state.currentBag = newBag
     if state.limboBagTail == nil:
       state.limboBagTail = newBag
+    # `limboBagHead` is no longer used; reclaim walks from tail. Retained on
+    # the type for now to keep the struct layout stable; do not read it.
+    state.limboBagHead = newBag
 
   # Add object to bag with type-specific unreffer
   let bag = state.currentBag
@@ -127,16 +132,21 @@ proc retire*[MaxThreads: static int](
   let epoch = RetireContext[MaxThreads](r).epoch
   let state = addr handle.manager.threads[handle.idx]
 
-  # Ensure we have a bag with space
+  # Ensure we have a bag with space. The bag list is a singly-linked FIFO:
+  # `limboBagTail` is the oldest unfreed bag, `currentBag` is the newest, and
+  # `next` chains oldest -> newer -> newest. Reclamation walks from tail.
   if state.currentBag == nil or state.currentBag.count >= LimboBagSize:
     let newBag = allocLimboBag()
     newBag.epoch = epoch
-    newBag.next = state.currentBag
-    if state.limboBagHead == nil:
-      state.limboBagHead = newBag
+    newBag.next = nil
+    if state.currentBag != nil:
+      state.currentBag.next = newBag
     state.currentBag = newBag
     if state.limboBagTail == nil:
       state.limboBagTail = newBag
+    # `limboBagHead` is no longer used; reclaim walks from tail. Retained on
+    # the type for now to keep the struct layout stable; do not read it.
+    state.limboBagHead = newBag
 
   # Add object to bag with provided destructor
   let bag = state.currentBag

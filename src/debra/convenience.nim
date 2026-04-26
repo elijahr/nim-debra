@@ -221,29 +221,43 @@ proc advanceEvery*[MT: static int](
     return true
   return false
 
-proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
-  ## Run one reclamation pass. Returns the number of objects reclaimed,
-  ## or 0 if no epoch is currently safe to reclaim.
+proc reclaimNow*[MT: static int](handle: ThreadHandle[MT]): int =
+  ## Run one reclamation pass over the calling thread's own retired objects.
+  ## Returns the number of objects reclaimed, or 0 if no epoch is currently
+  ## safe to reclaim.
   ##
   ## Pinning is not required: reclamation only inspects per-thread epochs.
-  ## Named distinctly from the typestate-level `tryReclaim` on `ReclaimReady`
-  ## (`reclaim.nim`) to avoid reader confusion.
+  ## Each thread reclaims only its own bags; cross-thread reclamation is not
+  ## supported because the bag list is mutated by the owning thread (via
+  ## `retire`) without synchronization.
   ##
   ## See also: `debra/typestates/reclaim.tryReclaim`_, `advance`_.
   runnableExamples:
     import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
     # Brand-new manager: no retired objects, returns 0 (not an error).
-    doAssert reclaimNow(manager) == 0
+    doAssert reclaimNow(handle) == 0
     # Retire something, advance the epoch a few times, then reclaim.
-    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
     withPin(handle):
       it.retire(alloc0(8), dtor)
     manager.advance()
     manager.advance()
-    discard reclaimNow(manager)
+    discard reclaimNow(handle)
+  let op = reclaimStart(handle).loadEpochs().checkSafe()
+  if op.kind == rReclaimReady:
+    op.reclaimready.tryReclaim()
+  else:
+    0
+
+proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
+  ## Legacy wrapper: infers the calling thread's slot from `threadLocalIdx`
+  ## (set by `registerThread`). Prefer `reclaimNow(handle)` for clarity and
+  ## for safety from unregistered threads.
+  ##
+  ## See also: `debra/typestates/reclaim.tryReclaim`_, `advance`_.
   let op = reclaimStart(addr manager).loadEpochs().checkSafe()
   if op.kind == rReclaimReady:
     op.reclaimready.tryReclaim()
@@ -285,9 +299,9 @@ proc retireAndReclaim*[MT: static int](
     Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
   discard pinnedAgain.unpin()
 
-  # Optional eager reclamation
+  # Optional eager reclamation (per-thread, scoped to this handle's slot).
   if eager:
-    let reclaim = reclaimStart(handle.manager).loadEpochs().checkSafe()
+    let reclaim = reclaimStart(handle).loadEpochs().checkSafe()
     if reclaim.kind == rReclaimReady:
       discard reclaim.reclaimready.tryReclaim()
 
@@ -325,8 +339,8 @@ proc retireAndReclaim*[T: ref, MT: static int](
     Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
   discard pinnedAgain.unpin()
 
-  # Optional eager reclamation
+  # Optional eager reclamation (per-thread, scoped to this handle's slot).
   if eager:
-    let reclaim = reclaimStart(handle.manager).loadEpochs().checkSafe()
+    let reclaim = reclaimStart(handle).loadEpochs().checkSafe()
     if reclaim.kind == rReclaimReady:
       discard reclaim.reclaimready.tryReclaim()

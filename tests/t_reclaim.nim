@@ -23,18 +23,21 @@ suite "Reclaim typestate":
     discard uninitializedManager(addr mgr).initialize()
 
   test "reclaimStart creates ReclaimStart":
-    let s = reclaimStart(addr mgr)
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let s = reclaimStart(handle)
     check s is ReclaimStart[4]
 
   test "loadEpochs computes safe epoch":
     mgr.globalEpoch.store(10'u64, moRelaxed)
-    let loaded = reclaimStart(addr mgr).loadEpochs()
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let loaded = reclaimStart(handle).loadEpochs()
     check loaded is EpochsLoaded[4]
     check loaded.safeEpoch == 10'u64
 
   test "checkSafe returns ReclaimReady when epoch > 1":
     mgr.globalEpoch.store(5'u64, moRelaxed)
-    let check = reclaimStart(addr mgr).loadEpochs().checkSafe()
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let check = reclaimStart(handle).loadEpochs().checkSafe()
     check check.kind == rReclaimReady
 
   test "tryReclaim reclaims eligible bags":
@@ -52,16 +55,18 @@ suite "Reclaim typestate":
     # Advance epoch past safe threshold
     mgr.globalEpoch.store(5'u64, moRelaxed)
 
-    # Reclaim
-    let result = reclaimStart(addr mgr).loadEpochs().checkSafe()
+    # Reclaim from this handle's perspective.
+    let result = reclaimStart(handle).loadEpochs().checkSafe()
     check result.kind == rReclaimReady
     let count = result.reclaimready.tryReclaim()
     check count == 5
 
-  test "multi-thread reclaim with different pinned epochs":
-    # This test verifies that reclamation correctly identifies the safe epoch
-    # based on the minimum pinned epoch across all threads, and only reclaims
-    # objects from epochs below that safe epoch.
+  test "per-thread reclaim respects safe epoch":
+    # `tryReclaim` reclaims only the calling thread's own retired objects.
+    # Each thread is responsible for draining its own bags. This test simulates
+    # three threads retiring at different epochs from the same OS thread by
+    # passing distinct handles and asserts each handle's reclaim sees only its
+    # own objects, gated by the global safe epoch.
 
     # Setup: Start at epoch 1
     mgr.globalEpoch.store(1'u64, moRelaxed)
@@ -108,51 +113,107 @@ suite "Reclaim typestate":
     # Advance to epoch 5
     mgr.globalEpoch.store(5'u64, moRelaxed)
 
-    # Now pin threads at different epochs to create interesting reclaim scenario:
-    # - Thread 0: pin at epoch 5 (current)
-    # - Thread 1: pin at epoch 3 (older) - this will be the minimum
-    # - Thread 2: not pinned
-    # - Thread 3: not pinned
-
+    # Pin thread 0 at epoch 5 and pin thread 1 at epoch 3 to make safeEpoch = 3.
     let p0_v2 = unpinned(h0).pin()
     check p0_v2.epoch == 5
-
-    # Manually set thread 1's pinned state at epoch 3 to simulate
-    # a thread that pinned earlier and is still in critical section
     mgr.threads[1].epoch.store(3'u64, moRelease)
     mgr.threads[1].pinned.store(true, moRelease)
 
-    # Verify loadEpochs computes correct safe epoch
-    let loaded = reclaimStart(addr mgr).loadEpochs()
-    check loaded.safeEpoch == 3 # Minimum of pinned threads: min(5, 3) = 3
+    # safeEpoch is computed from the minimum pinned epoch across all threads.
+    # safeEpoch = min(5, 3) = 3, threshold = safeEpoch - 1 = 2.
+    # Only bags with epoch < 2 are reclaimable in this pass.
 
-    # Check reclaim is ready (safeEpoch > 1)
-    let result = loaded.checkSafe()
-    check result.kind == rReclaimReady
+    # Reclaim from thread 0's perspective: its bag at epoch 1 is below the
+    # threshold and should be freed (3 objects).
+    let r0 = reclaimStart(h0).loadEpochs().checkSafe()
+    check r0.kind == rReclaimReady
+    check r0.reclaimready.tryReclaim() == 3
 
-    # Reclaim - with safeEpoch = 3, the reclaim threshold is (3 - 1) = 2
-    # This means bags with epoch < 2 are reclaimed (i.e., only epoch 1)
-    # This conservative approach ensures safety:
-    # - epoch 1 objects (3 items) should be reclaimed
-    # - epoch 2 objects (4 items) should NOT be reclaimed yet (not safe)
-    # - epoch 3 objects (5 items) should NOT be reclaimed (not safe)
-    let count = result.reclaimready.tryReclaim()
-    check count == 3 # Only the 3 from epoch 1
+    # Reclaim from thread 1's perspective: its bag at epoch 2 is NOT below
+    # the threshold; nothing should be freed.
+    let r1 = reclaimStart(h1).loadEpochs().checkSafe()
+    check r1.kind == rReclaimReady
+    check r1.reclaimready.tryReclaim() == 0
 
-    # Unpin thread 1 (which was at epoch 3)
+    # Reclaim from thread 2's perspective: its bag at epoch 3 is NOT below
+    # the threshold; nothing should be freed.
+    let r2 = reclaimStart(h2).loadEpochs().checkSafe()
+    check r2.kind == rReclaimReady
+    check r2.reclaimready.tryReclaim() == 0
+
+    # Now unpin thread 1; safeEpoch climbs to 5 (only thread 0 still pinned).
+    # Threshold becomes 4, so bags at epoch 2 and 3 become reclaimable.
     mgr.threads[1].pinned.store(false, moRelease)
 
-    # Now minimum pinned epoch is just thread 0 at epoch 5
-    # Try reclaim again with only thread 0 pinned at epoch 5
-    let loaded2 = reclaimStart(addr mgr).loadEpochs()
-    check loaded2.safeEpoch == 5 # Only thread 0 pinned at epoch 5
+    # Thread 1 reclaims its own 4 objects at epoch 2.
+    let r1b = reclaimStart(h1).loadEpochs().checkSafe()
+    check r1b.kind == rReclaimReady
+    check r1b.reclaimready.tryReclaim() == 4
 
-    let result2 = loaded2.checkSafe()
-    check result2.kind == rReclaimReady
-    # With safeEpoch = 5, threshold is 4, so bags with epoch < 4 are reclaimable
-    # This includes epoch 2 (4 objects) and epoch 3 (5 objects)
-    let count2 = result2.reclaimready.tryReclaim()
-    check count2 == 9 # 4 from epoch 2 + 5 from epoch 3
+    # Thread 2 reclaims its own 5 objects at epoch 3.
+    let r2b = reclaimStart(h2).loadEpochs().checkSafe()
+    check r2b.kind == rReclaimReady
+    check r2b.reclaimready.tryReclaim() == 5
 
     # Clean up remaining pinned thread
     discard p0_v2.unpin()
+
+  test "tryReclaim ignores other threads' bags":
+    # Verifies the per-thread scope explicitly: thread 0 retires, thread 1
+    # reclaims; thread 0's bags are untouched.
+    mgr.globalEpoch.store(1'u64, moRelaxed)
+
+    let h0 = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let h1 = ThreadHandle[4](idx: 1, manager: addr mgr)
+
+    # Thread 0 retires 3 objects at epoch 1
+    let p0 = unpinned(h0).pin()
+    var ready0 = retireReady(p0)
+    for i in 0 ..< 3:
+      let node = managed TestNode(value: i)
+      let retired = ready0.retire(node)
+      ready0 = retireReadyFromRetired(retired)
+    discard p0.unpin()
+
+    # Advance well past safe threshold
+    mgr.globalEpoch.store(10'u64, moRelaxed)
+
+    # Thread 1 attempts reclaim — should reclaim NOTHING because it has no
+    # retired objects of its own.
+    let r1 = reclaimStart(h1).loadEpochs().checkSafe()
+    check r1.kind == rReclaimReady
+    check r1.reclaimready.tryReclaim() == 0
+
+    # Thread 0's bag is still intact and still has 3 objects waiting.
+    check mgr.threads[0].limboBagTail != nil
+    check mgr.threads[0].limboBagTail.count == 3
+
+    # Thread 0 reclaims its own 3 objects.
+    let r0 = reclaimStart(h0).loadEpochs().checkSafe()
+    check r0.kind == rReclaimReady
+    check r0.reclaimready.tryReclaim() == 3
+    check mgr.threads[0].limboBagTail == nil
+
+  test "tryReclaim reclaims across multiple bags (FIFO ordering)":
+    # Retire enough objects to fill 2+ bags, then reclaim. Verifies the new
+    # tail-to-current FIFO list management correctly walks all eligible bags.
+    mgr.globalEpoch.store(1'u64, moRelaxed)
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let p = unpinned(handle).pin()
+    var ready = retireReady(p)
+    let totalObjects = LimboBagSize * 2 + 5 # 133 objects -> 3 bags
+    for i in 0 ..< totalObjects:
+      let node = managed TestNode(value: i)
+      let retired = ready.retire(node)
+      ready = retireReadyFromRetired(retired)
+    discard p.unpin()
+
+    # Advance past safe threshold so all bags become reclaimable.
+    mgr.globalEpoch.store(5'u64, moRelaxed)
+
+    let r = reclaimStart(handle).loadEpochs().checkSafe()
+    check r.kind == rReclaimReady
+    check r.reclaimready.tryReclaim() == totalObjects
+    # All bags freed: tail is nil, current is nil.
+    check mgr.threads[0].limboBagTail == nil
+    check mgr.threads[0].currentBag == nil
