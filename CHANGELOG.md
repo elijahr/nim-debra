@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-25
+
+### Added
+
+- `debra/atomics` module: custom atomic primitives built on C11 `__atomic_*` builtins
+  - `Atomic[T]` type with `load`, `store`, `exchange`, `fetchAdd`, `fetchSub`, `fetchAnd`, `fetchOr`, `fetchXor`
+  - Strong and weak compare-and-swap (`compareExchange`, `compareExchangeWeak`)
+  - `MemoryOrder` enum (Relaxed, Consume, Acquire, Release, AcqRel, SeqCst)
+  - `threadFence`, `signalFence`, `AtomicFlag`, `CacheLineBytes`
+  - DSL submodule for symmetric load/store syntax
+  - Lock-free enforcement: rejects `ref T` and types that are not lock-free at the requested width
+  - `T` constraint is `supportsCopyMem(T)` plus a lock-free check, admitting POD object types (e.g., `ThreadId` wrapping `Pthread`) in addition to primitives
+- `debra/refptr` module: `retain`, `release`, and `releaseDestructor` helpers for `Atomic[ptr T]` patterns
+- `withPin` template in `debra/convenience` for ergonomic pin/retire/unpin scopes
+  - Named form binds the pinned handle to a user-chosen identifier
+  - Unnamed form injects `it` into the body
+  - Auto-unpin on scope exit, including exception paths
+  - Debug assertion against nested pins
+- `retireBatch` for batched retirement within a single pinned scope
+- `reclaimNow` standalone reclaim helper
+- `advanceEvery(handle, n)` for cadence-controlled epoch advancement
+- `runnableExamples` blocks on the public API across `convenience`, `refptr`, `managed`, and the typestate `guard` / `retire` / `reclaim` modules
+- Pitfall and See-also sections in public-API doc comments
+- Epoch advancement guide at `docs/guide/epoch-advancement.md`
+
+### Changed
+
+- **BREAKING**: `tryReclaim` and `reclaimNow` are now scoped to the calling thread's own limbo bags. Cross-thread reclamation has been removed. Stalled threads are still handled via `neutralizeStalled`. Callers that relied on one thread reclaiming another thread's retired objects must now invoke reclamation on each thread, or rely on the neutralization path for unresponsive threads.
+- Three lock-free examples (`lockfree_queue`, `lockfree_stack`, `lockfree_stack_typestates`) rewritten from `Atomic[Managed[ref T]]` to `Atomic[ptr T]` with `retain` / `release`, removing the spinlock fallback hazard that `Atomic[ref T]` carries on arc/orc.
+
+### Removed
+
+- `std/atomics` dependency from nim-debra source code. All atomic operations now go through `debra/atomics`.
+
+### Fixed
+
+- Reclaim race in `tryReclaim`: the previous implementation walked other threads' limbo bag lists without synchronization, which could fault when reclamation actually fired concurrently with retire. Reclamation is now per-thread.
+- Bag-list tail tracking in `retire`: new bags were prepended but `limboBagTail` was never updated, so multi-bag reclamation was effectively a no-op. `retire` now correctly appends and maintains the tail pointer.
+- `examples/reclamation_background.nim` segfault under refc: refc's thread-local GC heap does not support cross-thread `GC_unref`. The example now skips with a clear diagnostic when compiled with `--mm:refc`.
+
 ## [0.2.1] - 2025-12-18
 
 ### Added
@@ -149,7 +189,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/elijahr/nim-debra/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/elijahr/nim-debra/compare/v0.1.1...v0.1.2
