@@ -53,6 +53,43 @@ proc retireReadyFromRetired*[MaxThreads: static int](
   ## Get back to RetireReady after retiring (for multiple retires).
   RetireReady[MaxThreads](RetireContext[MaxThreads](r))
 
+proc pinnedFromRetired*[MaxThreads: static int](
+    r: sink Retired[MaxThreads]
+): Pinned[MaxThreads] =
+  ## Return a `Pinned[MaxThreads]` reconstructed from a `Retired[MaxThreads]`
+  ## value, allowing the caller to keep working in the same pinned epoch
+  ## (e.g. interleaving reads with further retires) instead of unpinning
+  ## immediately after a retire.
+  ##
+  ## Symmetric to `retireReadyFromRetired`: same underlying
+  ## `RetireContext[MaxThreads]`, projected to the `Pinned` typestate via
+  ## the `EpochGuardContext[MaxThreads]` shape (handle + epoch). The slot's
+  ## `pinned` flag is unchanged; this is a typestate rebrand, not a
+  ## re-pin.
+  ##
+  ## See also: `retireReadyFromRetired`_, `retire`_, `debra/typestates/guard.pin`_.
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} =
+      dealloc(p)
+
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    # Stay in the pinned epoch across a retire so the thread can keep
+    # reading shared state without unpinning and re-pinning.
+    let pinned = unpinned(handle).pin()
+    let ready = retireReady(pinned)
+    let raw = alloc0(8)
+    let retired = ready.retire(raw, dtor)
+    let pinnedAgain = pinnedFromRetired(retired)
+    discard pinnedAgain.unpin()
+
+  let ctx = RetireContext[MaxThreads](r)
+  Pinned[MaxThreads](
+    EpochGuardContext[MaxThreads](handle: ctx.handle, epoch: ctx.epoch)
+  )
+
 proc retire*[MaxThreads: static int](
     r: sink RetireReady[MaxThreads], p: pointer, destructor: Destructor
 ): Retired[MaxThreads] {.transition.} =
@@ -71,11 +108,7 @@ proc retire*[MaxThreads: static int](
     let pinned = unpinned(handle).pin()
     let raw = alloc0(8)
     let retired = retireReady(pinned).retire(raw, dtor)
-    let pinnedAgain = Pinned[4](
-      EpochGuardContext[4](
-        handle: RetireContext[4](retired).handle, epoch: RetireContext[4](retired).epoch
-      )
-    )
+    let pinnedAgain = pinnedFromRetired(retired)
     discard pinnedAgain.unpin()
 
   # Extract values we need before consuming r

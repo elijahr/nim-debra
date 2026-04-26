@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `runnableExamples` blocks on the public API across `convenience`, `refptr`, `managed`, and the typestate `guard` / `retire` / `reclaim` modules
 - Pitfall and See-also sections in public-API doc comments
 - Epoch advancement guide at `docs/guide/epoch-advancement.md`
+- `pinnedFromRetired[MaxThreads]` helper in `debra/typestates/retire`. Symmetric to `retireReadyFromRetired`: lets a caller stay in the pinned epoch after a retire (e.g. interleaving reads with further retires) without unpinning and re-pinning.
 
 ### Changed
 

@@ -1,5 +1,6 @@
 import unittest2
 
+import debra/atomics
 import debra/types
 import debra/limbo
 import debra/typestates/manager
@@ -63,3 +64,29 @@ suite "Retire typestate":
       ready = retireReadyFromRetired(retired)
 
     check mgr.threads[0].currentBag.count == 3
+
+  test "pinnedFromRetired round-trips Pinned -> Retired -> Pinned -> unpin":
+    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let pinned = unpinned(handle).pin()
+    let originalEpoch = pinned.epoch
+    let ready = retireReady(pinned)
+
+    let raw = cast[ptr NodeObj](alloc0(sizeof(NodeObj)))
+    raw.value = 7
+    let retired = ready.retire(cast[pointer](raw), dtor)
+
+    # Slot must still be pinned: the typestate has consumed Retired into
+    # a fresh Pinned without ever flipping the slot's `pinned` flag.
+    check mgr.threads[0].pinned.load(moAcquire) == true
+
+    let pinnedAgain = pinnedFromRetired(retired)
+    check pinnedAgain.epoch == originalEpoch
+    check pinnedAgain.handle.idx == handle.idx
+
+    # The retire we did beforehand is still recorded.
+    check mgr.threads[0].currentBag != nil
+    check mgr.threads[0].currentBag.count == 1
+
+    # And we can unpin from the rebranded Pinned to close the lifecycle.
+    discard pinnedAgain.unpin()
+    check mgr.threads[0].pinned.load(moAcquire) == false
