@@ -72,6 +72,14 @@ proc pin*[MaxThreads: static int](
   mgr.threads[idx].neutralized.store(false, moRelease)
   mgr.threads[idx].epoch.store(ctx.epoch, moRelease)
   mgr.threads[idx].pinned.store(true, moRelease)
+  # Publication fence: prevents the caller's subsequent loads of shared
+  # state (the data this pin is meant to protect) from being reordered
+  # before the `pinned=true` store becomes globally visible. Without
+  # this, a reclaimer can observe `pinned=false` after we have already
+  # loaded a pointer to a soon-to-be-retired object, and free the
+  # object out from under us. Standard EBR publication barrier; matches
+  # Crossbeam's pin path.
+  threadFence(moSequentiallyConsistent)
 
   Pinned[MaxThreads](ctx)
 
