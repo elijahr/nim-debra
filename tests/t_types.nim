@@ -1,7 +1,7 @@
 # tests/t_types.nim
 
 import unittest2
-import atomics
+import debra/atomics
 
 import debra/types
 

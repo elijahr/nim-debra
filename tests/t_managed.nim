@@ -1,5 +1,5 @@
 import unittest2
-import std/atomics
+import debra/atomics
 
 import debra/managed
 

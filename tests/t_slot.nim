@@ -1,5 +1,5 @@
 import unittest2
-import atomics
+import debra/atomics
 
 import debra/types
 import debra/typestates/slot

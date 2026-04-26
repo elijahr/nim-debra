@@ -1,7 +1,7 @@
 # tests/t_integration.nim
 
 import unittest2
-import atomics
+import debra/atomics
 import os
 
 import debra

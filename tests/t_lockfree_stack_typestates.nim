@@ -10,7 +10,7 @@
 ## - Memory reclamation correctness
 
 import unittest2
-import atomics
+import debra/atomics
 import std/[options, os]
 import debra
 import ../examples/item_processing
