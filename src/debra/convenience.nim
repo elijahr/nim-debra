@@ -173,6 +173,54 @@ template withPin*[MT: static int](
       let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
       discard p.unpin()
 
+proc advanceEvery*[MT: static int](
+    handle: ThreadHandle[MT], n: int
+): bool {.discardable.} =
+  ## Increment a per-handle counter; advance the global epoch once every
+  ## `n` calls. Returns `true` on the calls that actually advanced.
+  ##
+  ## Cadence helper for the most common epoch advancement pattern: call this
+  ## from a hot path (e.g. after each retire, or once per pop) without paying
+  ## an atomic store on every invocation. Most calls are a single non-atomic
+  ## increment plus a branch; only every Nth call performs the atomic
+  ## `fetchAdd` on the global epoch.
+  ##
+  ## The counter lives on the handle's per-thread slot and is owned by the
+  ## registered thread. No synchronization is required; different handles
+  ## have independent counters.
+  ##
+  ## `n` must be `>= 1`. `n == 1` advances every call (equivalent to calling
+  ## `manager.advance()` directly). Larger `n` reduces atomic-store traffic
+  ## at the cost of letting the limbo bag fill more between advances.
+  ##
+  ## Typical cadences:
+  ##
+  ## * `n = 1`: advance every call. Simplest; highest throughput cost.
+  ## * `n = 32` to `n = 128`: good general default for queue hot paths.
+  ## * `n = 1024+`: very low-overhead, but limbo bag may grow noticeably.
+  ##
+  ## See also: `advance`_, `reclaimNow`_, the
+  ## `epoch advancement guide<../guide/epoch-advancement.md>`_.
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    # Hot loop: retire and amortize the global-epoch atomic store.
+    for i in 0 ..< 100:
+      withPin(handle):
+        it.retire(alloc0(8), dtor)
+      handle.advanceEvery(32)
+    discard reclaimNow(manager)
+  assert n >= 1, "advanceEvery: n must be >= 1"
+  let state = addr handle.manager.threads[handle.idx]
+  state.advanceCounter += 1'u64
+  if state.advanceCounter mod uint64(n) == 0'u64:
+    discard handle.manager.globalEpoch.fetchAdd(1'u64, moRelease)
+    return true
+  return false
+
 proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
   ## Run one reclamation pass. Returns the number of objects reclaimed,
   ## or 0 if no epoch is currently safe to reclaim.

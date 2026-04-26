@@ -166,6 +166,53 @@ suite "DEBRA Batched Retire/Reclaim API":
     check count == 2
     check destroyedCount == 2
 
+  test "advanceEvery advances every Nth call":
+    let startEpoch = currentEpoch(manager)
+    # n=4: calls 4, 8, 12 advance; calls 1-3, 5-7, 9-11 just increment.
+    var advanced = 0
+    for i in 1 .. 12:
+      if handle.advanceEvery(4):
+        inc advanced
+    check advanced == 3
+    check currentEpoch(manager) == startEpoch + 3'u64
+
+  test "advanceEvery with n=1 advances on every call":
+    let startEpoch = currentEpoch(manager)
+    for i in 1 .. 5:
+      check handle.advanceEvery(1) == true
+    check currentEpoch(manager) == startEpoch + 5'u64
+
+  test "advanceEvery counter is per-handle":
+    # Register a second handle; its counter starts at 0 independent of the
+    # first handle's counter. Different cadences interleave correctly.
+    let other = registerThread(manager)
+    # Drive `handle` partway toward its trigger.
+    discard handle.advanceEvery(4)
+    discard handle.advanceEvery(4)
+    discard handle.advanceEvery(4)
+    let mid = currentEpoch(manager) # no advance yet on `handle`
+    # `other` has its own counter starting from 0.
+    check other.advanceEvery(2) == false
+    check other.advanceEvery(2) == true # 2nd call on `other` triggers
+    check currentEpoch(manager) == mid + 1'u64
+    # Finish driving `handle` past its 4th call.
+    check handle.advanceEvery(4) == true
+    check currentEpoch(manager) == mid + 2'u64
+
+  test "advanceEvery + retire/reclaim cycle":
+    # End-to-end: retire, advance via cadence helper, reclaim observes safe.
+    let n1 = cast[Node](alloc0(sizeof(NodeObj)))
+    let n2 = cast[Node](alloc0(sizeof(NodeObj)))
+    handle.withPin:
+      it.retire(n1, destroyNode)
+      it.retire(n2, destroyNode)
+    # Drive enough cadence ticks (n=2) to advance the epoch past safe.
+    for i in 1 .. 6:
+      handle.advanceEvery(2)
+    let count = reclaimNow(manager)
+    check count == 2
+    check destroyedCount == 2
+
   test "retireBatch retires N objects with their destructors":
     const N = 16
     var items: seq[(pointer, Destructor)]

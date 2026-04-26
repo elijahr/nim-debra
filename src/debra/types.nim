@@ -21,6 +21,9 @@ type
     currentBag*: ptr LimboBag ## Currently filling limbo bag.
     limboBagHead*: ptr LimboBag ## Head of limbo bag list (newest).
     limboBagTail*: ptr LimboBag ## Tail of limbo bag list (oldest).
+    # Cadence counter for `advanceEvery` (owned by the registered thread, no
+    # cross-thread access; non-atomic).
+    advanceCounter*: uint64
 
   DebraManager*[MaxThreads: static int] = object
     ## Coordinates epoch-based reclamation across threads.
@@ -52,3 +55,4 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
     result.threads[i].currentBag = nil
     result.threads[i].limboBagHead = nil
     result.threads[i].limboBagTail = nil
+    result.threads[i].advanceCounter = 0'u64
