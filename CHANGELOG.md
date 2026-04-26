@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `std/atomics` dependency from nim-debra source code. All atomic operations now go through `debra/atomics`.
 - `Managed[ref T]` type, `managed()`, `inner()`, `Managed[T]` overloads of `retire` and `retireAndReclaim`, and the `-d:allowSpinlockManagedRef` opt-in flag. See the breaking-change note above for migration.
+- `unreffer[T]()` from `debra/limbo`: was a duplicate of `releaseDestructor[T]()` from `debra/refptr` retained during the `Managed[T]` removal to avoid touching tests. Use `releaseDestructor[T]()` instead.
 
 ### Fixed
 

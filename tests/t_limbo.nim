@@ -1,6 +1,7 @@
 import unittest2
 
 import debra/limbo
+import debra/refptr
 
 suite "LimboBag":
   test "LimboBagSize is 64":
@@ -97,17 +98,24 @@ suite "LimboBag":
     check counter1 == 20 # destructor1 called twice: 10 + 10
     check counter2 == 20 # destructor2 called once: 20
 
-  test "unreffer generates type-specific destructor":
-    type Node = ref object
-      value: int
+  test "releaseDestructor generates type-specific destructor":
+    type
+      NodeObj = object
+        value: int
 
-    var destroyed = false
+      Node = ref NodeObj
+
     let node = Node(value: 42)
-    GC_ref(node)
+    # `retain` increments the GC refcount and hands back a raw pointer; the
+    # destructor returned by `releaseDestructor[NodeObj]()` is what the
+    # limbo bag will eventually invoke to balance that retain via GC_unref.
+    let raw = retain(node)
+    check raw.value == 42
 
-    let destructor = unreffer[Node]()
-    destructor(cast[pointer](node))
+    let destructor = releaseDestructor[NodeObj]()
+    check destructor != nil
+    destructor(cast[pointer](raw))
 
-    # After GC_unref, the ref should be collectable
-    # We can't easily test destruction, but we can verify it doesn't crash
-    check true
+    # After GC_unref the local `node` binding still holds the cell alive
+    # for the remainder of this scope, so reading through it is safe.
+    check node.value == 42
