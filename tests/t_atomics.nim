@@ -82,6 +82,12 @@ suite "load/store":
     a.store(Blue)
     check a.load() == Blue
 
+  test "pointer (untyped) roundtrip":
+    var x: int = 9
+    var a: Atomic[pointer]
+    a.store(cast[pointer](addr x))
+    check a.load() == cast[pointer](addr x)
+
 suite "exchange":
   test "int exchange returns previous":
     var a: Atomic[int]
