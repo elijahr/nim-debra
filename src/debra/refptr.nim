@@ -1,0 +1,56 @@
+## Bridge `ref` types into `Atomic[ptr T]` storage with explicit GC tracking.
+##
+## ## Why
+##
+## `Managed[ref T]` integrates with Nim's GC by holding a strong reference
+## inside a `distinct ref`. That works for non-atomic shared ownership, but
+## `Atomic[Managed[ref T]]` falls back to spinlock-based atomics on arc/orc
+## (any atomic over a `ref` does), which defeats lock-free guarantees.
+##
+## For atomic pointer storage in lock-free data structures, the cleaner
+## pattern is to convert the `ref` into a raw `ptr T`, increment the GC
+## ref count manually so the object survives, and decrement it from the
+## DEBRA destructor at retire-reclaim time.
+##
+## ## API
+##
+## * `retain(obj)` -> `ptr T`: GC_ref + cast.
+## * `release(p)`: GC_unref the pointer (nil-safe).
+## * `releaseDestructor[T]()` -> `Destructor`: factory that returns a
+##   `Destructor` releasing a `ptr T`. Pass to `it.retire(p, releaseDestructor[T]())`.
+##
+## Each `retain` MUST be paired with exactly one `release` (typically via
+## `releaseDestructor[T]()` handed to `pin.retire`). Double-release will
+## free the underlying object early.
+
+import ./limbo
+
+proc retain*[T: ref](obj: T): ptr typeof(obj[]) {.inline.} =
+  ## Increment the GC ref count and return a raw pointer suitable for
+  ## atomic storage. The caller owns the resulting pointer's reference
+  ## count; pair every `retain` with exactly one `release` (usually via
+  ## `releaseDestructor[T]()` handed to `pin.retire`).
+  ##
+  ## Passing nil is a programmer error and will likely crash inside
+  ## `GC_ref`. The result is never nil.
+  GC_ref(obj)
+  cast[ptr typeof(obj[])](obj)
+
+proc release*[T](p: ptr T) {.inline.} =
+  ## Decrement the GC ref count for a pointer obtained via `retain`.
+  ## Safe to call on `nil` (no-op).
+  ##
+  ## Note: takes `ptr T` (the value type), matching what `retain` returns.
+  if p != nil:
+    GC_unref(cast[ref T](p))
+
+proc releaseDestructor*[T](): Destructor =
+  ## Build a `Destructor` (the type DEBRA's `retire` accepts) that
+  ## releases a typed pointer obtained from `retain[ref T]`. Hand the
+  ## result to `pin.retire(rawPtr, releaseDestructor[T]())`.
+  ##
+  ## Each instantiation produces an identical closure; cache the result
+  ## per type if you retire many objects in a hot loop.
+  result = proc(p: pointer) {.nimcall.} =
+    if p != nil:
+      GC_unref(cast[ref T](p))

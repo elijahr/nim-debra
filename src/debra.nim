@@ -21,6 +21,7 @@ import ./debra/typestates/neutralize
 import ./debra/typestates/advance
 import ./debra/typestates/slot
 import ./debra/managed
+import ./debra/refptr
 import ./debra/convenience
 
 export types
@@ -37,6 +38,7 @@ export neutralize
 export advance
 export slot
 export managed
+export refptr
 export convenience
 
 proc registerThread*[MaxThreads: static int](
