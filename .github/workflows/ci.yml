@@ -28,9 +28,12 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.nim-version }} / ${{ matrix.runs-on }})
+    runs-on: ${{ matrix.runs-on }}
     strategy:
+      fail-fast: false
       matrix:
+        runs-on: [ubuntu-latest, ubuntu-24.04-arm]
         nim-version: ['stable']
     steps:
       - name: Checkout
@@ -45,9 +48,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.nimble
-          key: ${{ runner.os }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
+          key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
           restore-keys: |
-            ${{ runner.os }}-nimble-${{ matrix.nim-version }}-
+            ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-
 
       - name: Install dependencies
         run: nimble install -y
