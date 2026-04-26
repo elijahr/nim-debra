@@ -3,6 +3,7 @@
 ## These procs compose the low-level typestate API for frequent use cases.
 ## For fine-grained control or batching, use the typestate API directly.
 
+import ./atomics
 import ./types
 import ./limbo
 import ./managed
@@ -50,8 +51,15 @@ template withPin*[MT: static int](
   ##
   ## Injects `pin` as a `var RetireReady[MT]`. Body may call
   ## `pin.retire(p, dtor)` zero or more times.
+  ##
+  ## Under debug builds, asserts the thread is not already pinned on the
+  ## given handle. Under `-d:release`/`-d:danger` the assertion is a no-op.
+  ## Different-handle nesting (multi-manager) is independent and legal.
   block:
     let h = handle
+    assert not h.manager.threads[h.idx].pinned.load(moAcquire),
+      "withPin: thread is already pinned (handle slot " & $h.idx &
+      "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
     var pin {.inject.} = retireReady(pinnedGuard)
     try:
@@ -69,6 +77,9 @@ template withPin*[MT: static int](
   ## across multiple managers.
   block:
     let h = handle
+    assert not h.manager.threads[h.idx].pinned.load(moAcquire),
+      "withPin: thread is already pinned (handle slot " & $h.idx &
+      "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
     var name {.inject.} = retireReady(pinnedGuard)
     try:
