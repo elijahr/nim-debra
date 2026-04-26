@@ -31,8 +31,6 @@
 ##   is undefined and crashes inside `decRef`. arc/orc use atomic shared
 ##   refcounts and are not affected. See `examples/reclamation_background.nim`
 ##   for the full investigation.
-## * `releaseDestructor[T]()` allocates a fresh closure on each call. Cache the
-##   result per type if you retire many objects in a hot loop.
 ##
 ## ## See also
 ##
@@ -81,13 +79,24 @@ proc release*[T](p: ptr T) {.inline.} =
   if p != nil:
     GC_unref(cast[ref T](p))
 
-proc releaseDestructor*[T](): Destructor =
-  ## Build a `Destructor` (the type DEBRA's `retire` accepts) that
+proc releaseDestructorImpl[T](p: pointer) {.nimcall.} =
+  # Top-level per-`T` instantiation backing `releaseDestructor[T]()`.
+  # Lives at module scope so the compiler emits a plain procedure (no
+  # captured environment, no per-call heap allocation). Retire sites that
+  # repeatedly call `releaseDestructor[T]()` therefore share a single
+  # function pointer per `T` and incur no per-call closure construction.
+  if p != nil:
+    GC_unref(cast[ref T](p))
+
+proc releaseDestructor*[T](): Destructor {.inline.} =
+  ## Return the `Destructor` (the type DEBRA's `retire` accepts) that
   ## releases a typed pointer obtained from `retain[ref T]`. Hand the
   ## result to `pin.retire(rawPtr, releaseDestructor[T]())`.
   ##
-  ## Each instantiation produces an identical closure; cache the result
-  ## per type if you retire many objects in a hot loop.
+  ## The returned `Destructor` is a plain `nimcall` procedure address with
+  ## no captured environment, so each `T` instantiation produces one
+  ## function pointer that is reused across calls. Calling
+  ## `releaseDestructor[T]()` repeatedly does not allocate.
   ##
   ## See also: `retain`_, `release`_.
   runnableExamples:
@@ -98,11 +107,9 @@ proc releaseDestructor*[T](): Destructor =
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
-    # Cache the destructor once per type, retire many pointers with it.
-    let dtor = releaseDestructor[Node]()
+    # `releaseDestructor[T]()` returns the same proc address each call;
+    # passing it inline costs no allocation.
     withPin(handle):
       let raw = retain(Node(value: 1))
-      it.retire(raw, dtor)
-  result = proc(p: pointer) {.nimcall.} =
-    if p != nil:
-      GC_unref(cast[ref T](p))
+      it.retire(raw, releaseDestructor[Node]())
+  releaseDestructorImpl[T]

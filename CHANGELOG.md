@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reclaim race in `tryReclaim`: the previous implementation walked other threads' limbo bag lists without synchronization, which could fault when reclamation actually fired concurrently with retire. Reclamation is now per-thread.
 - Bag-list tail tracking in `retire`: new bags were prepended but `limboBagTail` was never updated, so multi-bag reclamation was effectively a no-op. `retire` now correctly appends and maintains the tail pointer.
 - `examples/reclamation_background.nim` segfault under refc: refc's thread-local GC heap does not support cross-thread `GC_unref`. The example now skips with a clear diagnostic when compiled with `--mm:refc`.
+- `releaseDestructor[T]()` no longer allocates a fresh closure on each call. The returned `Destructor` is now a plain `nimcall` proc address (one per `T` instantiation) with no captured environment, so retire sites that build the destructor inline pay no per-call allocation.
 
 ## [0.2.1] - 2025-12-18
 
