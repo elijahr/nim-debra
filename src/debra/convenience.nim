@@ -10,6 +10,63 @@ import ./typestates/guard
 import ./typestates/retire
 import ./typestates/reclaim
 
+# ---------------------------------------------------------------------------
+# Batched retire/reclaim API (see docs/design/2026-04-25-batched-retire-reclaim.md)
+# ---------------------------------------------------------------------------
+
+proc retire*[MT: static int](
+    pin: var RetireReady[MT], p: pointer, destructor: Destructor
+) =
+  ## Retire `p` inside an existing pinned epoch held by `pin`.
+  ##
+  ## Wraps the sink-form `retire` from typestates/retire.nim so the caller
+  ## can chain `pin.retire(...)` repeatedly inside a `withPin` body without
+  ## manually rebuilding `RetireReady` from `Retired`.
+  let retired = retire(move(pin), p, destructor)
+  pin = retireReadyFromRetired(retired)
+
+proc retire*[T: ref, MT: static int](
+    pin: var RetireReady[MT], obj: Managed[T]
+) =
+  ## Retire a `Managed[ref T]` inside an existing pinned epoch held by `pin`.
+  let retired = retire(move(pin), obj)
+  pin = retireReadyFromRetired(retired)
+
+template withPin*[MT: static int](
+    handle: ThreadHandle[MT], body: untyped
+) =
+  ## Pin the calling thread, run `body`, unpin on exit (including raises).
+  ##
+  ## Injects `pin` as a `var RetireReady[MT]`. Body may call
+  ## `pin.retire(p, dtor)` zero or more times.
+  block:
+    let h = handle
+    let pinnedGuard = unpinned(h).pin()
+    var pin {.inject.} = retireReady(pinnedGuard)
+    try:
+      body
+    finally:
+      let ctx = RetireContext[MT](pin)
+      let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
+      discard p.unpin()
+
+template withPin*[MT: static int](
+    handle: ThreadHandle[MT], name, body: untyped
+) =
+  ## `withPin` variant that injects a caller-supplied identifier `name`
+  ## (instead of the default `pin`). Use to disambiguate nested handles
+  ## across multiple managers.
+  block:
+    let h = handle
+    let pinnedGuard = unpinned(h).pin()
+    var name {.inject.} = retireReady(pinnedGuard)
+    try:
+      body
+    finally:
+      let ctx = RetireContext[MT](name)
+      let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
+      discard p.unpin()
+
 proc retireAndReclaim*[MT: static int](
     handle: ThreadHandle[MT], p: pointer, destructor: Destructor, eager: bool = true
 ) =
