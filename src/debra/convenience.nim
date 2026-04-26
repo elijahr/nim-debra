@@ -67,6 +67,19 @@ template withPin*[MT: static int](
       let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
       discard p.unpin()
 
+proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
+  ## Run one reclamation pass. Returns the number of objects reclaimed,
+  ## or 0 if no epoch is currently safe to reclaim.
+  ##
+  ## Pinning is not required: reclamation only inspects per-thread epochs.
+  ## Named distinctly from the typestate-level `tryReclaim` on `ReclaimReady`
+  ## (`reclaim.nim`) to avoid reader confusion.
+  let op = reclaimStart(addr manager).loadEpochs().checkSafe()
+  if op.kind == rReclaimReady:
+    op.reclaimready.tryReclaim()
+  else:
+    0
+
 proc retireAndReclaim*[MT: static int](
     handle: ThreadHandle[MT], p: pointer, destructor: Destructor, eager: bool = true
 ) =
