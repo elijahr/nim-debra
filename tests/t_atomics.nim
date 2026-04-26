@@ -237,3 +237,132 @@ suite "CacheLineBytes":
       check CacheLineBytes == 128
     else:
       check CacheLineBytes == 64
+
+suite "static rejection":
+  test "Atomic[ref T] does not compile":
+    # The error fires at instantiation; `compiles` swallows it.
+    check not compiles(
+      block:
+        var a: Atomic[ref string]
+        a.store(nil)
+    )
+
+  test "Atomic[seq[T]] does not compile (not a Trivial type)":
+    # Constraints fire at op site; trying to load forces it.
+    check not compiles(
+      block:
+        var a: Atomic[seq[int]]
+        discard a.load()
+    )
+
+  test "Atomic[string] does not compile (not a Trivial type)":
+    check not compiles(
+      block:
+        var a: Atomic[string]
+        discard a.load()
+    )
+
+  test "store with moAcquire does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        a.store(1, moAcquire)
+    )
+
+  test "store with moAcquireRelease does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        a.store(1, moAcquireRelease)
+    )
+
+  test "load with moRelease does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        discard a.load(moRelease)
+    )
+
+  test "load with moAcquireRelease does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        discard a.load(moAcquireRelease)
+    )
+
+  test "compareExchange failure stronger than success does not compile":
+    # success=moRelease, failure=moAcquire: failure is not <= success
+    # ordinally (moAcquire=2, moRelease=3) so this passes; let's pick
+    # a real violation: success=moAcquire (2), failure=moSeqCst (5).
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(
+          expected, 1, moAcquire, moSequentiallyConsistent)
+    )
+
+  test "compareExchange failure=moRelease does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(
+          expected, 1, moSequentiallyConsistent, moRelease)
+    )
+
+  test "compareExchange failure=moAcquireRelease does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(
+          expected, 1, moSequentiallyConsistent, moAcquireRelease)
+    )
+
+  test "valid store orders compile":
+    check compiles(
+      block:
+        var a: Atomic[int]
+        a.store(1, moRelaxed)
+        a.store(1, moRelease)
+        a.store(1, moSequentiallyConsistent)
+    )
+
+  test "valid load orders compile":
+    check compiles(
+      block:
+        var a: Atomic[int]
+        discard a.load(moRelaxed)
+        discard a.load(moConsume)
+        discard a.load(moAcquire)
+        discard a.load(moSequentiallyConsistent)
+    )
+
+  # Note on non-lock-free coverage: on 64-bit macOS/Linux every
+  # primitive supported by `assertAtomCompat` (size <= 8) is
+  # lock-free, so a positive test for the
+  # `-d:debraAllowNonLockFreeAtomics` opt-out cannot be expressed
+  # without a 32-bit target or a hostile build flag. The flag itself
+  # is parsed unconditionally; failing builds on non-lock-free
+  # primitives is exercised by the 32-bit CI lane in Phase D.
+
+when compileOption("threads"):
+  suite "multi-threaded smoke":
+    test "4 threads each fetchAdd 1000 increments share a counter":
+      var counter: Atomic[int]
+      counter.store(0)
+      const NumThreads = 4
+      const Increments = 1000
+      var threads: array[NumThreads, Thread[ptr Atomic[int]]]
+
+      proc worker(c: ptr Atomic[int]) {.thread.} =
+        for _ in 0 ..< Increments:
+          discard c[].fetchAdd(1, moAcquireRelease)
+
+      for i in 0 ..< NumThreads:
+        createThread(threads[i], worker, addr counter)
+      for i in 0 ..< NumThreads:
+        joinThread(threads[i])
+
+      check counter.load() == NumThreads * Increments
