@@ -5,7 +5,7 @@
 ## When a thread is stalled (hasn't advanced its epoch), other threads
 ## can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.
 
-import atomics
+import ./atomics
 import std/posix
 
 import ./constants

@@ -5,7 +5,7 @@
 ## When the epoch needs to advance, scan all threads and send SIGUSR1
 ## to pinned threads that are stalled (behind globalEpoch by threshold).
 
-import atomics
+import ../atomics
 import typestates
 
 import ../types

@@ -3,7 +3,7 @@
 ## Handles thread registration with the DEBRA manager, ensuring threads
 ## properly claim slots in the thread array using lock-free CAS operations.
 
-import atomics
+import ../atomics
 import typestates
 
 import ../types

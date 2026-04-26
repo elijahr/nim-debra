@@ -6,7 +6,7 @@
 when not compileOption("threads"):
   {.error: "nim-debra requires --threads:on".}
 
-import atomics
+import ./debra/atomics
 import ./debra/types
 import ./debra/signal
 import ./debra/limbo

@@ -2,7 +2,7 @@
 ##
 ## Ensures threads properly enter/exit critical sections.
 
-import atomics
+import ../atomics
 import typestates
 
 import ../types

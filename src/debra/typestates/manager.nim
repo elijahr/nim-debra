@@ -2,7 +2,7 @@
 ##
 ## Ensures manager is initialized before use and properly shut down.
 
-import atomics
+import ../atomics
 import typestates
 
 import ../types

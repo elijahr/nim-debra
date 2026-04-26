@@ -2,7 +2,7 @@
 ##
 ## Walks limbo bags and reclaims objects retired before safeEpoch.
 
-import atomics
+import ../atomics
 import typestates
 
 import ../types

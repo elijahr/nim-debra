@@ -2,7 +2,7 @@
 
 ## Core types for DEBRA+ implementation.
 
-import atomics
+import ./atomics
 
 import ./constants
 import ./limbo
