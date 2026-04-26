@@ -1,6 +1,27 @@
 ## EpochGuard typestate for pin/unpin lifecycle.
 ##
 ## Ensures threads properly enter/exit critical sections.
+##
+## ## Pitfalls
+##
+## * The `Unpinned` -> `Pinned` -> `Unpinned`/`Neutralized` typestate sequence
+##   must be respected. Calling `pin` on a handle that is already pinned at
+##   the slot level (the manager's `threads[idx].pinned` flag is true) leaves
+##   the slot inconsistent. Use `withPin` (in `debra/convenience`) for the
+##   common path; reach for the typestate API only when you need finer control.
+## * If `unpin` returns `Neutralized`, the thread was signaled while inside
+##   the critical section. Call `acknowledge` before re-pinning. Skipping
+##   `acknowledge` will leave the slot's `neutralized` flag set, and the
+##   next `pin`/`unpin` cycle will misreport state.
+## * `Pinned[MT]` carries the captured `epoch` field; do not mutate the
+##   manager's global epoch under the assumption a particular `Pinned` value
+##   tracks it. Advance the manager epoch on the worker side, then re-pin to
+##   refresh.
+##
+## ## See also
+##
+## * `debra/convenience.withPin`_ - the recommended high-level wrapper.
+## * `debra/typestates/retire`_ - `RetireReady` constructed from `Pinned`.
 
 import ../atomics
 import typestates
@@ -36,6 +57,13 @@ proc pin*[MaxThreads: static int](
     u: sink Unpinned[MaxThreads]
 ): Pinned[MaxThreads] {.transition.} =
   ## Enter critical section. Blocks reclamation of current epoch.
+  runnableExamples:
+    import debra
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let pinned = unpinned(handle).pin()
+    discard pinned.unpin()
   var ctx = EpochGuardContext[MaxThreads](u)
   let mgr = ctx.handle.manager
   let idx = ctx.handle.idx
@@ -51,6 +79,16 @@ proc unpin*[MaxThreads: static int](
     p: sink Pinned[MaxThreads]
 ): UnpinResult[MaxThreads] {.transition.} =
   ## Leave critical section. Returns Neutralized if signaled.
+  runnableExamples:
+    import debra
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let pinned = unpinned(handle).pin()
+    let res = pinned.unpin()
+    case res.kind
+    of uUnpinned: discard
+    of uNeutralized: discard res.neutralized.acknowledge()
   let ctx = EpochGuardContext[MaxThreads](p)
   let mgr = ctx.handle.manager
   let idx = ctx.handle.idx
@@ -66,6 +104,8 @@ proc acknowledge*[MaxThreads: static int](
     n: sink Neutralized[MaxThreads]
 ): Unpinned[MaxThreads] {.transition.} =
   ## Acknowledge neutralization. Required before re-pinning.
+  ##
+  ## See also: `unpin`_ (returns `Neutralized` when signaled), `pin`_.
   let ctx = EpochGuardContext[MaxThreads](n)
   ctx.handle.manager.threads[ctx.handle.idx].neutralized.store(false, moRelease)
   Unpinned[MaxThreads](EpochGuardContext[MaxThreads](handle: ctx.handle, epoch: 0))

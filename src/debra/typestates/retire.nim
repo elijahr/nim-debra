@@ -1,6 +1,25 @@
 ## Retire typestate for adding objects to limbo bags.
 ##
 ## Must be pinned to retire objects.
+##
+## ## Pitfalls
+##
+## * `retire` is sink-form: it consumes `RetireReady[MT]` and returns
+##   `Retired[MT]`. To retire multiple objects in the same pinned epoch,
+##   convert back with `retireReadyFromRetired`. The `var`-form wrappers in
+##   `debra/convenience` (`retire`, `retireBatch`) handle this for you.
+## * The pointer/destructor pair handed to `retire(p, dtor)` is captured
+##   into the limbo bag immediately. The destructor closure must remain
+##   valid until reclamation runs (`Destructor` is a `nimcall` proc, so a
+##   top-level proc or `releaseDestructor[T]()` result is fine).
+## * Retiring the same pointer twice from different threads (or the same
+##   thread across multiple `pin` cycles) double-frees on reclamation.
+##   The library does not deduplicate.
+##
+## ## See also
+##
+## * `debra/convenience.withPin`_ + `it.retire(...)` - the recommended path.
+## * `debra/typestates/reclaim`_ - eventual reclamation after epoch safety.
 
 import typestates
 
@@ -42,6 +61,20 @@ proc retire*[T: ref, MaxThreads: static int](
   ##
   ## The object will be freed (via GC_unref) when its epoch
   ## becomes safe for reclamation.
+  runnableExamples("-d:allowSpinlockManagedRef"):
+    import debra
+    type Node = ref object
+      value: int
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let pinned = unpinned(handle).pin()
+    let n = managed Node(value: 1)
+    let retired = retireReady(pinned).retire(n)
+    let pinnedAgain = Pinned[4](EpochGuardContext[4](
+      handle: RetireContext[4](retired).handle,
+      epoch: RetireContext[4](retired).epoch))
+    discard pinnedAgain.unpin()
 
   # Extract values we need before consuming r
   let handle = RetireContext[MaxThreads](r).handle
@@ -75,6 +108,19 @@ proc retire*[MaxThreads: static int](
   ##
   ## The destructor will be called when the epoch becomes safe.
   ## Use for manually-managed memory (ptr types, alloc/dealloc, etc.)
+  runnableExamples:
+    import debra
+    proc dtor(p: pointer) {.nimcall.} = dealloc(p)
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    let handle = registerThread(manager)
+    let pinned = unpinned(handle).pin()
+    let raw = alloc0(8)
+    let retired = retireReady(pinned).retire(raw, dtor)
+    let pinnedAgain = Pinned[4](EpochGuardContext[4](
+      handle: RetireContext[4](retired).handle,
+      epoch: RetireContext[4](retired).epoch))
+    discard pinnedAgain.unpin()
 
   # Extract values we need before consuming r
   let handle = RetireContext[MaxThreads](r).handle

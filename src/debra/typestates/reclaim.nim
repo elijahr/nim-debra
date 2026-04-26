@@ -1,6 +1,26 @@
 ## Reclaim typestate for safe memory reclamation.
 ##
 ## Walks limbo bags and reclaims objects retired before safeEpoch.
+##
+## ## Pitfalls
+##
+## * The `ReclaimStart` -> `EpochsLoaded` -> `ReclaimReady`/`ReclaimBlocked`
+##   chain must be honored. `ReclaimBlocked` means the global epoch has not
+##   advanced far enough for any retired object to be safe; this is normal,
+##   not an error. `manager.advance()` increments the global epoch.
+## * Reclamation does not require pinning. The walker only inspects per-thread
+##   epoch stamps. Calling reclaim from a worker that is currently `Pinned`
+##   on the same manager is safe but will see its own thread as a constraint
+##   on `safeEpoch`.
+## * `tryReclaim` walks every thread's limbo tail and unlinks reclaimed bags.
+##   It is `notATransition` because `ReclaimReady` is the terminal state of
+##   the `ReclaimContext` typestate and the count return value is what the
+##   caller cares about.
+##
+## ## See also
+##
+## * `debra/convenience.reclaimNow`_ - the one-shot wrapper.
+## * `debra/typestates/retire`_ - puts objects into limbo bags.
 
 import ../atomics
 import typestates
@@ -32,6 +52,8 @@ proc reclaimStart*[MaxThreads: static int](
     mgr: ptr DebraManager[MaxThreads]
 ): ReclaimStart[MaxThreads] =
   ## Begin reclamation attempt.
+  ##
+  ## See also: `debra/convenience.reclaimNow`_ for the one-shot wrapper.
   ReclaimStart[MaxThreads](
     ReclaimContext[MaxThreads](manager: mgr, globalEpoch: 0, safeEpoch: 0)
   )
@@ -70,6 +92,18 @@ proc tryReclaim*[MaxThreads: static int](
 ): int {.notATransition.} =
   ## Reclaim all eligible objects from all threads' limbo bags.
   ## Returns count of objects reclaimed.
+  runnableExamples:
+    import debra
+    var manager = initDebraManager[4]()
+    setGlobalManager(addr manager)
+    discard registerThread(manager)
+    let op = reclaimStart(addr manager).loadEpochs().checkSafe()
+    case op.kind
+    of rReclaimReady:
+      discard op.reclaimready.tryReclaim()
+    of rReclaimBlocked:
+      # Brand-new manager: epoch hasn't advanced; this branch is normal.
+      discard
   let ctx = ReclaimContext[MaxThreads](r)
   let safeEpoch = ctx.safeEpoch - 1 # Objects retired BEFORE this epoch are safe
   var count = 0
