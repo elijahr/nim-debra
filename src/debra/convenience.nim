@@ -21,7 +21,7 @@ proc retire*[MT: static int](
   ## Retire `p` inside an existing pinned epoch held by `pin`.
   ##
   ## Wraps the sink-form `retire` from typestates/retire.nim so the caller
-  ## can chain `pin.retire(...)` repeatedly inside a `withPin` body without
+  ## can chain `it.retire(...)` repeatedly inside a `withPin` body without
   ## manually rebuilding `RetireReady` from `Retired`.
   let retired = retire(move(pin), p, destructor)
   pin = retireReadyFromRetired(retired)
@@ -45,38 +45,40 @@ proc retireBatch*[MT: static int](
     pin.retire(item[0], item[1])
 
 template withPin*[MT: static int](
-    handle: ThreadHandle[MT], body: untyped
+    th: ThreadHandle[MT], body: untyped
 ) =
   ## Pin the calling thread, run `body`, unpin on exit (including raises).
   ##
-  ## Injects `pin` as a `var RetireReady[MT]`. Body may call
-  ## `pin.retire(p, dtor)` zero or more times.
+  ## Injects `it` as a `var RetireReady[MT]` (matches the Nim convention
+  ## used by `filterIt`/`mapIt`). Body may call `it.retire(p, dtor)` zero
+  ## or more times. Using `it` avoids collisions with the exported `pin`
+  ## proc from `debra/typestates/guard`.
   ##
   ## Under debug builds, asserts the thread is not already pinned on the
   ## given handle. Under `-d:release`/`-d:danger` the assertion is a no-op.
   ## Different-handle nesting (multi-manager) is independent and legal.
   block:
-    let h = handle
+    let h = th
     assert not h.manager.threads[h.idx].pinned.load(moAcquire),
       "withPin: thread is already pinned (handle slot " & $h.idx &
       "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
-    var pin {.inject.} = retireReady(pinnedGuard)
+    var it {.inject.} = retireReady(pinnedGuard)
     try:
       body
     finally:
-      let ctx = RetireContext[MT](pin)
+      let ctx = RetireContext[MT](it)
       let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
       discard p.unpin()
 
 template withPin*[MT: static int](
-    handle: ThreadHandle[MT], name, body: untyped
+    th: ThreadHandle[MT], name, body: untyped
 ) =
   ## `withPin` variant that injects a caller-supplied identifier `name`
-  ## (instead of the default `pin`). Use to disambiguate nested handles
+  ## (instead of the default `it`). Use to disambiguate nested handles
   ## across multiple managers.
   block:
-    let h = handle
+    let h = th
     assert not h.manager.threads[h.idx].pinned.load(moAcquire),
       "withPin: thread is already pinned (handle slot " & $h.idx &
       "). Nested pinning is forbidden."

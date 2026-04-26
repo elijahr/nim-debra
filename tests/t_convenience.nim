@@ -75,15 +75,15 @@ suite "DEBRA Batched Retire/Reclaim API":
     let handle = registerThread(manager)
     destroyedCount = 0
 
-  test "withPin injects pin and retires multiple pointers":
+  test "withPin injects it and retires multiple pointers":
     let n1 = cast[Node](alloc0(sizeof(NodeObj)))
     let n2 = cast[Node](alloc0(sizeof(NodeObj)))
     let n3 = cast[Node](alloc0(sizeof(NodeObj)))
 
     handle.withPin:
-      pin.retire(n1, destroyNode)
-      pin.retire(n2, destroyNode)
-      pin.retire(n3, destroyNode)
+      it.retire(n1, destroyNode)
+      it.retire(n2, destroyNode)
+      it.retire(n3, destroyNode)
 
     # Thread is unpinned after the body
     check not manager.threads[handle.idx].pinned.load(moAcquire)
@@ -121,7 +121,7 @@ suite "DEBRA Batched Retire/Reclaim API":
 
     expect(ValueError):
       handle.withPin:
-        pin.retire(n, destroyNode)
+        it.retire(n, destroyNode)
         raise newException(ValueError, "boom")
 
     # Thread is unpinned despite the raise
@@ -156,8 +156,8 @@ suite "DEBRA Batched Retire/Reclaim API":
     let n2 = cast[Node](alloc0(sizeof(NodeObj)))
 
     handle.withPin:
-      pin.retire(n1, destroyNode)
-      pin.retire(n2, destroyNode)
+      it.retire(n1, destroyNode)
+      it.retire(n2, destroyNode)
 
     advance(manager)
     advance(manager)
@@ -175,7 +175,7 @@ suite "DEBRA Batched Retire/Reclaim API":
       items.add((cast[pointer](node), destroyNode))
 
     handle.withPin:
-      pin.retireBatch(items)
+      it.retireBatch(items)
 
     check not manager.threads[handle.idx].pinned.load(moAcquire)
 
