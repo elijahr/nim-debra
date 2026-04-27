@@ -127,24 +127,30 @@ proc retire*[MaxThreads: static int](
   # could pass even though the reader is still actively reading the retired
   # object — a use-after-free.
   #
-  # An SC load of `globalEpoch` participates in the C11 SC total order S,
-  # pairing with the SC RMW in `pin` and the SC load in `loadEpochs`. This
-  # forces `bag.epoch` to dominate any pinning thread's published epoch
-  # that could still reach the just-detached pointer, restoring the EBR
-  # safety invariant `reader_epoch <= bag.epoch`.
+  # An SC RMW on a stack-local atomic participates in the C11 SC total
+  # order S, pairing with the SC RMW in `pin` and the SC ops in
+  # `loadEpochs`. The hardware StoreLoad barrier is per-CPU (`lock`-prefixed
+  # RMW on x86, `ldaxr`/`stlxr` seq-cst pair on ARM), and S is a single
+  # total order across every SC op regardless of which atomic location it
+  # touches (C11 §29.3), so a stack-local atomic gives the same
+  # synchronisation as an SC RMW on `globalEpoch` while avoiding the
+  # cross-core cache-line bouncing of the shared global counter under
+  # concurrent retire. The subsequent acquire load on `globalEpoch`
+  # synchronises-with the latest `advance`-side release store, yielding a
+  # value that dominates any earlier capture; `bag.epoch` is set to this
+  # value, which is `>=` any reader's published epoch that could still
+  # reach the just-detached pointer. See `reclaim.reclaimStart` for the
+  # analogous pattern.
   #
-  # We use an SC fetchAdd(0) (not `threadFence(moSequentiallyConsistent)` +
-  # Acquire load) for TSAN compatibility: standalone SC thread fences are
-  # not modelled by TSAN's vector clocks (`compiler-rt/lib/tsan/rtl/`
+  # Stack-local SC RMW (rather than `threadFence(moSequentiallyConsistent)`)
+  # is required for TSAN compatibility: standalone SC thread fences are not
+  # modelled by TSAN's vector clocks (`compiler-rt/lib/tsan/rtl/`
   # `tsan_interface_atomic.cpp`, `OpFence::Atomic` -> `FIXME: not implemented`).
-  # A plain SC load is too weak — on x86 it lowers to a bare `mov` and
-  # loses the StoreLoad barrier (`mfence`) that the previous fence
-  # provided. An SC fetchAdd is an RMW: it lowers to a `lock`-prefixed
-  # instruction on x86 (full StoreLoad barrier) and to an `ldaxr`/`stlxr`
-  # seq-cst loop on ARM (full StoreLoad barrier), AND it participates in
-  # TSAN's vector clock model. Adding 0 returns the current value
-  # without changing it.
-  let epoch = handle.manager.globalEpoch.fetchAdd(0'u64, moSequentiallyConsistent)
+  # SC RMWs are modelled correctly.
+  var subscribeBarrier: Atomic[uint64]
+  subscribeBarrier.store(0'u64, moRelaxed)
+  discard subscribeBarrier.fetchAdd(0'u64, moSequentiallyConsistent)
+  let epoch = handle.manager.globalEpoch.load(moAcquire)
 
   # Ensure we have a bag with space. The bag list is a singly-linked FIFO:
   # `limboBagTail` is the oldest unfreed bag, `currentBag` is the newest, and

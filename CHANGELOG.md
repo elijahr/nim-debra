@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ThreadState` is now cache-line aligned to prevent false sharing across the per-thread slots in `DebraManager.threads`.
 - `reclaimStart`'s stack-local SC subscribe-barrier atomic is now explicitly zero-initialized via `store(0, moRelaxed)` before its SC `fetchAdd`. Default zero-init of `Atomic[uint64]` is already correct in Nim, but the explicit store makes the intent obvious to readers and static analyzers.
 - `withPin`'s nested-pin check uses `doAssert` (was `assert`) so the safety guard survives release builds. A nested pin would silently corrupt the EBR slot's `pinned` flag bookkeeping.
+- `retire`'s SC `fetchAdd(0)` on shared `globalEpoch` replaced with a stack-local SC RMW plus an acquire load on `globalEpoch`. Equivalent StoreLoad barrier and S-ordering, no cross-thread cache contention on the global counter under concurrent retire. Mirrors the round-3 fix in `reclaimStart`.
 
 ## [0.2.1] - 2025-12-18
 
