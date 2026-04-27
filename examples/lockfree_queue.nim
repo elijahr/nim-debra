@@ -46,15 +46,22 @@ proc enqueue*[T](queue: var Queue[T], value: T) =
       if next == nil:
         var expected: ptr NodeObj[T] = nil
         if tail.next.compareExchangeStrong(expected, newNode, moRelease, moRelaxed):
+          # Best-effort "help" to swing the tail forward. A spurious weak
+          # failure here is fine — another enqueue/dequeue will retry the
+          # same swing on its next iteration. Weak avoids the LL/SC retry
+          # loop on weakly-ordered architectures.
           var observedTail = tail
-          discard queue.tail.compareExchangeStrong(
+          discard queue.tail.compareExchangeWeak(
             observedTail, newNode, moRelease, moRelaxed
           )
           break
       else:
+        # Help-along: another producer enqueued but hasn't yet swung the
+        # tail. Weak CAS is sufficient — spurious failure is harmless;
+        # the next iteration retries.
         var observedTail = tail
         discard
-          queue.tail.compareExchangeStrong(observedTail, next, moRelease, moRelaxed)
+          queue.tail.compareExchangeWeak(observedTail, next, moRelease, moRelaxed)
 
 proc dequeue*[T](queue: var Queue[T]): Option[T] =
   result = none(T)
@@ -69,9 +76,11 @@ proc dequeue*[T](queue: var Queue[T]): Option[T] =
         if head == tail:
           if next == nil:
             break dequeueLoop
+          # Help-along: same as in `enqueue`'s help branch. Weak is fine
+          # because a spurious failure is recovered by the next iteration.
           var observedTail = tail
           discard
-            queue.tail.compareExchangeStrong(observedTail, next, moRelease, moRelaxed)
+            queue.tail.compareExchangeWeak(observedTail, next, moRelease, moRelaxed)
         else:
           let value = next.value
           var observedHead = head
