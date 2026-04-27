@@ -23,6 +23,7 @@
 
 import typestates
 
+import ../atomics
 import ../types
 import ../limbo
 import ./guard
@@ -113,8 +114,29 @@ proc retire*[MaxThreads: static int](
 
   # Extract values we need before consuming r
   let handle = RetireContext[MaxThreads](r).handle
-  let epoch = RetireContext[MaxThreads](r).epoch
   let state = addr handle.manager.threads[handle.idx]
+
+  # Record the CURRENT global epoch as the bag's epoch, not the pin's
+  # captured epoch. This is the canonical DEBRA/EBR retire-time invariant.
+  #
+  # If we used the pin's captured epoch, a reader that pinned at a *later*
+  # global epoch could still observe a not-yet-detached pointer (its load of
+  # the protected variable happened before our detach CAS). When that
+  # reader's pin is later checked by `loadEpochs`, its epoch would be
+  # numerically larger than `bag.epoch`, so `bag.epoch < safeEpoch - 1`
+  # could pass even though the reader is still actively reading the retired
+  # object — a use-after-free.
+  #
+  # The SC fence pairs with the publication fence in `pin` and the
+  # subscription fence in `loadEpochs`. The fence forces the subsequent
+  # globalEpoch load into the same total order as every pinning thread's
+  # published epoch, so bag.epoch dominates any reader-epoch that could
+  # still reach the just-detached pointer. Without the fence, a release
+  # fetchAdd on globalEpoch by a third thread is not synchronized with
+  # this acquire load via the C11 memory model alone, and the load can
+  # observe a stale value smaller than a still-pinning reader's epoch.
+  threadFence(moSequentiallyConsistent)
+  let epoch = handle.manager.globalEpoch.load(moAcquire)
 
   # Ensure we have a bag with space. The bag list is a singly-linked FIFO:
   # `limboBagTail` is the oldest unfreed bag, `currentBag` is the newest, and
