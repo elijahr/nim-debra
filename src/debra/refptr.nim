@@ -95,7 +95,7 @@ proc release*[T](p: ptr T) {.inline.} =
   if p != nil:
     GC_unref(cast[ref T](p))
 
-proc releaseDestructorImpl[T](p: pointer) {.nimcall.} =
+proc releaseDestructorImpl[T](p: pointer) {.nimcall, raises: [].} =
   # Top-level per-`T` instantiation backing `releaseDestructor[T]()`.
   # Lives at module scope so the compiler emits a plain procedure (no
   # captured environment, no per-call heap allocation). Retire sites that

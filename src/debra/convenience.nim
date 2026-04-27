@@ -249,7 +249,7 @@ proc advanceEvery*[MT: static int](
         it.retire(alloc0(8), dtor)
       handle.advanceEvery(32)
     discard reclaimNow(manager)
-  assert n >= 1, "advanceEvery: n must be >= 1"
+  doAssert n >= 1, "advanceEvery: n must be >= 1"
   let state = addr handle.manager.threads[handle.idx]
   state.advanceCounter += 1'u64
   if state.advanceCounter mod uint64(n) == 0'u64:
