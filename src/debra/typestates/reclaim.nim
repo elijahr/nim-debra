@@ -156,6 +156,11 @@ proc loadEpochs*[MaxThreads: static int](
   ## construction. So a stack-local `Atomic[uint64]` gives us the same
   ## subscription point with no cross-thread cache traffic.
   var subscribeBarrier: Atomic[uint64]
+  # Explicit zero-init. Default zero-init of `Atomic[uint64]` is already
+  # correct in Nim, but the explicit store makes the intent obvious to
+  # readers and to static-analysis tools that flag "use of uninitialized
+  # atomic" on the SC RMW below.
+  subscribeBarrier.store(0'u64, moRelaxed)
   discard subscribeBarrier.fetchAdd(0'u64, moSequentiallyConsistent)
   var ctx = ReclaimContext[MaxThreads](s)
   # `globalEpoch` is now just a value read; reading a slightly stale

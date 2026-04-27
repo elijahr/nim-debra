@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `advanceEvery(n)` validates `n >= 1` via `doAssert` (was `assert`) so the divisor check survives release-mode builds.
 - `withPin` (both forms) now unpins via the original `Pinned` guard captured at template entry, not via reconstruction from the injected `it`/`name`. The reconstruction path was vulnerable to a null-pointer dereference if `it.retire` raised mid-call: the `move(pin)` inside the retire wrapper zeroes `it` before the assignment back, so the `finally` would unpin a zero-initialized context.
 - `static_assert`/`_Static_assert` emit in `Atomic[T]` instantiation now constructs the message via `astToStr(T)` concatenation instead of a separate `$T` array element, eliminating reliance on the underspecified emit-array string-expression handling.
+- `ThreadState` is now cache-line aligned to prevent false sharing across the per-thread slots in `DebraManager.threads`.
+- `reclaimStart`'s stack-local SC subscribe-barrier atomic is now explicitly zero-initialized via `store(0, moRelaxed)` before its SC `fetchAdd`. Default zero-init of `Atomic[uint64]` is already correct in Nim, but the explicit store makes the intent obvious to readers and static analyzers.
 
 ## [0.2.1] - 2025-12-18
 

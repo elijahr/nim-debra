@@ -30,7 +30,11 @@ type
     globalEpoch* {.align: CacheLineBytes.}: Atomic[uint64] ## Global epoch counter.
     activeThreadMask* {.align: CacheLineBytes.}: Atomic[uint64]
       ## Bitmask of registered threads.
-    threads*: array[MaxThreads, ThreadState[MaxThreads]] ## Per-thread state.
+    threads* {.align: CacheLineBytes.}: array[MaxThreads, ThreadState[MaxThreads]]
+      ## Per-thread state. Cache-line aligned to prevent false sharing
+      ## across the per-thread slots (each slot is owned by a different
+      ## thread, so adjacent slots sharing a cache line would cause
+      ## false-sharing on every atomic write).
 
   ThreadHandle*[MaxThreads: static int] = object
     ## Handle for a registered thread. Required for pin/unpin.
@@ -39,6 +43,17 @@ type
 
   DebraRegistrationError* = object of CatchableError
     ## Raised when thread registration fails (e.g., max threads reached).
+
+# The cache-line alignment of `DebraManager.threads` only prevents false
+# sharing if each `ThreadState` is itself an exact multiple of the cache
+# line. If this static assertion ever fails, switch to padding `ThreadState`
+# (e.g. add a `_pad: array[CacheLineBytes - sizeof(...), byte]` field, or
+# wrap each slot in a padded object).
+static:
+  assert sizeof(ThreadState[DefaultMaxThreads]) mod CacheLineBytes == 0,
+    "ThreadState size (" & $sizeof(ThreadState[DefaultMaxThreads]) &
+      ") must be a multiple of CacheLineBytes (" & $CacheLineBytes &
+      ") to prevent false sharing across DebraManager.threads slots"
 
 proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
   ## Initialize a new DEBRA+ manager.
