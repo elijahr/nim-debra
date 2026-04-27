@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `examples/reclamation_background.nim` segfault under refc: refc's thread-local GC heap does not support cross-thread `GC_unref`. The example now skips with a clear diagnostic when compiled with `--mm:refc`.
 - `releaseDestructorImpl` now declares `raises: []` explicitly to match the `Destructor` type signature.
 - `advanceEvery(n)` validates `n >= 1` via `doAssert` (was `assert`) so the divisor check survives release-mode builds.
+- `withPin` (both forms) now unpins via the original `Pinned` guard captured at template entry, not via reconstruction from the injected `it`/`name`. The reconstruction path was vulnerable to a null-pointer dereference if `it.retire` raised mid-call: the `move(pin)` inside the retire wrapper zeroes `it` before the assignment back, so the `finally` would unpin a zero-initialized context.
+- `static_assert`/`_Static_assert` emit in `Atomic[T]` instantiation now constructs the message via `astToStr(T)` concatenation instead of a separate `$T` array element, eliminating reliance on the underspecified emit-array string-expression handling.
 
 ## [0.2.1] - 2025-12-18
 

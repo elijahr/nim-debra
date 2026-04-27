@@ -113,9 +113,7 @@ template assertLockFree(T: typedesc) =
         emit: [
           "static_assert(__atomic_always_lock_free(sizeof(",
           T,
-          "), 0), \"Atomic[",
-          $T,
-          "] is not lock-free on this target; pass " &
+          "), 0), \"Atomic[" & astToStr(T) & "] is not lock-free on this target; pass " &
             "-d:debraAllowNonLockFreeAtomics to override\");",
         ]
       .}
@@ -124,9 +122,7 @@ template assertLockFree(T: typedesc) =
         emit: [
           "_Static_assert(__atomic_always_lock_free(sizeof(",
           T,
-          "), 0), \"Atomic[",
-          $T,
-          "] is not lock-free on this target; pass " &
+          "), 0), \"Atomic[" & astToStr(T) & "] is not lock-free on this target; pass " &
             "-d:debraAllowNonLockFreeAtomics to override\");",
         ]
       .}

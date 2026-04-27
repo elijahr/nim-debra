@@ -159,9 +159,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
       # not surface neutralization to the caller (see Pitfall above);
       # acknowledging here keeps the slot's `neutralized` flag tidy at
       # unpin time instead of relying on the next `pin` to clear it.
-      let ctx = RetireContext[MT](it)
-      let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
-      let res = p.unpin()
+      let res = pinnedGuard.unpin()
       case res.kind
       of uUnpinned:
         discard
@@ -198,9 +196,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
     finally:
       # Honour the `Pinned -> Unpinned | Neutralized` typestate. Same
       # rationale as the unnamed `withPin` form above.
-      let ctx = RetireContext[MT](name)
-      let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
-      let res = p.unpin()
+      let res = pinnedGuard.unpin()
       case res.kind
       of uUnpinned:
         discard
