@@ -78,7 +78,7 @@ let retired = ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 - **Signal-based neutralization** - Handles stalled threads for bounded memory usage
 - **Limbo bags** - Thread-local retire queues organized in 64-object batches
 - **`retain` / `release` bridge** - Stores `ref` types in `Atomic[ptr T]` slots without spinlock fallback under arc/orc
-- **O(mn) memory bound** - Where m = threads, n = objects per epoch
+- **O(mn) memory bound** - Where m = threads, n = retired pointers per thread per epoch
 - **Zero runtime overhead** - Typestate validation happens at compile time
 
 ## Memory Reclamation Workflow
