@@ -7,56 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-04-25
+## [0.3.0] - 2026-04-27
 
 ### Added
 
-- `debra/atomics` module: custom atomic primitives built on C11 `__atomic_*` builtins
-  - `Atomic[T]` type with `load`, `store`, `exchange`, `fetchAdd`, `fetchSub`, `fetchAnd`, `fetchOr`, `fetchXor`
-  - Strong and weak compare-and-swap (`compareExchange`, `compareExchangeWeak`)
-  - `MemoryOrder` enum (Relaxed, Consume, Acquire, Release, AcqRel, SeqCst)
-  - `threadFence`, `signalFence`, `AtomicFlag`, `CacheLineBytes`
-  - DSL submodule for symmetric load/store syntax
-  - Lock-free enforcement: rejects `ref T` and types that are not lock-free at the requested width
-  - `T` constraint is `supportsCopyMem(T)` plus a lock-free check, admitting POD object types (e.g., `ThreadId` wrapping `Pthread`) in addition to primitives
-- `debra/refptr` module: `retain`, `release`, and `releaseDestructor` helpers for `Atomic[ptr T]` patterns
-- `withPin` template in `debra/convenience` for ergonomic pin/retire/unpin scopes
-  - Named form binds the pinned handle to a user-chosen identifier
-  - Unnamed form injects `it` into the body
-  - Auto-unpin on scope exit, including exception paths
-  - Debug assertion against nested pins
-- `retireBatch` for batched retirement within a single pinned scope
-- `reclaimNow` standalone reclaim helper
-- `advanceEvery(handle, n)` for cadence-controlled epoch advancement
-- `runnableExamples` blocks on the public API across `convenience`, `refptr`, `managed`, and the typestate `guard` / `retire` / `reclaim` modules
-- Pitfall and See-also sections in public-API doc comments
-- Epoch advancement guide at `docs/guide/epoch-advancement.md`
+- `debra/atomics` module: custom atomic primitives built on C11 `__atomic_*` builtins.
+  - `Atomic[T]` type with `load`, `store`, `exchange`, `fetchAdd`, `fetchSub`, `fetchAnd`, `fetchOr`, `fetchXor`.
+  - Strong and weak compare-and-swap (`compareExchange`, `compareExchangeWeak`).
+  - `MemoryOrder` enum (Relaxed, Consume, Acquire, Release, AcqRel, SeqCst).
+  - `threadFence`, `signalFence`, `AtomicFlag`, `CacheLineBytes`.
+  - DSL submodule for symmetric load/store syntax.
+  - Lock-free enforcement: rejects `ref T` and types that are not lock-free at the requested width.
+  - `T` constraint is `supportsCopyMem(T)` plus a lock-free check, admitting POD object types (e.g., `ThreadId` wrapping `Pthread`) in addition to primitives.
+- `debra/refptr` module: `retain`, `release`, and `releaseDestructor` helpers for the `Atomic[ptr T]` pattern. The returned `Destructor` is a top-level `nimcall` proc per instantiated `T`, so retire sites that build a destructor inline do not allocate a closure.
+- `withPin` template in `debra/convenience` for pin/retire/unpin scopes. Named form binds the pinned handle to a caller-chosen identifier; unnamed form injects `it`. Auto-unpins on scope exit, including exception paths. Debug builds assert against nested pins on the same handle.
+- `retireBatch` for batched retirement within a single pinned scope.
+- `reclaimNow` standalone reclaim helper.
+- `advanceEvery(handle, n)` for cadence-controlled epoch advancement.
 - `pinnedFromRetired[MaxThreads]` helper in `debra/typestates/retire`. Symmetric to `retireReadyFromRetired`: lets a caller stay in the pinned epoch after a retire (e.g. interleaving reads with further retires) without unpinning and re-pinning.
+- Explicit thread-local `threadLocalRegistered` flag. Disambiguates "registered at slot 0" from "unregistered" so the signal handler and the legacy `reclaimStart(addr manager)` path can detect calls from unregistered threads instead of mistaking slot 0 for the unregistered state.
+- `=destroy` for `DebraManager` that drains per-thread limbo bags (calls each retired object's destructor and frees the bag). Required worker threads to have joined before the manager goes out of scope.
+- `runnableExamples` blocks on the public API across `convenience`, `refptr`, and the typestate `guard` / `retire` / `reclaim` modules; pitfall and See-also sections in public-API doc comments.
+- Epoch advancement guide at `docs/guide/epoch-advancement.md`.
 
 ### Changed
 
 - **BREAKING**: `tryReclaim` and `reclaimNow` are now scoped to the calling thread's own limbo bags. Cross-thread reclamation has been removed. Stalled threads are still handled via `neutralizeStalled`. Callers that relied on one thread reclaiming another thread's retired objects must now invoke reclamation on each thread, or rely on the neutralization path for unresponsive threads.
+- **BREAKING**: Removed `Managed[ref T]` and the `-d:allowSpinlockManagedRef` opt-in flag. The lock-free `Atomic[ptr T]` + `retain` / `release` / `releaseDestructor` pattern is the only supported path. Migrate by replacing `Atomic[Managed[ref T]]` with `Atomic[ptr T]` and using manual `retain` / `release` calls.
 - Three lock-free examples (`lockfree_queue`, `lockfree_stack`, `lockfree_stack_typestates`) rewritten from `Atomic[Managed[ref T]]` to `Atomic[ptr T]` with `retain` / `release`, removing the spinlock fallback hazard that `Atomic[ref T]` carries on arc/orc.
-- **BREAKING**: Removed `Managed[ref T]` and the `allowSpinlockManagedRef` opt-in flag. The lock-free `Atomic[ptr T]` + `retain`/`release`/`releaseDestructor` pattern is the only supported path. Migrate by replacing `Atomic[Managed[ref T]]` with `Atomic[ptr T]` and using manual `retain`/`release` calls.
 
 ### Removed
 
 - `std/atomics` dependency from nim-debra source code. All atomic operations now go through `debra/atomics`.
-- `Managed[ref T]` type, `managed()`, `inner()`, `Managed[T]` overloads of `retire` and `retireAndReclaim`, and the `-d:allowSpinlockManagedRef` opt-in flag. See the breaking-change note above for migration.
-- `unreffer[T]()` from `debra/limbo`: was a duplicate of `releaseDestructor[T]()` from `debra/refptr` retained during the `Managed[T]` removal to avoid touching tests. Use `releaseDestructor[T]()` instead.
+- `Managed[ref T]` type, `managed()`, `inner()`, the `Managed[T]` overloads of `retire` and `retireAndReclaim`, and the `-d:allowSpinlockManagedRef` opt-in flag. See the BREAKING note above for migration.
+- `unreffer[T]()` from `debra/limbo`. Use `releaseDestructor[T]()` from `debra/refptr` instead.
 
 ### Fixed
 
-- Reclaim race in `tryReclaim`: the previous implementation walked other threads' limbo bag lists without synchronization, which could fault when reclamation actually fired concurrently with retire. Reclamation is now per-thread.
-- Missing publication fence in `pin()`. The `pinned=true` store used `moRelease`, but the caller's subsequent loads of the data the pin is meant to protect could be reordered before that store became globally visible (StoreLoad reordering, observable on x86 between distinct addresses and worse on weakly-ordered targets). A reclaimer scanning per-thread `pinned` flags could observe `pinned=false` after the pinning thread had already loaded a pointer it was about to dereference, and free the object out from under it. `pin()` now issues `threadFence(moSequentiallyConsistent)` after the `pinned=true` store. This is the standard EBR publication barrier (matches Crossbeam's pin path). TSAN under `lockfreequeues`'s unbounded queue stress tests was flagging this; the fence clears the warning.
-- Missing subscription fence in `loadEpochs` (the reclaim path). Standard EBR requires SC fences on BOTH sides — a publication fence on `pin` (above) AND a subscription fence on the reclaimer before it reads other threads' `pinned` flags. With only the publication side, a reclaimer's acquire-load of another thread's `pinned` could miss a concurrent `pinned=true` store, causing the reclaimer to compute a too-permissive `safeEpoch` and free objects the still-pinning thread is reading. `loadEpochs` now issues `threadFence(moSequentiallyConsistent)` before iterating the per-thread state. Surfaced as a TSAN data race between `pop` reading segment data and a concurrent `tryReclaim` freeing the segment in `lockfreequeues`'s unbounded MPMC threaded test on Linux x86-64.
-- Bag-list tail tracking in `retire`: new bags were prepended but `limboBagTail` was never updated, so multi-bag reclamation was effectively a no-op. `retire` now correctly appends and maintains the tail pointer.
-- Retire-time `bag.epoch` now records the current global epoch (paired with `pin`'s and `loadEpochs`'s SC sync points), not the pin's captured epoch. Using the pin's captured epoch could leave `bag.epoch` smaller than a still-pinning reader's epoch, so `bag.epoch < safeEpoch - 1` could pass while the reader was still actively dereferencing the retired pointer — a use-after-free. Surfaced as an ASAN heap-use-after-free in `lockfreequeues`'s unbounded MPMC threaded test on Linux x86-64.
-- EBR publication/subscription/retire SC sync points re-encoded from `threadFence(moSequentiallyConsistent)` to SC read-modify-write operations: `pin()` now uses `pinned.exchange(true, moSequentiallyConsistent)`, and `loadEpochs`/`retire` use `globalEpoch.fetchAdd(0, moSequentiallyConsistent)`. The previous fence-based encoding is C11-equivalent but standalone SC thread fences are not modelled by TSAN's vector clocks (per `compiler-rt/lib/tsan/rtl/tsan_interface_atomic.cpp`, `OpFence::Atomic` -> `// FIXME(dvyukov): not implemented.`), so TSAN on Linux ARM64 reported phantom data races between consumer pop and concurrent reclaim even though the protocol is sound. SC RMWs are modelled correctly and emit the same hardware StoreLoad barrier (`lock`-prefixed instruction on x86, `ldaxr`/`stlxr` seq-cst pair on ARM). Crossbeam's `crossbeam-epoch` uses the same encoding for the same reason.
-- `loadEpochs` now reads each thread's `pinned` flag with `moSequentiallyConsistent` (was `moAcquire`), and `unpin` stores `false` with `moSequentiallyConsistent` (was `moRelease`). With every access to `pinned` SC, the modification order on that location is fully ordered by the C11 SC total order S, so the reclaimer is guaranteed to observe a value consistent with concurrent pin RMWs. The previous Acquire load on a different SC location (`globalEpoch`) did not constrain the modification order on `pinned` itself, leaving a window where the reclaimer could observe `pinned=false` for a thread that had already published `pinned=true` — exactly the EBR subscription gap that crossbeam closes by packing pin+epoch into a single SC-accessed word.
-- `bag.epoch` is now stamped on every `retire` call, not just at bag allocation. A bag accumulates retires until it fills `LimboBagSize`, and the global epoch can advance between retires. With the old behavior an object retired at epoch K+2 would land in a bag still stamped at K, and the reclaimer's `bag.epoch < safeEpoch - 1` check would free it once `safeEpoch >= K+2` even though the EBR invariant requires `safeEpoch >= K+4` for that retire to be safe. This was the underlying cause of TSAN data races (and real use-after-free under concurrent retire/reclaim) reported in `lockfreequeues`'s unbounded MPMC threaded test on Linux x86-64. Bumping `bag.epoch = epoch` on each retire is over-conservative for earlier objects in the bag (they live longer than necessary) but restores the safety invariant for later objects.
+- Cross-thread `tryReclaim` race: the previous implementation walked every thread's limbo bag list and mutated `currentBag`, `limboBagTail`, and per-bag `next` pointers without synchronization against the owning thread, which could corrupt the list or fault when reclamation fired concurrently with retire on another thread. Reclamation is now per-thread (see also the BREAKING note in Changed).
+- `DebraManager` leaked all retired objects on scope exit. There was no destructor to drain per-thread limbo bags, so retired objects accumulated until process exit. Surfaced as ~62 KB leaked under LeakSanitizer in `lockfreequeues`'s Linux CI. Fixed by the new `=destroy` for `DebraManager`.
+- Bag-list tail tracking in `retire`: when a new bag was allocated it was prepended to `currentBag` but `limboBagTail` was never updated, so the bag list lost its tail pointer after the second bag and multi-bag reclamation walked only the head. `retire` now maintains `limboBagTail` correctly.
+- EBR retire-time epoch stamping. `bag.epoch` is now stamped on every `retire` call instead of only when a new bag is allocated. A bag accumulates retires until it fills `LimboBagSize`, and the global epoch can advance between retires. With the old behavior an object retired at epoch `K+2` could land in a bag still stamped at `K`, and the reclaimer's `bag.epoch < safeEpoch - 1` check could free it once `safeEpoch >= K+2` even though the EBR invariant requires `safeEpoch >= K+4` for that retire. Surfaced as an ASAN heap-use-after-free under `lockfreequeues`'s unbounded MPMC threaded stress test on Linux x86-64.
+- EBR pin/reclaim subscription handshake. `pin` now publishes via `pinned.exchange(true, moSequentiallyConsistent)`, `loadEpochs` reads each thread's `pinned` flag with `moSequentiallyConsistent` and issues an SC RMW on `globalEpoch` before the scan, and `unpin` stores `false` with `moSequentiallyConsistent`. With every access to `pinned` ordered SC, the modification order on that location is constrained by the C11 SC total order, so the reclaimer is guaranteed to observe a value consistent with concurrent pin operations. RMWs are used instead of standalone SC thread fences because TSAN's vector-clock model does not implement standalone SC fences (`compiler-rt/.../tsan_interface_atomic.cpp` `OpFence::Atomic` -> `// FIXME(dvyukov): not implemented.`); SC RMWs are modelled correctly and emit the same hardware StoreLoad barrier (lock-prefixed op on x86, `ldaxr` / `stlxr` seq-cst pair on ARM). This is the encoding `crossbeam-epoch` uses for the same reason. Closes the TSAN data race between consumer pop and concurrent reclaim that surfaced in `lockfreequeues`'s unbounded MPMC threaded test on Linux ARM64.
 - `examples/reclamation_background.nim` segfault under refc: refc's thread-local GC heap does not support cross-thread `GC_unref`. The example now skips with a clear diagnostic when compiled with `--mm:refc`.
-- `releaseDestructor[T]()` no longer allocates a fresh closure on each call. The returned `Destructor` is now a plain `nimcall` proc address (one per `T` instantiation) with no captured environment, so retire sites that build the destructor inline pay no per-call allocation.
 
 ## [0.2.1] - 2025-12-18
 
