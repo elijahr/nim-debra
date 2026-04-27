@@ -49,10 +49,10 @@ proc registerThread*[MaxThreads: static int](
   installSignalHandler()
 
   let u = unregistered(addr manager)
-  let result = u.register()
-  case result.kind
+  let regResult = u.register()
+  case regResult.kind
   of rRegistered:
-    return result.registered.getHandle()
+    return regResult.registered.getHandle()
   of rRegistrationFull:
     raise newException(
       DebraRegistrationError, "Maximum threads (" & $MaxThreads & ") already registered"
