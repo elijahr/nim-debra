@@ -158,10 +158,11 @@ type Atomic*[T] = object
 template enforceAtomicConstraints(T: typedesc) =
   assertAtomCompat(T)
   assertLockFree(T)
-  static:
-    assert alignof(Atomic[T]) >= sizeof(T),
-      "alignment guard for Atomic[" & $T & "] failed " & "(alignof=" &
-        $alignof(Atomic[T]) & ", sizeof=" & $sizeof(T) & ")"
+  when not defined(debraAllowNonLockFreeAtomics):
+    static:
+      assert alignof(Atomic[T]) >= sizeof(T),
+        "alignment guard for Atomic[" & $T & "] failed " & "(alignof=" &
+          $alignof(Atomic[T]) & ", sizeof=" & $sizeof(T) & ")"
 
 # ---------------------------------------------------------------------------
 # Memory-order validation per op
@@ -189,6 +190,15 @@ template validCasFailureOrder(success, failure: MemoryOrder) =
     assert ord(failure) <= ord(success),
       "compareExchange failure order is stronger than success " &
         "order; failure must be <= success"
+
+func casFailureFromSuccess(s: MemoryOrder): MemoryOrder {.compileTime.} =
+  ## Derive a CAS failure order from a success order per C11: drop the
+  ## release component. `moRelease` -> `moRelaxed`,
+  ## `moAcquireRelease` -> `moAcquire`, all others unchanged.
+  case s
+  of moRelease: moRelaxed
+  of moAcquireRelease: moAcquire
+  else: s
 
 # ---------------------------------------------------------------------------
 # Loads and stores
@@ -246,8 +256,8 @@ proc compareExchangeStrong*[T](
     loc: var Atomic[T],
     expected: var T,
     desired: T,
-    success: static MemoryOrder = moSequentiallyConsistent,
-    failure: static MemoryOrder = moSequentiallyConsistent,
+    success: static MemoryOrder,
+    failure: static MemoryOrder,
 ): bool {.inline.} =
   ## Strong CAS. On success, swaps `desired` into `loc`. On failure,
   ## overwrites `expected` with the current value of `loc`.
@@ -266,8 +276,8 @@ proc compareExchangeWeak*[T](
     loc: var Atomic[T],
     expected: var T,
     desired: T,
-    success: static MemoryOrder = moSequentiallyConsistent,
-    failure: static MemoryOrder = moSequentiallyConsistent,
+    success: static MemoryOrder,
+    failure: static MemoryOrder,
 ): bool {.inline.} =
   ## Weak CAS. May fail spuriously on platforms (notably ARM LL/SC)
   ## even when current value equals `expected`. Cheaper inside a loop.
@@ -280,6 +290,47 @@ proc compareExchangeWeak*[T](
     weak = true,
     toAtomMemModel(success),
     toAtomMemModel(failure),
+  )
+
+proc compareExchangeStrong*[T](
+    loc: var Atomic[T],
+    expected: var T,
+    desired: T,
+    order: static MemoryOrder,
+): bool {.inline.} =
+  ## Strong CAS, single-order form. Failure order is derived from
+  ## success per C11 (drop the release component): `moRelease` ->
+  ## `moRelaxed`, `moAcquireRelease` -> `moAcquire`, otherwise
+  ## unchanged. Use the five-arg form to spell the failure order
+  ## explicitly.
+  compareExchangeStrong(loc, expected, desired, order, casFailureFromSuccess(order))
+
+proc compareExchangeWeak*[T](
+    loc: var Atomic[T],
+    expected: var T,
+    desired: T,
+    order: static MemoryOrder,
+): bool {.inline.} =
+  ## Weak CAS, single-order form. Failure order is derived from
+  ## success per `compareExchangeStrong`'s single-order overload.
+  compareExchangeWeak(loc, expected, desired, order, casFailureFromSuccess(order))
+
+proc compareExchangeStrong*[T](
+    loc: var Atomic[T], expected: var T, desired: T
+): bool {.inline.} =
+  ## Strong CAS, default-order form. Equivalent to passing
+  ## `moSequentiallyConsistent` for both success and failure.
+  compareExchangeStrong(
+    loc, expected, desired, moSequentiallyConsistent, moSequentiallyConsistent
+  )
+
+proc compareExchangeWeak*[T](
+    loc: var Atomic[T], expected: var T, desired: T
+): bool {.inline.} =
+  ## Weak CAS, default-order form. Equivalent to passing
+  ## `moSequentiallyConsistent` for both success and failure.
+  compareExchangeWeak(
+    loc, expected, desired, moSequentiallyConsistent, moSequentiallyConsistent
   )
 
 # ---------------------------------------------------------------------------

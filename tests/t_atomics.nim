@@ -208,6 +208,46 @@ suite "compareExchange":
     check a.compareExchangeStrong(expected, addr y) == true
     check a.load() == addr y
 
+  test "compareExchangeStrong single-order form with moAcquire":
+    # The single-order overload derives failure order from success
+    # (drops the release component). success=moAcquire -> failure=moAcquire.
+    # Without the overload this call would bind failure to the default
+    # moSequentiallyConsistent and fail validCasFailureOrder.
+    var a: Atomic[int]
+    a.store(5)
+    var expected = 5
+    check a.compareExchangeStrong(expected, 10, moAcquire) == true
+    check a.load() == 10
+
+  test "compareExchangeStrong single-order form with moRelease":
+    # success=moRelease -> failure=moRelaxed (C11 derivation).
+    var a: Atomic[int]
+    a.store(7)
+    var expected = 7
+    check a.compareExchangeStrong(expected, 13, moRelease) == true
+    check a.load() == 13
+
+  test "compareExchangeWeak single-order form with moAcquireRelease":
+    # success=moAcquireRelease -> failure=moAcquire.
+    var a: Atomic[int]
+    a.store(5)
+    var expected = 5
+    var ok = false
+    for _ in 0 .. 32:
+      if a.compareExchangeWeak(expected, 10, moAcquireRelease):
+        ok = true
+        break
+    check ok
+    check a.load() == 10
+
+  test "single-order CAS failure overwrites expected":
+    var a: Atomic[int]
+    a.store(5)
+    var expected = 99
+    check a.compareExchangeStrong(expected, 10, moAcquire) == false
+    check expected == 5
+    check a.load() == 5
+
 suite "fences":
   test "threadFence compiles and executes for each order":
     threadFence(moRelaxed)

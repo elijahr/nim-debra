@@ -58,6 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `reclaimStart`'s stack-local SC subscribe-barrier atomic is now explicitly zero-initialized via `store(0, moRelaxed)` before its SC `fetchAdd`. Default zero-init of `Atomic[uint64]` is already correct in Nim, but the explicit store makes the intent obvious to readers and static analyzers.
 - `withPin`'s nested-pin check uses `doAssert` (was `assert`) so the safety guard survives release builds. A nested pin would silently corrupt the EBR slot's `pinned` flag bookkeeping.
 - `retire`'s SC `fetchAdd(0)` on shared `globalEpoch` replaced with a stack-local SC RMW plus an acquire load on `globalEpoch`. Equivalent StoreLoad barrier and S-ordering, no cross-thread cache contention on the global counter under concurrent retire. Mirrors the round-3 fix in `reclaimStart`.
+- `enforceAtomicConstraints` alignment static assert is now gated by `-d:debraAllowNonLockFreeAtomics`, matching the lock-free check. Targets where natural alignment is insufficient for the requested atomic width (e.g., `uint64` on 32-bit i386 ABI where `alignof(uint64) == 4`) can opt in via the same flag instead of being unconditionally rejected.
+- `compareExchangeStrong` and `compareExchangeWeak` gained single-order overloads that derive the failure order from the success order (drops the Release component per C11). Callers no longer have to spell out `failure=moAcquire` when passing `success=moAcquire`.
 
 ## [0.2.1] - 2025-12-18
 
