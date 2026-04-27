@@ -24,6 +24,8 @@ tests/debug_*
 # Note: Can't easily ignore extensionless files without also ignoring directories.
 # Nim places compiled binaries in nimcache/ by default, which is already ignored.
 # If you compile with -o:src/foo, manually add src/foo to this file.
+src/*.out
+src/**/*.out
 ## Example binaries
 examples/[a-z_]*
 !examples/*.nim
