@@ -162,8 +162,24 @@ proc retire*[MaxThreads: static int](
     # the type for now to keep the struct layout stable; do not read it.
     state.limboBagHead = newBag
 
-  # Add object to bag with provided destructor
+  # Add object to bag with provided destructor.
+  #
+  # Stamp the bag with the LATEST retire epoch on every retire, not just on
+  # bag creation. A bag accumulates retires across multiple `retire` calls
+  # until it fills `LimboBagSize`, and the global epoch may advance between
+  # them. If we left `bag.epoch` at the creation-time value, an object
+  # retired at epoch K+2 would be reclaimed once `safeEpoch >= K+2` even
+  # though the EBR invariant requires `safeEpoch >= K+4` (i.e. all readers
+  # must have moved past K+2). The reclaimer's `bag.epoch < safeEpoch - 1`
+  # check would then free a still-live pointer — exactly the
+  # use-after-free TSAN reports as a race in `free` after `tryReclaim`.
+  # Bumping `bag.epoch` to the current `epoch` is over-conservative for
+  # earlier objects in the bag (they live longer than necessary) but
+  # restores the safety invariant for later objects. `epoch` is monotonic
+  # (globalEpoch only ever increases), so this is equivalent to
+  # `max(bag.epoch, epoch)`.
   let bag = state.currentBag
+  bag.epoch = epoch
   bag.objects[bag.count] = RetiredObject(data: p, destructor: destructor)
   inc bag.count
 
