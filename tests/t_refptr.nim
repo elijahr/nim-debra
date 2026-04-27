@@ -70,3 +70,20 @@ suite "refptr retain/release":
     let dtor = releaseDestructor[NodeObj]()
     dtor(nil) # Must not crash.
     check true
+
+  test "releaseDestructor[Node] (ref alias) and releaseDestructor[NodeObj] are both safe":
+    # The implementation branches on `T is ref` so the alias spelling
+    # decrements the correct GC cell instead of casting through `ref ref
+    # NodeObj`. Both spellings must run without crashing and leave the
+    # local binding holding the only remaining strong reference.
+    let n1 = Node(value: 11)
+    let p1 = retain(n1)
+    let dtorObj = releaseDestructor[NodeObj]()
+    dtorObj(cast[pointer](p1))
+    check n1.value == 11
+
+    let n2 = Node(value: 22)
+    let p2 = retain(n2)
+    let dtorRef = releaseDestructor[Node]()
+    dtorRef(cast[pointer](p2))
+    check n2.value == 22

@@ -101,31 +101,58 @@ proc releaseDestructorImpl[T](p: pointer) {.nimcall.} =
   # captured environment, no per-call heap allocation). Retire sites that
   # repeatedly call `releaseDestructor[T]()` therefore share a single
   # function pointer per `T` and incur no per-call closure construction.
+  #
+  # `T` may be supplied as either the object type (`NodeObj`) or the ref
+  # alias (`Node = ref NodeObj`). `retain` is parameterised on the ref
+  # form, so users naturally have both names in scope; without the `when`
+  # guard, `releaseDestructor[Node]()` would silently `cast[ref ref
+  # NodeObj]` and the resulting `GC_unref` would decrement the wrong
+  # cell. Branching on `T is ref` makes either spelling correct, matching
+  # the symmetry users expect with `retain[T: ref](obj: T)`.
   if p != nil:
-    GC_unref(cast[ref T](p))
+    when T is ref:
+      GC_unref(cast[T](p))
+    else:
+      GC_unref(cast[ref T](p))
 
 proc releaseDestructor*[T](): Destructor {.inline.} =
   ## Return the `Destructor` (the type DEBRA's `retire` accepts) that
   ## releases a typed pointer obtained from `retain[ref T]`. Hand the
   ## result to `pin.retire(rawPtr, releaseDestructor[T]())`.
   ##
+  ## `T` may be supplied as either the object type or its `ref` alias —
+  ## `releaseDestructor[NodeObj]()` and `releaseDestructor[Node]()`
+  ## (where `Node = ref NodeObj`) both produce a destructor that
+  ## decrements the correct GC cell. The implementation branches on
+  ## `T is ref` to avoid a silent `cast[ref ref T]` on the alias spelling.
+  ## The object-type spelling is canonical (it matches what `retain`
+  ## returns: `ptr typeof(obj[])`); the alias spelling exists for
+  ## symmetry with `retain[T: ref](obj: T)`.
+  ##
   ## The returned `Destructor` is a plain `nimcall` procedure address with
   ## no captured environment, so each `T` instantiation produces one
   ## function pointer that is reused across calls. Calling
-  ## `releaseDestructor[T]()` repeatedly does not allocate.
+  ## `releaseDestructor[T]()` repeatedly does not allocate. Note that
+  ## `releaseDestructor[NodeObj]` and `releaseDestructor[Node]`
+  ## instantiate to *different* function pointers — same behaviour, two
+  ## entries in the binary. Pick one form per call site.
   ##
   ## See also: `retain`_, `release`_.
   runnableExamples:
     import debra
-    type Node = ref object
-      value: int
+    type
+      NodeObj = object
+        value: int
+
+      Node = ref NodeObj
 
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
+    # Object-type spelling — canonical, matches what `retain` returns.
     # `releaseDestructor[T]()` returns the same proc address each call;
     # passing it inline costs no allocation.
     withPin(handle):
       let raw = retain(Node(value: 1))
-      it.retire(raw, releaseDestructor[Node]())
+      it.retire(raw, releaseDestructor[NodeObj]())
   releaseDestructorImpl[T]

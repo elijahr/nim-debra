@@ -115,8 +115,25 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
   ## given handle. Under `-d:release`/`-d:danger` the assertion is a no-op.
   ## Different-handle nesting (multi-manager) is independent and legal.
   ##
+  ## ## Pitfall — neutralization
+  ##
+  ## If another thread calls `neutralizeStalled` on this thread mid-body
+  ## (because we stalled long enough that other threads' reclamation was
+  ## blocked waiting on us), the SIGUSR1 handler force-unpins the slot
+  ## and `unpin` returns `Neutralized`. `withPin` honours the typestate
+  ## by acknowledging the neutralization in its `finally`, but it does
+  ## **not** surface the fact to the caller. Code paths that need to
+  ## know whether their critical section was interrupted (for example
+  ## to roll back a non-idempotent side effect they performed inside the
+  ## body) must use the explicit `unpinned(handle).pin()` /
+  ## `pin.unpin()` form and branch on `UnpinResult.kind`. Code paths
+  ## that only read epoch-protected pointers do not need to — neutralization
+  ## only fires on threads that have already stalled long enough for
+  ## another thread to suspect them, which is a workload-level pathology,
+  ## not a normal operating condition.
+  ##
   ## See also: `debra/typestates/guard.pin`_ (explicit transition), `retire`_,
-  ## `retireBatch`_.
+  ## `retireBatch`_, `debra/typestates/neutralize.neutralizeStalled`_.
   runnableExamples:
     import debra
     proc dtor(p: pointer) {.nimcall.} =
@@ -138,14 +155,26 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
     try:
       body
     finally:
+      # Honour the `Pinned -> Unpinned | Neutralized` typestate. We do
+      # not surface neutralization to the caller (see Pitfall above);
+      # acknowledging here keeps the slot's `neutralized` flag tidy at
+      # unpin time instead of relying on the next `pin` to clear it.
       let ctx = RetireContext[MT](it)
       let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
-      discard p.unpin()
+      let res = p.unpin()
+      case res.kind
+      of uUnpinned:
+        discard
+      of uNeutralized:
+        discard res.neutralized.acknowledge()
 
 template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
   ## `withPin` variant that injects a caller-supplied identifier `name`
   ## (instead of the default `it`). Use to disambiguate nested handles
-  ## across multiple managers.
+  ## across multiple managers. The neutralization pitfall described on
+  ## the unnamed `withPin` template applies here too — see that
+  ## docstring before relying on this form for code paths that may be
+  ## interrupted by `neutralizeStalled`.
   runnableExamples:
     import debra
     proc dtor(p: pointer) {.nimcall.} =
@@ -167,9 +196,16 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
     try:
       body
     finally:
+      # Honour the `Pinned -> Unpinned | Neutralized` typestate. Same
+      # rationale as the unnamed `withPin` form above.
       let ctx = RetireContext[MT](name)
       let p = Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
-      discard p.unpin()
+      let res = p.unpin()
+      case res.kind
+      of uUnpinned:
+        discard
+      of uNeutralized:
+        discard res.neutralized.acknowledge()
 
 proc advanceEvery*[MT: static int](
     handle: ThreadHandle[MT], n: int

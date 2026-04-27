@@ -126,19 +126,44 @@ proc loadEpochs*[MaxThreads: static int](
   ## happens after our prior writes — so T cannot have observed a still-live
   ## pointer to an object we are about to free.
   ##
-  ## We use an SC fetchAdd(0) (not `threadFence(moSequentiallyConsistent)` +
-  ## Acquire load) for TSAN compatibility: standalone SC thread fences are
-  ## not modelled by TSAN's vector clocks (see `compiler-rt/lib/tsan/rtl/`
-  ## `tsan_interface_atomic.cpp`, `OpFence::Atomic` -> `FIXME: not implemented`).
-  ## A plain SC load is too weak — on x86 it lowers to a bare `mov` and
-  ## loses the StoreLoad barrier (`mfence`) that the previous fence
-  ## provided. An SC fetchAdd is an RMW: it lowers to a `lock`-prefixed
-  ## instruction on x86 (full StoreLoad barrier) and to an `ldaxr`/`stlxr`
-  ## seq-cst loop on ARM (full StoreLoad barrier), AND it participates in
-  ## TSAN's vector clock model. Adding 0 returns the current value
-  ## without changing it.
+  ## The SC RMW used to be issued against `manager.globalEpoch`
+  ## (`globalEpoch.fetchAdd(0)`), but `globalEpoch` is a hot shared cache
+  ## line and every reclaimer-side subscription bounced it across cores.
+  ## Three properties were needed for the subscription handshake to be
+  ## correct under TSAN:
+  ##
+  ## 1. **Hardware StoreLoad barrier.** A plain SC load is too weak — on
+  ##    x86 it lowers to a bare `mov` and loses the `mfence` that an SC
+  ##    fence would provide. An SC RMW lowers to a `lock`-prefixed
+  ##    instruction on x86 and an `ldaxr`/`stlxr` seq-cst loop on ARM,
+  ##    both of which are full StoreLoad barriers.
+  ##
+  ## 2. **Participation in C11's SC total order S.** The SC loads on
+  ##    each thread's `pinned` flag (below) are in S. For the proof of
+  ##    EBR safety to go through, the subscription point itself must be
+  ##    in S so that pin RMWs published before our subscription are
+  ##    visible. C11 §29.3 makes S a single total order across **every**
+  ##    SC op, regardless of which atomic location it touches.
+  ##
+  ## 3. **TSAN vector-clock modelling.** Standalone SC fences are not
+  ##    modelled by TSAN (see `compiler-rt/lib/tsan/rtl/`
+  ##    `tsan_interface_atomic.cpp` `OpFence::Atomic` ->
+  ##    `// FIXME: not implemented.`). SC RMWs are modelled correctly on
+  ##    every atomic location, so the analyser sees the synchronisation.
+  ##
+  ## Properties (1) and (3) are properties of the *instruction*, not the
+  ## operand location; property (2) is location-independent by C11
+  ## construction. So a stack-local `Atomic[uint64]` gives us the same
+  ## subscription point with no cross-thread cache traffic.
+  var subscribeBarrier: Atomic[uint64]
+  discard subscribeBarrier.fetchAdd(0'u64, moSequentiallyConsistent)
   var ctx = ReclaimContext[MaxThreads](s)
-  ctx.globalEpoch = ctx.manager.globalEpoch.fetchAdd(0'u64, moSequentiallyConsistent)
+  # `globalEpoch` is now just a value read; reading a slightly stale
+  # epoch only makes `safeEpoch` conservatively lower, which is safe.
+  # The acquire ordering is enough to pair with the release-stamping in
+  # `advance.nim` and gives us the most-recent value any predecessor
+  # thread has observed.
+  ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
   ctx.safeEpoch = ctx.globalEpoch
 
   # Subscribe to each thread's `pinned` flag with an SC load, not Acquire.
