@@ -51,17 +51,15 @@ proc enqueue*[T](queue: var Queue[T], value: T) =
           # same swing on its next iteration. Weak avoids the LL/SC retry
           # loop on weakly-ordered architectures.
           var observedTail = tail
-          discard queue.tail.compareExchangeWeak(
-            observedTail, newNode, moRelease, moRelaxed
-          )
+          discard
+            queue.tail.compareExchangeWeak(observedTail, newNode, moRelease, moRelaxed)
           break
       else:
         # Help-along: another producer enqueued but hasn't yet swung the
         # tail. Weak CAS is sufficient — spurious failure is harmless;
         # the next iteration retries.
         var observedTail = tail
-        discard
-          queue.tail.compareExchangeWeak(observedTail, next, moRelease, moRelaxed)
+        discard queue.tail.compareExchangeWeak(observedTail, next, moRelease, moRelaxed)
 
 proc dequeue*[T](queue: var Queue[T]): Option[T] =
   result = none(T)
