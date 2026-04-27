@@ -110,7 +110,12 @@ proc unpin*[MaxThreads: static int](
   let mgr = ctx.handle.manager
   let idx = ctx.handle.idx
 
-  mgr.threads[idx].pinned.store(false, moRelease)
+  # SC store (not Release) so the modification order on `pinned` is fully
+  # ordered with the SC RMW in `pin` and the SC load in `loadEpochs`.
+  # Without SC here, a reclaimer's SC load on `pinned` could read the
+  # unpin's value while a subsequent re-pin RMW is in flight, breaking
+  # the EBR subscription handshake.
+  mgr.threads[idx].pinned.store(false, moSequentiallyConsistent)
 
   if mgr.threads[idx].neutralized.load(moAcquire):
     UnpinResult[MaxThreads] -> Neutralized[MaxThreads](ctx)

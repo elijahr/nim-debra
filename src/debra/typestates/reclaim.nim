@@ -135,8 +135,18 @@ proc loadEpochs*[MaxThreads: static int](
   ctx.globalEpoch = ctx.manager.globalEpoch.fetchAdd(0'u64, moSequentiallyConsistent)
   ctx.safeEpoch = ctx.globalEpoch
 
+  # Subscribe to each thread's `pinned` flag with an SC load, not Acquire.
+  # The pin side publishes via an SC RMW on `pinned`. SC ops on the *same*
+  # atomic location are totally ordered in C11's S, so an SC load here is
+  # guaranteed to read from a position in `pinned`'s modification order
+  # that is consistent with S relative to every concurrent pin RMW. An
+  # Acquire load is not in S, so the reclaimer could observe `pinned=false`
+  # for a thread that has already published `pinned=true` — exactly the
+  # race TSAN reports as a use-after-free in `free` after `tryReclaim`.
+  # Crossbeam relies on the same property by packing pin+epoch into a
+  # single SC-accessed word.
   for i in 0 ..< MaxThreads:
-    if ctx.manager.threads[i].pinned.load(moAcquire):
+    if ctx.manager.threads[i].pinned.load(moSequentiallyConsistent):
       let threadEpoch = ctx.manager.threads[i].epoch.load(moAcquire)
       if threadEpoch < ctx.safeEpoch:
         ctx.safeEpoch = threadEpoch
