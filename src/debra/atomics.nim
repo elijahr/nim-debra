@@ -293,10 +293,7 @@ proc compareExchangeWeak*[T](
   )
 
 proc compareExchangeStrong*[T](
-    loc: var Atomic[T],
-    expected: var T,
-    desired: T,
-    order: static MemoryOrder,
+    loc: var Atomic[T], expected: var T, desired: T, order: static MemoryOrder
 ): bool {.inline.} =
   ## Strong CAS, single-order form. Failure order is derived from
   ## success per C11 (drop the release component): `moRelease` ->
@@ -306,10 +303,7 @@ proc compareExchangeStrong*[T](
   compareExchangeStrong(loc, expected, desired, order, casFailureFromSuccess(order))
 
 proc compareExchangeWeak*[T](
-    loc: var Atomic[T],
-    expected: var T,
-    desired: T,
-    order: static MemoryOrder,
+    loc: var Atomic[T], expected: var T, desired: T, order: static MemoryOrder
 ): bool {.inline.} =
   ## Weak CAS, single-order form. Failure order is derived from
   ## success per `compareExchangeStrong`'s single-order overload.
