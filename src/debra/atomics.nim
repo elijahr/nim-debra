@@ -6,8 +6,13 @@
 ##   * Reject `Atomic[ref T]` at compile time (no silent spinlock).
 ##   * Require `Atomic[T]` to be lock-free at compile time.
 ##   * Validate `MemoryOrder` per op at compile time.
-##   * Force natural alignment so 32-bit targets do not silently
-##     downgrade `Atomic[uint64]` to a non-lock-free 4-byte object.
+##   * Statically assert `alignof(Atomic[T]) >= sizeof(T)` so a target
+##     where `T`'s natural alignment is insufficient (e.g. `uint64` on
+##     some 32-bit ABIs) fails to compile rather than silently downgrading
+##     to a non-lock-free split-lock object. The assert is the safety
+##     boundary; we cannot force alignment higher than the type's natural
+##     alignment from generic code (see `Atomic[T]` doc), so we trap the
+##     mismatch instead.
 ##
 ## Design doc: docs/design/2026-04-25-custom-atomics.md
 ##
@@ -137,11 +142,19 @@ type Atomic*[T] = object
   ## Note on alignment: Nim's field-level `{.align: ...}` pragma
   ## cannot reference `sizeof(T)` from a generic context (as of
   ## Nim 2.2.6 it triggers `sizeof requires .importc types to be
-  ## .completeStruct`). Instead we rely on `T`'s natural alignment
-  ## (always >= sizeof(T) for primitives on 64-bit targets) and
-  ## guard via `static: assert alignof(Atomic[T]) >= sizeof(T)`
-  ## inside each op. If a 32-bit target ever trips that guard we
-  ## will emit a per-size dispatch.
+  ## .completeStruct`). We therefore rely on `T`'s natural alignment
+  ## — which is `>= sizeof(T)` for the primitives we ship on every
+  ## 64-bit ABI we currently target, but is **not** universally true.
+  ## Notably, on i386 System V `alignof(uint64) == 4`, which would
+  ## yield a split-lock object that is not always-lock-free.
+  ##
+  ## `enforceAtomicConstraints` therefore fires
+  ## `static: assert alignof(Atomic[T]) >= sizeof(T)` per instantiation;
+  ## a target where natural alignment is insufficient fails to compile
+  ## rather than silently producing a non-lock-free object. If we ever
+  ## need to support such a target, the fix is a per-size specialisation
+  ## that boxes `T` in a struct with an explicit `{.align: 8.}` (or
+  ## similar) field; the generic path cannot do better today.
   value: T
 
 # Compile-time gates fire when the type is referenced in a real

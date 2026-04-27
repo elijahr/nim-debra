@@ -32,10 +32,13 @@
 ## * `tryReclaim` is `notATransition` because `ReclaimReady` is the terminal
 ##   state of the `ReclaimContext` typestate and the count return value is
 ##   what the caller cares about.
-## * Calling `reclaimStart(addr manager)` from an unregistered thread is a
-##   bug: `threadLocalIdx` defaults to 0, so the call would silently walk
-##   slot 0's bag list and race with that slot's owner. Prefer the handle
-##   form `reclaimStart(handle)` whenever possible.
+## * `reclaimStart(addr manager)` infers the slot from the thread-local
+##   `threadLocalRegistered` / `threadLocalIdx` pair. If the calling thread
+##   has not been registered with any manager, the returned context carries
+##   `idx = -1` and `tryReclaim` short-circuits to 0 reclaimed (rather than
+##   silently walking slot 0's bag list and racing with its owner). Prefer
+##   the handle form `reclaimStart(handle)` regardless: it is explicit and
+##   needs no thread-local lookup.
 ##
 ## ## See also
 ##
@@ -94,14 +97,17 @@ proc reclaimStart*[MaxThreads: static int](
   ## thread-local `threadLocalIdx` set by `registerThread`. Prefer the
   ## `reclaimStart(handle)` overload.
   ##
-  ## Calling this from a thread that has not been registered with `mgr` is a
-  ## bug; it will silently walk slot 0's bag list.
+  ## If the calling thread has not been registered with this (or any) manager,
+  ## the returned context carries `idx = -1`, so `tryReclaim` short-circuits to
+  ## 0 reclaimed instead of mutating slot 0's bag list (which would race with
+  ## that slot's owner). `threadLocalIdx` defaults to 0 and cannot by itself
+  ## distinguish "registered at slot 0" from "never registered" — the
+  ## companion `threadLocalRegistered` flag is the explicit registered-bit.
   ##
   ## See also: `debra/convenience.reclaimNow`_ for the one-shot wrapper.
+  let idx = if threadLocalRegistered: threadLocalIdx else: -1
   ReclaimStart[MaxThreads](
-    ReclaimContext[MaxThreads](
-      manager: mgr, idx: threadLocalIdx, globalEpoch: 0, safeEpoch: 0
-    )
+    ReclaimContext[MaxThreads](manager: mgr, idx: idx, globalEpoch: 0, safeEpoch: 0)
   )
 
 proc loadEpochs*[MaxThreads: static int](
@@ -198,36 +204,37 @@ proc tryReclaim*[MaxThreads: static int](
   var count = 0
   let state = addr ctx.manager.threads[ctx.idx]
 
-  # Walk from tail (oldest) and reclaim eligible bags. Only the calling thread
-  # mutates this list (via retire) and we are that thread, so no
-  # synchronization is needed.
+  # Walk from tail (oldest) toward head and reclaim eligible bags. Bags are
+  # epoch-ordered (retire stamps `bag.epoch` on every insert and the list
+  # advances monotonically), so the safe prefix is always contiguous starting
+  # at the tail; the first not-yet-safe bag terminates the walk. Only the
+  # calling thread mutates this list (via retire), so no synchronization is
+  # needed.
   var bag = state.limboBagTail
-  var prevBag: ptr LimboBag = nil
 
   while bag != nil:
-    if bag.epoch < safeEpoch:
-      # This bag's objects are safe to reclaim
-      for j in 0 ..< bag.count:
-        let obj = bag.objects[j]
-        if obj.destructor != nil:
-          obj.destructor(obj.data)
-        inc count
-
-      # Unlink and free bag
-      let nextBag = bag.next
-      if prevBag == nil:
-        state.limboBagTail = nextBag
-      else:
-        prevBag.next = nextBag
-      if state.currentBag == bag:
-        state.currentBag = nextBag
-      if state.limboBagHead == bag:
-        state.limboBagHead = nextBag
-
-      freeLimboBag(bag)
-      bag = nextBag
-    else:
-      # Not safe yet, stop walking
+    if bag.epoch >= safeEpoch:
+      # Not safe yet. Because bags are epoch-ordered, no later bag is safe
+      # either; stop walking.
       break
+
+    for j in 0 ..< bag.count:
+      let obj = bag.objects[j]
+      if obj.destructor != nil:
+        obj.destructor(obj.data)
+      inc count
+
+    # Unlink from the tail. Because reclamation always strips a contiguous
+    # prefix from the tail, the freed bag is the current tail by construction
+    # — no `prevBag` bookkeeping is needed.
+    let nextBag = bag.next
+    state.limboBagTail = nextBag
+    if state.currentBag == bag:
+      state.currentBag = nextBag
+    if state.limboBagHead == bag:
+      state.limboBagHead = nextBag
+
+    freeLimboBag(bag)
+    bag = nextBag
 
   result = count

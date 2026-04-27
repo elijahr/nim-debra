@@ -27,10 +27,14 @@ type
     # `when not supportsCopyMem(T): {.error.}` (section 4). No concept
     # needed. Atomic[T] is required to be lock-free at compile time
     # (section 3.1).
-    # `value` is `{.align: max(alignof(T), sizeof(T)).}` so the operand is
-    # naturally aligned regardless of containing-struct layout (section 3.2).
-    # `static: assert alignof(Atomic[T]) >= sizeof(T)` guards the type.
-    value {.align: alignofAtomic(T).}: T
+    # See section 3.2: a field-level `{.align: sizeof(T).}` was the
+    # original design, but Nim 2.2.6 rejects `sizeof(T)` in a generic
+    # context (`sizeof requires .importc types to be .completeStruct`).
+    # The shipped form relies on `T`'s natural alignment and traps
+    # mismatches with a per-instantiation
+    # `static: assert alignof(Atomic[T]) >= sizeof(T)` in
+    # `enforceAtomicConstraints`.
+    value: T
 
   AtomicFlag* = distinct uint8
     ## Underlying byte must be 0 or 1; `__atomic_test_and_set` is
@@ -97,7 +101,7 @@ MSVC: replicate `_Interlocked*` from `atomics.nim:212-276` (~80 lines). `threadF
 
 ### 3.1 Lock-Free Enforcement
 
-Every `Atomic[T]` must be lock-free. Checked via `__atomic_always_lock_free(sizeof(T), 0)` (GCC/Clang) and `_InterlockedCompareExchange*`-size dispatch (MSVC), wrapped behind `template isAlwaysLockFree(T: typedesc): bool` in a `static:` block. Fires at type definition; non-lock-free fails at the use site. Because `value` is force-aligned to `sizeof(T)` (§3.2), `__atomic_always_lock_free` is not misled by 32-bit targets that would default-align `Atomic[uint64]` to 4 bytes.
+Every `Atomic[T]` must be lock-free. Checked via `__atomic_always_lock_free(sizeof(T), 0)` (GCC/Clang) and `_InterlockedCompareExchange*`-size dispatch (MSVC), wrapped behind `template isAlwaysLockFree(T: typedesc): bool` in a `static:` block. Fires at type definition; non-lock-free fails at the use site. The lock-free check pairs with the alignment static assert in §3.2: `__atomic_always_lock_free(8, 0)` may report `true` for an 8-byte type whose actual storage is only 4-byte aligned (a 32-bit ABI default for `uint64`); the alignment assert catches that gap by failing to compile.
 
 ```
 Atomic[T] is not lock-free on this target. Use a smaller T, or pass
@@ -108,7 +112,9 @@ Atomic[T] is not lock-free on this target. Use a smaller T, or pass
 
 ### 3.2 Alignment
 
-`value` is `{.align: alignofAtomic(T).}` where `alignofAtomic(T) == max(alignof(T), sizeof(T))` for primitives up to pointer width. The operand is naturally aligned regardless of outer-struct layout — critical on 32-bit targets where `Atomic[uint64]` would default-align to 4 bytes and silently lose the lock-free guarantee `__atomic_always_lock_free(8, 0)` reports. `static: assert alignof(Atomic[T]) >= sizeof(T)` guards the type. If a caller embeds `Atomic[T]` in `{.packed.}`, Nim rejects the alignment override — caller's problem.
+The original design force-aligned `value` to `max(alignof(T), sizeof(T))`. Nim 2.2.6 cannot resolve `sizeof(T)` inside a field-level `{.align: ...}` pragma in a generic context (`sizeof requires .importc types to be .completeStruct`), so the shipped form is `value: T` with no explicit alignment override. The 64-bit ABIs we target give every primitive used here `alignof(T) == sizeof(T)` already, so this is functionally equivalent on those platforms.
+
+To keep the i386 / armv7 / other-where-`alignof(uint64) == 4` failure mode loud rather than silent, `enforceAtomicConstraints` runs `static: assert alignof(Atomic[T]) >= sizeof(T)` per instantiation. A target whose natural alignment falls short fails to compile rather than producing a non-lock-free split-lock object. If support for such a target ever becomes a goal, the fix is a per-size specialisation that boxes `T` in a struct with an explicit literal `{.align: 8.}` (or similar) field — the generic path cannot do better today. `{.packed.}` containers also remain caller-managed: the alignment assert fires at the use site if they tighten alignment below `sizeof(T)`.
 
 ### 3.3 Memory Order Validation
 

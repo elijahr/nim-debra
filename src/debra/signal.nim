@@ -15,8 +15,14 @@ var
   globalManagerPtr*: pointer = nil
     ## Set during manager initialization. Used by signal handler.
 
-# Thread-local storage for thread index
+# Thread-local storage for thread index. Nim threadvars are
+# zero-initialized, so a bare `int` cannot distinguish "unregistered" from
+# "registered at slot 0". `threadLocalRegistered` is the explicit
+# registered-bit; both fields must be consulted before treating
+# `threadLocalIdx` as a real slot index. `registerThread` flips
+# `threadLocalRegistered = true` after assigning a slot.
 var threadLocalIdx* {.threadvar.}: int
+var threadLocalRegistered* {.threadvar.}: bool
 
 proc neutralizationHandler(sig: cint) {.noconv.} =
   ## SIGUSR1 handler - force unpin if pinned, mark neutralized.
@@ -24,7 +30,7 @@ proc neutralizationHandler(sig: cint) {.noconv.} =
   ## This runs asynchronously when the OS delivers the signal.
   ## We use raw pointer arithmetic because we can't know MaxThreads
   ## at compile time in the signal handler context.
-  if threadLocalIdx >= 0 and globalManagerPtr != nil:
+  if threadLocalRegistered and globalManagerPtr != nil:
     let basePtr = cast[ptr UncheckedArray[byte]](globalManagerPtr)
 
     # Layout of DebraManager:

@@ -56,8 +56,12 @@ proc register*[MaxThreads: static int](
         # Successfully claimed slot i
         # Store thread ID for signaling
         mgr.threads[i].threadId.store(currentThreadId(), moRelease)
-        # Set thread-local index for signal handler
+        # Set thread-local index for signal handler. Both `threadLocalIdx`
+        # and `threadLocalRegistered` must be set: the bare index can't
+        # distinguish "registered at slot 0" from "never registered" since
+        # threadvars default to zero.
         threadLocalIdx = i
+        threadLocalRegistered = true
         return
           RegisterResult[MaxThreads] ->
           Registered[MaxThreads](RegistrationContext[MaxThreads](manager: mgr, idx: i))
