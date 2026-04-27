@@ -57,3 +57,6 @@ nimble.paths
 
 # Atlas local config
 nim.cfg
+
+# Local PR description scratch file (do not commit)
+.pr-description.md
