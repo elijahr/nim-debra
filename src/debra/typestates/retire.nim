@@ -127,16 +127,24 @@ proc retire*[MaxThreads: static int](
   # could pass even though the reader is still actively reading the retired
   # object — a use-after-free.
   #
-  # The SC fence pairs with the publication fence in `pin` and the
-  # subscription fence in `loadEpochs`. The fence forces the subsequent
-  # globalEpoch load into the same total order as every pinning thread's
-  # published epoch, so bag.epoch dominates any reader-epoch that could
-  # still reach the just-detached pointer. Without the fence, a release
-  # fetchAdd on globalEpoch by a third thread is not synchronized with
-  # this acquire load via the C11 memory model alone, and the load can
-  # observe a stale value smaller than a still-pinning reader's epoch.
-  threadFence(moSequentiallyConsistent)
-  let epoch = handle.manager.globalEpoch.load(moAcquire)
+  # An SC load of `globalEpoch` participates in the C11 SC total order S,
+  # pairing with the SC RMW in `pin` and the SC load in `loadEpochs`. This
+  # forces `bag.epoch` to dominate any pinning thread's published epoch
+  # that could still reach the just-detached pointer, restoring the EBR
+  # safety invariant `reader_epoch <= bag.epoch`.
+  #
+  # We use an SC fetchAdd(0) (not `threadFence(moSequentiallyConsistent)` +
+  # Acquire load) for TSAN compatibility: standalone SC thread fences are
+  # not modelled by TSAN's vector clocks (`compiler-rt/lib/tsan/rtl/`
+  # `tsan_interface_atomic.cpp`, `OpFence::Atomic` -> `FIXME: not implemented`).
+  # A plain SC load is too weak — on x86 it lowers to a bare `mov` and
+  # loses the StoreLoad barrier (`mfence`) that the previous fence
+  # provided. An SC fetchAdd is an RMW: it lowers to a `lock`-prefixed
+  # instruction on x86 (full StoreLoad barrier) and to an `ldaxr`/`stlxr`
+  # seq-cst loop on ARM (full StoreLoad barrier), AND it participates in
+  # TSAN's vector clock model. Adding 0 returns the current value
+  # without changing it.
+  let epoch = handle.manager.globalEpoch.fetchAdd(0'u64, moSequentiallyConsistent)
 
   # Ensure we have a bag with space. The bag list is a singly-linked FIFO:
   # `limboBagTail` is the oldest unfreed bag, `currentBag` is the newest, and

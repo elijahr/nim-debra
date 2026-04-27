@@ -71,15 +71,22 @@ proc pin*[MaxThreads: static int](
   ctx.epoch = mgr.globalEpoch.load(moAcquire)
   mgr.threads[idx].neutralized.store(false, moRelease)
   mgr.threads[idx].epoch.store(ctx.epoch, moRelease)
-  mgr.threads[idx].pinned.store(true, moRelease)
-  # Publication fence: prevents the caller's subsequent loads of shared
-  # state (the data this pin is meant to protect) from being reordered
-  # before the `pinned=true` store becomes globally visible. Without
-  # this, a reclaimer can observe `pinned=false` after we have already
-  # loaded a pointer to a soon-to-be-retired object, and free the
-  # object out from under us. Standard EBR publication barrier; matches
-  # Crossbeam's pin path.
-  threadFence(moSequentiallyConsistent)
+  # Publication via an SC read-modify-write on `pinned`. Semantically
+  # equivalent to `pinned.store(true, moRelease)` followed by an SC
+  # thread fence: the RMW participates in the C11 SC total order S, so
+  # subsequent loads in this thread are ordered after any reclaimer's SC
+  # operations that precede this RMW in S, and prior stores in this
+  # thread (`epoch.store`, `neutralized.store`) are HB-before any
+  # reclaimer load that observes this RMW.
+  #
+  # We use an exchange (rather than `store`/`exchange`-with-fence) for a
+  # specific TSAN reason: standalone SC thread fences are not modelled by
+  # TSAN's vector clocks (see `compiler-rt/lib/tsan/rtl/tsan_interface_atomic.cpp`,
+  # `OpFence::Atomic` -> `// FIXME(dvyukov): not implemented.`). On ARM64,
+  # this caused TSAN to flag the EBR pin/reclaim handshake as a race even
+  # though the C11 proof goes through. SC RMWs are modelled correctly,
+  # and Crossbeam uses the same encoding for the same reason.
+  discard mgr.threads[idx].pinned.exchange(true, moSequentiallyConsistent)
 
   Pinned[MaxThreads](ctx)
 

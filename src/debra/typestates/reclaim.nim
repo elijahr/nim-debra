@@ -109,20 +109,30 @@ proc loadEpochs*[MaxThreads: static int](
 ): EpochsLoaded[MaxThreads] {.transition.} =
   ## Load global epoch and compute minimum epoch across pinned threads.
   ##
-  ## Subscription fence: pairs with the publication fence in `pin` to give EBR
-  ## its StoreLoad ordering across threads. Without this, a reclaimer can read
-  ## another thread's `pinned=false` even when that thread's pin store has
+  ## Subscription read: an SC load of `globalEpoch` participates in the C11
+  ## SC total order S, pairing with the SC RMW in `pin` to give EBR its
+  ## StoreLoad ordering across threads. Without this, a reclaimer can read
+  ## another thread's `pinned=false` even when that thread's pin RMW has
   ## already been issued, then proceed to free an object the still-pinning
-  ## thread is about to read. The fence ensures that for every concurrently
-  ## pinning thread T, either (a) T's pin store is visible here (we observe
+  ## thread is about to read. The SC load ensures that for every concurrently
+  ## pinning thread T, either (a) T's pin RMW is visible here (we observe
   ## `pinned=true`), or (b) T's subsequent load of the protected pointer
   ## happens after our prior writes — so T cannot have observed a still-live
-  ## pointer to an object we are about to free. Matches the Crossbeam EBR
-  ## subscription fence in `Collector::collect`/`try_advance`.
-  threadFence(moSequentiallyConsistent)
-
+  ## pointer to an object we are about to free.
+  ##
+  ## We use an SC fetchAdd(0) (not `threadFence(moSequentiallyConsistent)` +
+  ## Acquire load) for TSAN compatibility: standalone SC thread fences are
+  ## not modelled by TSAN's vector clocks (see `compiler-rt/lib/tsan/rtl/`
+  ## `tsan_interface_atomic.cpp`, `OpFence::Atomic` -> `FIXME: not implemented`).
+  ## A plain SC load is too weak — on x86 it lowers to a bare `mov` and
+  ## loses the StoreLoad barrier (`mfence`) that the previous fence
+  ## provided. An SC fetchAdd is an RMW: it lowers to a `lock`-prefixed
+  ## instruction on x86 (full StoreLoad barrier) and to an `ldaxr`/`stlxr`
+  ## seq-cst loop on ARM (full StoreLoad barrier), AND it participates in
+  ## TSAN's vector clock model. Adding 0 returns the current value
+  ## without changing it.
   var ctx = ReclaimContext[MaxThreads](s)
-  ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
+  ctx.globalEpoch = ctx.manager.globalEpoch.fetchAdd(0'u64, moSequentiallyConsistent)
   ctx.safeEpoch = ctx.globalEpoch
 
   for i in 0 ..< MaxThreads:
