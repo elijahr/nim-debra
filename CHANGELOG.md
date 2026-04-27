@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `static_assert`/`_Static_assert` emit in `Atomic[T]` instantiation now constructs the message via `astToStr(T)` concatenation instead of a separate `$T` array element, eliminating reliance on the underspecified emit-array string-expression handling.
 - `ThreadState` is now cache-line aligned to prevent false sharing across the per-thread slots in `DebraManager.threads`.
 - `reclaimStart`'s stack-local SC subscribe-barrier atomic is now explicitly zero-initialized via `store(0, moRelaxed)` before its SC `fetchAdd`. Default zero-init of `Atomic[uint64]` is already correct in Nim, but the explicit store makes the intent obvious to readers and static analyzers.
+- `withPin`'s nested-pin check uses `doAssert` (was `assert`) so the safety guard survives release builds. A nested pin would silently corrupt the EBR slot's `pinned` flag bookkeeping.
 
 ## [0.2.1] - 2025-12-18
 

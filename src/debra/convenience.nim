@@ -147,7 +147,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
       it.retire(p, dtor)
   block:
     let h = th
-    assert not h.manager.threads[h.idx].pinned.load(moAcquire),
+    doAssert not h.manager.threads[h.idx].pinned.load(moAcquire),
       "withPin: thread is already pinned (handle slot " & $h.idx &
         "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
@@ -186,7 +186,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
       slot.retire(p, dtor)
   block:
     let h = th
-    assert not h.manager.threads[h.idx].pinned.load(moAcquire),
+    doAssert not h.manager.threads[h.idx].pinned.load(moAcquire),
       "withPin: thread is already pinned (handle slot " & $h.idx &
         "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
