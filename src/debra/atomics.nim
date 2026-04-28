@@ -442,6 +442,27 @@ proc fetchAdd*[T: SomeFloat](
   ##
   ## `order` is applied to the successful CAS; the failure order is
   ## derived per C11 (drops the release component).
+  ##
+  ## Bit-pattern fidelity caveat: `fetchAdd` performs an IEEE-754
+  ## float addition; unlike `load`/`store`/`exchange`/`compareExchange*`
+  ## (pure bitwise transfer), the bit-pattern guarantees do NOT apply
+  ## to the *new stored value*. Specifically:
+  ##
+  ##   * The returned old value IS bit-exact: it comes from a relaxed
+  ##     load before the add and reflects the pre-RMW storage bits
+  ##     verbatim (so e.g. a NaN payload in `loc` is preserved in the
+  ##     return value).
+  ##   * The new stored value is `old + v` computed by the FPU, which
+  ##     means: NaN payloads are not preserved across the add (e.g.
+  ##     `NaN_payload_A + 1.0` yields a quiet NaN with implementation-
+  ##     defined payload, not `payload_A`); denormal results may flush
+  ##     to zero if FTZ/DAZ is enabled in the calling thread's FPU
+  ##     state; the rounding mode is whatever the FPU is currently set
+  ##     to (round-to-nearest by default; modifiable via `fesetround`
+  ##     on x86 or FPCR on ARM); and overflow produces +/-Inf.
+  ##
+  ## The CAS-loop preserves atomicity; these caveats are inherent to
+  ## float arithmetic, not to this implementation.
   enforceAtomicConstraints(T)
   var old = load(loc, moRelaxed)
   while true:

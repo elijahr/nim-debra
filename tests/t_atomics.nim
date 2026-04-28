@@ -3,6 +3,8 @@
 ## Tests for debra/atomics: a custom atomics module that rejects ref T,
 ## enforces lock-free at compile time, and validates memory orders per op.
 
+import std/math
+
 import unittest2
 
 import debra/atomics
@@ -656,6 +658,80 @@ suite "float fetchAdd":
     a.store(1.0'f32)
     check a.fetchAdd(2.0'f32, moAcquireRelease) == 1.0'f32
     check a.load() == 3.0'f32
+
+  test "float32 fetchAdd overflow produces +Inf":
+    # `fetchAdd` performs an IEEE-754 add; overflowing the format
+    # range produces +Inf. Document this as part of the FPU-state
+    # contract: the new stored value is whatever the FPU computes.
+    let maxF32 = cast[float32](0x7F7F_FFFF'u32) # largest finite float32
+    var a: Atomic[float32]
+    a.store(maxF32)
+    let old = a.fetchAdd(maxF32)
+    # Old value is bit-exact (relaxed-load contract): the pre-RMW
+    # storage bits round-trip into the return value.
+    check cast[uint32](old) == cast[uint32](maxF32)
+    # New stored value overflowed to +Inf.
+    check classify(a.load()) == fcInf
+    check a.load() > 0.0'f32
+
+  test "float64 fetchAdd overflow produces +Inf":
+    let maxF64 = cast[float64](0x7FEF_FFFF_FFFF_FFFF'u64)
+    var a: Atomic[float64]
+    a.store(maxF64)
+    let old = a.fetchAdd(maxF64)
+    check cast[uint64](old) == cast[uint64](maxF64)
+    check classify(a.load()) == fcInf
+    check a.load() > 0.0'f64
+
+  test "float32 fetchAdd of NaN: old value is bit-exact, new value is some NaN":
+    # Locks in the FPU-state contract for NaN inputs:
+    #   * The OLD value returned by fetchAdd is bit-exact (it comes
+    #     from a relaxed load before the add) - the original NaN
+    #     bit pattern is preserved in the return value.
+    #   * The NEW stored value is `NaN + 1.0`, which IEEE-754 says
+    #     is some NaN with implementation-defined payload. We do
+    #     NOT promise the payload is preserved across the add.
+    let nanBits: uint32 = 0x7FC0_0042'u32 # quiet NaN, payload 0x42
+    let nanVal = cast[float32](nanBits)
+    var a: Atomic[float32]
+    a.store(nanVal)
+    let old = a.fetchAdd(1.0'f32)
+    # Old value: bit-exact match to the original NaN.
+    check cast[uint32](old) == nanBits
+    # New stored value: some NaN (any bit pattern). Do NOT assert on
+    # the payload - that's implementation-defined.
+    check classify(a.load()) == fcNan
+
+  test "float64 fetchAdd of NaN: old value is bit-exact, new value is some NaN":
+    let nanBits: uint64 = 0x7FF8_0000_0000_0042'u64
+    let nanVal = cast[float64](nanBits)
+    var a: Atomic[float64]
+    a.store(nanVal)
+    let old = a.fetchAdd(1.0'f64)
+    check cast[uint64](old) == nanBits
+    check classify(a.load()) == fcNan
+
+  test "float64 fetchAdd of +Inf + (-Inf) yields NaN":
+    # IEEE-754: `+Inf + -Inf` is NaN (invalid operation). The old
+    # value returned must be the original +Inf bit pattern.
+    var a: Atomic[float64]
+    a.store(Inf)
+    let old = a.fetchAdd(NegInf)
+    # Old is bit-exact: the +Inf we stored.
+    check cast[uint64](old) == cast[uint64](float64(Inf))
+    check classify(old) == fcInf
+    check old > 0.0'f64
+    # New stored value: NaN (any pattern).
+    check classify(a.load()) == fcNan
+
+  test "float32 fetchAdd of +Inf + (-Inf) yields NaN":
+    var a: Atomic[float32]
+    a.store(float32(Inf))
+    let old = a.fetchAdd(float32(NegInf))
+    check cast[uint32](old) == cast[uint32](float32(Inf))
+    check classify(old) == fcInf
+    check old > 0.0'f32
+    check classify(a.load()) == fcNan
 
 when compileOption("threads"):
   suite "multi-threaded smoke":

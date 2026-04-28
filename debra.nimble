@@ -28,8 +28,9 @@ task test, "Run tests with all memory managers":
   # (via `compiles`) that DSL symbols are NOT reachable from `debra/atomics`
   # alone. Wiring it into `tests/test.nim` would force the DSL to be imported
   # transitively and defeat the test.
-  echo "Checking tests/t_atomics_dsl_negative.nim (compile-time only)"
-  exec "nim check --threads:on --path:src tests/t_atomics_dsl_negative.nim"
+  echo "[nim check] verifying tests/t_atomics_dsl_negative.nim - DSL must NOT leak into debra/atomics core"
+  exec "nim check --threads:on --hints:off --warnings:off --path:src tests/t_atomics_dsl_negative.nim"
+  echo "[nim check] passed: DSL boundary intact"
   echo "All backends passed!"
 
 task testExamples, "Compile and run all example files":
