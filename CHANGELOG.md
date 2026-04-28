@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-27
+
+### Added
+
+- `Atomic[float32]` and `Atomic[float64]` support in `debra/atomics`.
+  - `load`, `store`, `exchange`, and `compareExchangeStrong`/`compareExchangeWeak` accept floats through the existing generic path: the `nonAtomicType(T)` indirection routes float operations through the same-width integer atomic builtins via a bitcast, so `-0.0`, denormals, and NaN payloads round-trip bit-exactly. CAS uses bit-equality, matching `std::atomic<float>` semantics in C++ and the `AtomicU32::as_float`-style pattern in other languages: `+0.0` does NOT match `-0.0`, and two NaN values with distinct bit patterns do NOT compare equal.
+  - `fetchAdd[T: SomeFloat]` implemented via a `compareExchangeWeak` CAS-loop because GCC's `__atomic_fetch_add_n` builtin family is integer-only on float operands.
+  - The bitwise fetch ops (`fetchAnd`/`fetchOr`/`fetchXor`) and `fetchSub` are deliberately not provided for floats: bitwise ops have no meaningful float semantics, and `fetchSub` is expressible as `fetchAdd(-x)`.
+
 ## [0.3.0] - 2026-04-27
 
 ### Added
@@ -210,7 +219,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/elijahr/nim-debra/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/elijahr/nim-debra/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0
