@@ -45,7 +45,6 @@ proc initialize*[MaxThreads: static int](
     mgr.threads[i].neutralized.store(false, moRelaxed)
     mgr.threads[i].threadId.store(InvalidThreadId, moRelaxed)
     mgr.threads[i].currentBag = nil
-    mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil
   ManagerReady[MaxThreads](ManagerContext[MaxThreads](manager: mgr))
 
@@ -66,7 +65,6 @@ proc shutdown*[MaxThreads: static int](
         discard # Ignore destructor exceptions during shutdown
       bag = next
     mgr.threads[i].currentBag = nil
-    mgr.threads[i].limboBagHead = nil
     mgr.threads[i].limboBagTail = nil
   ManagerShutdown[MaxThreads](ManagerContext[MaxThreads](manager: mgr))
 

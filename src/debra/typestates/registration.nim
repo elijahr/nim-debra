@@ -62,6 +62,7 @@ proc register*[MaxThreads: static int](
         # threadvars default to zero.
         threadLocalIdx = i
         threadLocalRegistered = true
+        threadLocalManager = cast[pointer](mgr)
         return
           RegisterResult[MaxThreads] ->
           Registered[MaxThreads](RegistrationContext[MaxThreads](manager: mgr, idx: i))

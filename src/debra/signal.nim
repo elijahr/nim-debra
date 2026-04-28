@@ -23,6 +23,13 @@ var
 # `threadLocalRegistered = true` after assigning a slot.
 var threadLocalIdx* {.threadvar.}: int
 var threadLocalRegistered* {.threadvar.}: bool
+var threadLocalManager* {.threadvar.}: pointer
+  ## Manager pointer the calling thread is registered with. Stored as raw
+  ## `pointer` because the threadvar cannot carry the `MaxThreads` static
+  ## parameter. Compared by identity in `reclaimStart(addr manager)` to
+  ## reject the multi-manager hazard where a thread registered with manager
+  ## A would otherwise have its `threadLocalIdx` interpreted against
+  ## manager B's slot array.
 
 proc neutralizationHandler(sig: cint) {.noconv.} =
   ## SIGUSR1 handler - force unpin if pinned, mark neutralized.

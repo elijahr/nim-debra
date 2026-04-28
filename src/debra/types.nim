@@ -19,11 +19,20 @@ type
     threadId* {.align: 8.}: Atomic[ThreadId] ## Thread identifier for sending signals.
     # Limbo bag fields
     currentBag*: ptr LimboBag ## Currently filling limbo bag.
-    limboBagHead*: ptr LimboBag ## Head of limbo bag list (newest).
     limboBagTail*: ptr LimboBag ## Tail of limbo bag list (oldest).
     # Cadence counter for `advanceEvery` (owned by the registered thread, no
     # cross-thread access; non-atomic).
     advanceCounter*: uint64
+    # Pad to a full cache line so adjacent slots in `DebraManager.threads`
+    # do not share a cache line. The `{.align: CacheLineBytes.}` on the
+    # `threads` array only aligns the first element; without per-slot
+    # padding, every slot after the first floats to its natural alignment
+    # and adjacent slots would false-share on every atomic write. After
+    # the `limboBagHead` removal the live fields total 56 bytes (4 atomics
+    # at 8 bytes, 2 pointers at 8 bytes, `advanceCounter` at 8 bytes); pad
+    # the remaining 8 to keep the slot at `CacheLineBytes`. The static
+    # assert below catches any layout drift.
+    cacheLinePad: array[8, byte]
 
   DebraManager*[MaxThreads: static int] = object
     ## Coordinates epoch-based reclamation across threads.
@@ -68,7 +77,6 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
     result.threads[i].neutralized.store(false, moRelaxed)
     result.threads[i].threadId.store(InvalidThreadId, moRelaxed)
     result.threads[i].currentBag = nil
-    result.threads[i].limboBagHead = nil
     result.threads[i].limboBagTail = nil
     result.threads[i].advanceCounter = 0'u64
 
@@ -90,5 +98,4 @@ proc `=destroy`*[MaxThreads: static int](manager: var DebraManager[MaxThreads]) 
       reclaimBag(bag)
       bag = nextBag
     manager.threads[i].currentBag = nil
-    manager.threads[i].limboBagHead = nil
     manager.threads[i].limboBagTail = nil

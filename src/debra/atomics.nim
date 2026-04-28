@@ -126,6 +126,22 @@ template assertLockFree(T: typedesc) =
             "-d:debraAllowNonLockFreeAtomics to override\");",
         ]
       .}
+  else:
+    # Fallback path: caller opted in to libatomic spinlock when the type is
+    # not always-lock-free at the requested width. The design doc
+    # (`docs/design/2026-04-25-custom-atomics.md` section 3.1) mandates a
+    # compile-time warning at the call site so the relaxation is visible
+    # in build output. The warning fires once per `T` instantiation since
+    # `assertLockFree` is invoked from `enforceAtomicConstraints`'s `static`
+    # block, which is itself per-`T`.
+    {.
+      warning:
+        "Atomic[" & astToStr(T) &
+        "] is not guaranteed lock-free on this target; if the C compiler " &
+        "selects the libatomic spinlock fallback the lock-free guarantee " &
+        "is lost. Compiled with -d:debraAllowNonLockFreeAtomics; verify " &
+        "the target supports the fallback at acceptable cost."
+    .}
 
 # ---------------------------------------------------------------------------
 # Atomic[T]

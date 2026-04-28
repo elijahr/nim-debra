@@ -30,5 +30,4 @@ suite "ThreadState limbo bags":
   test "ThreadState has limbo bag fields":
     var state: ThreadState[64]
     check state.currentBag == nil
-    check state.limboBagHead == nil
     check state.limboBagTail == nil

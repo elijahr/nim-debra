@@ -164,9 +164,6 @@ proc retire*[MaxThreads: static int](
     state.currentBag = newBag
     if state.limboBagTail == nil:
       state.limboBagTail = newBag
-    # `limboBagHead` is no longer used; reclaim walks from tail. Retained on
-    # the type for now to keep the struct layout stable; do not read it.
-    state.limboBagHead = newBag
 
   # Add object to bag with provided destructor.
   #

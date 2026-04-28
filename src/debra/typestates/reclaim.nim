@@ -33,12 +33,14 @@
 ##   state of the `ReclaimContext` typestate and the count return value is
 ##   what the caller cares about.
 ## * `reclaimStart(addr manager)` infers the slot from the thread-local
-##   `threadLocalRegistered` / `threadLocalIdx` pair. If the calling thread
-##   has not been registered with any manager, the returned context carries
-##   `idx = -1` and `tryReclaim` short-circuits to 0 reclaimed (rather than
-##   silently walking slot 0's bag list and racing with its owner). Prefer
-##   the handle form `reclaimStart(handle)` regardless: it is explicit and
-##   needs no thread-local lookup.
+##   `threadLocalRegistered` / `threadLocalIdx` pair, additionally guarded
+##   by `threadLocalManager` so a thread registered with manager A cannot
+##   accidentally walk manager B's slot list. If the calling thread has
+##   not been registered with `manager`, the returned context carries
+##   `idx = -1` and `tryReclaim` short-circuits to 0 reclaimed (rather
+##   than silently walking slot 0's bag list and racing with its owner).
+##   Prefer the handle form `reclaimStart(handle)` regardless: it is
+##   explicit and needs no thread-local lookup.
 ##
 ## ## See also
 ##
@@ -101,11 +103,24 @@ proc reclaimStart*[MaxThreads: static int](
   ## the returned context carries `idx = -1`, so `tryReclaim` short-circuits to
   ## 0 reclaimed instead of mutating slot 0's bag list (which would race with
   ## that slot's owner). `threadLocalIdx` defaults to 0 and cannot by itself
-  ## distinguish "registered at slot 0" from "never registered" — the
+  ## distinguish "registered at slot 0" from "never registered"; the
   ## companion `threadLocalRegistered` flag is the explicit registered-bit.
   ##
+  ## In multi-manager scenarios `threadLocalIdx` and `threadLocalRegistered`
+  ## describe the slot the calling thread holds with whichever manager it
+  ## last registered with. Calling `reclaimStart(addr managerB)` from a
+  ## thread registered with `managerA` would otherwise reuse A's slot index
+  ## against B's bag list, racing with B's actual slot owner. The companion
+  ## `threadLocalManager` pointer is therefore compared by identity here:
+  ## on mismatch the context is returned with `idx = -1` and `tryReclaim`
+  ## short-circuits to 0.
+  ##
   ## See also: `debra/convenience.reclaimNow`_ for the one-shot wrapper.
-  let idx = if threadLocalRegistered: threadLocalIdx else: -1
+  let idx =
+    if threadLocalRegistered and threadLocalManager == cast[pointer](mgr):
+      threadLocalIdx
+    else:
+      -1
   ReclaimStart[MaxThreads](
     ReclaimContext[MaxThreads](manager: mgr, idx: idx, globalEpoch: 0, safeEpoch: 0)
   )
@@ -212,8 +227,8 @@ proc tryReclaim*[MaxThreads: static int](
   ## Other threads' bags are untouched: they reclaim their own.
   ##
   ## Cross-thread reclamation would race with the owner thread's `retire`
-  ## mutations on `currentBag`, `limboBagHead`, and `limboBagTail`; those
-  ## fields have no synchronization and are owned by the registered thread.
+  ## mutations on `currentBag` and `limboBagTail`; those fields have no
+  ## synchronization and are owned by the registered thread.
   runnableExamples:
     import debra
     var manager = initDebraManager[4]()
@@ -261,8 +276,6 @@ proc tryReclaim*[MaxThreads: static int](
     state.limboBagTail = nextBag
     if state.currentBag == bag:
       state.currentBag = nextBag
-    if state.limboBagHead == bag:
-      state.limboBagHead = nextBag
 
     freeLimboBag(bag)
     bag = nextBag
