@@ -6,9 +6,10 @@
 ## ## Pitfalls
 ##
 ## * `withPin` does not allow re-pinning the same handle inside its body.
-##   A debug `assert` catches direct nesting; under `-d:release` the assert
-##   is a no-op and the second `pin` will corrupt the pinned-flag on the
-##   thread's slot. Different handles (multi-manager) are independent.
+##   A `doAssert` catches direct nesting and fires in release builds too,
+##   because a second `pin` would silently corrupt the pinned-flag on the
+##   thread's slot — this is a safety guard, not just a debug aid.
+##   Different handles (multi-manager) are independent.
 ## * Do not invoke explicit typestate transitions
 ##   (`unpinned`/`pin`/`unpin`/`acknowledge`) inside a `withPin` body. The
 ##   `try`/`finally` already manages the lifecycle; manual transitions on the
@@ -111,8 +112,10 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
   ## or more times. Using `it` avoids collisions with the exported `pin`
   ## proc from `debra/typestates/guard`.
   ##
-  ## Under debug builds, asserts the thread is not already pinned on the
-  ## given handle. Under `-d:release`/`-d:danger` the assertion is a no-op.
+  ## Asserts the thread is not already pinned on the given handle. The check
+  ## uses `doAssert` and fires in release builds too — nested pins on the
+  ## same handle silently corrupt the EBR slot's `pinned` flag bookkeeping,
+  ## so this is a safety guard, not just a debug aid.
   ## Different-handle nesting (multi-manager) is independent and legal.
   ##
   ## ## Pitfall — neutralization
@@ -204,7 +207,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
         discard res.neutralized.acknowledge()
 
 proc advanceEvery*[MT: static int](
-    handle: ThreadHandle[MT], n: int
+    handle: ThreadHandle[MT], n: static int
 ): bool {.discardable.} =
   ## Increment a per-handle counter; advance the global epoch once every
   ## `n` calls. Returns `true` on the calls that actually advanced.
@@ -245,7 +248,8 @@ proc advanceEvery*[MT: static int](
         it.retire(alloc0(8), dtor)
       handle.advanceEvery(32)
     discard reclaimNow(manager)
-  doAssert n >= 1, "advanceEvery: n must be >= 1"
+  static:
+    assert n >= 1, "advanceEvery: n must be >= 1"
   let state = addr handle.manager.threads[handle.idx]
   state.advanceCounter += 1'u64
   if state.advanceCounter mod uint64(n) == 0'u64:

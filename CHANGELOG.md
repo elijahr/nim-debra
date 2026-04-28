@@ -63,6 +63,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `compareExchangeStrong` and `compareExchangeWeak` gained single-order overloads that derive the failure order from the success order (drops the Release component per C11). Callers no longer have to spell out `failure=moAcquire` when passing `success=moAcquire`.
 - `reclaimStart(addr manager)` now compares the calling thread's registered manager against `manager` via a new `threadLocalManager` threadvar (set by `register`) and returns `idx = -1` on mismatch. Without this guard, a thread registered with manager A that called `reclaimStart(addr managerB)` would reuse A's slot index against B's bag list and race with B's actual slot owner. The handle form `reclaimStart(handle)` is unaffected and still preferred.
 - `Atomic[T]` instantiations compiled with `-d:debraAllowNonLockFreeAtomics` now emit a compile-time `{.warning.}` per the design doc's call-site visibility requirement (`docs/design/2026-04-25-custom-atomics.md` section 3.1). The previous behavior accepted the flag silently, hiding the relaxation from build output.
+- `withPin` docstrings updated to reflect that the nested-pin check uses `doAssert` and fires in release builds (was incorrectly described as debug-only after the round-7 switch).
+- `Atomic[T]` docstring documents the `sizeof(T) in {1, 2, 4, 8}` size limit explicitly. 16-byte atomics (`__int128`, double-quadword) are not currently provided; instantiation fails with a compile-time error from `nonAtomicType`.
+- `advanceEvery`'s `n` parameter is now `static int` with a `static: assert n >= 1` compile-time check (was `int` with `doAssert`). Catches misconfiguration at compile time. All known call sites pass compile-time constants.
 
 ## [0.2.1] - 2025-12-18
 

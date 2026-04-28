@@ -151,6 +151,12 @@ type Atomic*[T] = object
   ## Atomic wrapper for `T`. Lock-free on this target; rejects
   ## `ref T`.
   ##
+  ## Supports 1-, 2-, 4-, and 8-byte types only. 16-byte types
+  ## (`__int128`, double-quadword pointers) require a different code
+  ## path (`cmpxchg16b` on x86_64, `casp` on aarch64) and are not
+  ## currently provided. Such instantiations fail with a compile-time
+  ## `{.error.}` from the underlying `nonAtomicType` template.
+  ##
   ## Note on alignment: Nim's field-level `{.align: ...}` pragma
   ## cannot reference `sizeof(T)` from a generic context (as of
   ## Nim 2.2.6 it triggers `sizeof requires .importc types to be
