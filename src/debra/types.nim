@@ -27,12 +27,13 @@ type
     # do not share a cache line. The `{.align: CacheLineBytes.}` on the
     # `threads` array only aligns the first element; without per-slot
     # padding, every slot after the first floats to its natural alignment
-    # and adjacent slots would false-share on every atomic write. After
-    # the `limboBagHead` removal the live fields total 56 bytes (4 atomics
-    # at 8 bytes, 2 pointers at 8 bytes, `advanceCounter` at 8 bytes); pad
-    # the remaining 8 to keep the slot at `CacheLineBytes`. The static
-    # assert below catches any layout drift.
-    cacheLinePad: array[8, byte]
+    # and adjacent slots would false-share on every atomic write. The live
+    # fields above total 56 bytes today (4 atomics at 8 bytes, 2 pointers
+    # at 8 bytes, `advanceCounter` at 8 bytes); pad to `CacheLineBytes` so
+    # 64-byte (x86_64, AArch64) and 128-byte (Apple Silicon, PowerPC, or
+    # `-d:CacheLineBytes=128`) targets both work without manual edits.
+    # The static assert below catches any layout drift.
+    cacheLinePad: array[CacheLineBytes - 56, byte]
 
   DebraManager*[MaxThreads: static int] = object
     ## Coordinates epoch-based reclamation across threads.
