@@ -24,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for in-slot field access. A regression test in `tests/t_signal.nim`
   exercises the real signal-delivery path and asserts that thread 0's
   limbo-bag pointers stay intact when thread 1 receives the signal.
+- Hardened the signal handler's publish ordering: `globalManagerPtr`
+  is now an `Atomic[pointer]` with `moRelease` stores in
+  `setGlobalManager` (pointer published last, after stride/header)
+  and a `moAcquire` load in the handler (pointer loaded first), so a
+  reader that observes the new pointer is guaranteed to see the
+  matching stride/header. Tightened the static asserts in
+  `signal.nim` to pin the absolute byte offsets of `pinned` (8) and
+  `neutralized` (16), making the asserts a real tripwire for field
+  reorders rather than a tautology. Documented `setGlobalManager`'s
+  race constraint: it must not race with signal delivery; quiesce
+  all registered threads before replacing the manager.
 
 ## [0.7.0] - 2026-05-02
 
