@@ -24,6 +24,12 @@ task test, "Run tests with all memory managers":
       " --threads:on --path:src -d:testing tests/test.nim"
   echo "Testing C++ backend"
   exec "nim cpp -r --threads:on --path:src -d:testing tests/test.nim"
+  # Negative compile-time test: must run via `nim check` because it asserts
+  # (via `compiles`) that DSL symbols are NOT reachable from `debra/atomics`
+  # alone. Wiring it into `tests/test.nim` would force the DSL to be imported
+  # transitively and defeat the test.
+  echo "Checking tests/t_atomics_dsl_negative.nim (compile-time only)"
+  exec "nim check --threads:on --path:src tests/t_atomics_dsl_negative.nim"
   echo "All backends passed!"
 
 task testExamples, "Compile and run all example files":

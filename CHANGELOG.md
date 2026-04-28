@@ -7,11 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-04-27
-
 ### Fixed
 
-- Wired tests/t_atomics into the nimble test runner (was previously not exercised in CI).
+- Wired previously-orphaned test files into the nimble test runner: `tests/t_atomics`, `tests/t_atomics_dsl`, `tests/t_thread_id`, `tests/t_item_processing`, and `tests/t_lockfree_stack_typestates` were not imported by `tests/test.nim` and so were not exercised in CI. The compile-time-only negative test `tests/t_atomics_dsl_negative.nim` is now run via `nim check` from the `test` nimble task (it cannot be wired into `tests/test.nim` directly because doing so would import the DSL it asserts is not transitively reachable).
 
 ### Added
 
@@ -223,8 +221,7 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/elijahr/nim-debra/compare/v0.3.0...v0.4.0
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/elijahr/nim-debra/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0
