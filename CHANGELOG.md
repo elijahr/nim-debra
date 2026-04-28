@@ -36,6 +36,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   race constraint: it must not race with signal delivery; quiesce
   all registered threads before replacing the manager.
 
+### Changed
+
+- Strengthened the `tests/t_neutralize` "scanAndSignal signals real
+  thread beyond threshold" test to actually exercise cross-slot signal
+  delivery end-to-end (helper thread registered at slot 1 with its
+  pthread handle wired into `mgr.threads[1].threadId`, slot 0 sentinel
+  pointers asserted intact post-handler). The previous test stored
+  `currentThreadId()` into slot 0 so the scanner skipped it, asserting
+  only the threshold logic; that sidestep was structurally necessary
+  before the stride bug fix because actually signaling slot >= 1 would
+  have corrupted slot 0's pointer fields. Added
+  `forceReinstallSignalHandler` to `debra/signal` so
+  `tests/t_signal_handler` (which installs a placeholder no-op handler
+  via direct `sigaction`) can restore the real handler before sibling
+  tests run.
+
 ## [0.7.0] - 2026-05-02
 
 ### Changed

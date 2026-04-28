@@ -177,6 +177,23 @@ proc isSignalHandlerInstalled*(): bool =
   ## Check if signal handler has been installed.
   signalHandlerInstalled
 
+proc forceReinstallSignalHandler*() =
+  ## Re-install the SIGUSR1 handler unconditionally, bypassing the
+  ## `signalHandlerInstalled` idempotency flag. Intended for test
+  ## isolation: when a sibling test installs a different SIGUSR1
+  ## handler via direct `sigaction` (e.g. the placeholder in
+  ## `typestates/signal_handler`), the OS-level handler is overwritten
+  ## even though `signalHandlerInstalled` remains true. Calling this
+  ## restores the real `neutralizationHandler`. Not part of the
+  ## library's public surface for normal use; prefer
+  ## `installSignalHandler` in production code.
+  var sa: Sigaction
+  sa.sa_handler = neutralizationHandler
+  discard sigemptyset(sa.sa_mask)
+  sa.sa_flags = 0
+  if sigaction(QuiescentSignal, sa, nil) == 0:
+    signalHandlerInstalled = true
+
 proc setGlobalManager*[MaxThreads: static int](manager: ptr DebraManager[MaxThreads]) =
   ## Set the global manager pointer for the signal handler and capture
   ## the byte-stride information the handler needs to find each
