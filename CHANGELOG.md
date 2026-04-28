@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Hardened `ThreadState.cacheLinePad` size derivation against future field additions. Padding length is now derived from `sizeof(ThreadStateLive[MaxThreads])` (a sibling type that mirrors `ThreadState`'s live fields) instead of a hand-summed `56` constant, so adding or removing fields automatically resizes the pad. A drift-detection `static: assert` fails fast at compile time if the two types fall out of sync.
+
 ### Fixed
 
 - Wired previously-orphaned test files into the nimble test runner: `tests/t_atomics`, `tests/t_atomics_dsl`, `tests/t_thread_id`, `tests/t_item_processing`, and `tests/t_lockfree_stack_typestates` were not imported by `tests/test.nim` and so were not exercised in CI. The compile-time-only negative test `tests/t_atomics_dsl_negative.nim` is now run via `nim check` from the `test` nimble task (it cannot be wired into `tests/test.nim` directly because doing so would import the DSL it asserts is not transitively reachable).
