@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] - 2026-04-27
 
+### Fixed
+
+- Wired tests/t_atomics into the nimble test runner (was previously not exercised in CI).
+
 ### Added
 
 - `Atomic[float32]` and `Atomic[float64]` support in `debra/atomics`.

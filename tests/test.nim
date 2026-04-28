@@ -15,3 +15,4 @@ import ./t_slot
 import ./t_convenience
 import ./t_refptr
 import ./t_integration
+import ./t_atomics
