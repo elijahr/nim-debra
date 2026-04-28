@@ -28,32 +28,29 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
   test:
-    runs-on: ubuntu-latest
+    name: test (${{ matrix.nim-version }} / ${{ matrix.runs-on }})
+    runs-on: ${{ matrix.runs-on }}
     strategy:
+      fail-fast: false
       matrix:
-        nim-version: ['latest:2']
+        runs-on: [ubuntu-latest, ubuntu-24.04-arm]
+        nim-version: ['stable']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install asdf
-        uses: asdf-vm/actions/setup@v3
-
-      - name: Install asdf-nim plugin
-        run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
-
-      - name: Install Nim ${{ matrix.nim-version }}
-        run: |
-          asdf install nim ${{ matrix.nim-version }}
-          asdf global nim ${{ matrix.nim-version }}
+      - name: Setup Nim ${{ matrix.nim-version }}
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: ${{ matrix.nim-version }}
 
       - name: Cache Nimble packages
         uses: actions/cache@v4
         with:
           path: ~/.nimble
-          key: ${{ runner.os }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
+          key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
           restore-keys: |
-            ${{ runner.os }}-nimble-${{ matrix.nim-version }}-
+            ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-
 
       - name: Install dependencies
         run: nimble install -y
@@ -62,7 +59,43 @@ jobs:
         run: rm -rf ~/.cache/nim
 
       - name: Run tests
-        run: nimble test
+        shell: bash
+        run: |
+          set -o pipefail
+          # Workaround for nimble v0.20.x: `nimble <task>` exits 0 even when
+          # an inner `exec` aborts the script (it logs `Error:` but does not
+          # propagate the failure). Tee output and grep for nimble's error
+          # markers to force a non-zero exit.
+          nimble_run() {
+            local logfile
+            logfile="$(mktemp)"
+            "$@" 2>&1 | tee "$logfile"
+            local rc=${PIPESTATUS[0]}
+            if [[ $rc -ne 0 ]]; then
+              return $rc
+            fi
+            if grep -Eq '^[[:space:]]*Error:' "$logfile"; then
+              echo "::error::nimble reported an error but exited 0; failing the step."
+              return 1
+            fi
+          }
+          nimble_run nimble test
 
       - name: Test examples
-        run: nimble testExamples
+        shell: bash
+        run: |
+          set -o pipefail
+          nimble_run() {
+            local logfile
+            logfile="$(mktemp)"
+            "$@" 2>&1 | tee "$logfile"
+            local rc=${PIPESTATUS[0]}
+            if [[ $rc -ne 0 ]]; then
+              return $rc
+            fi
+            if grep -Eq '^[[:space:]]*Error:' "$logfile"; then
+              echo "::error::nimble reported an error but exited 0; failing the step."
+              return 1
+            fi
+          }
+          nimble_run nimble testExamples

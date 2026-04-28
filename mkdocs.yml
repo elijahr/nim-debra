@@ -86,6 +86,7 @@ nav:
     - Pin/Unpin: guide/pin-unpin.md
     - Retiring Objects: guide/retiring-objects.md
     - Reclamation: guide/reclamation.md
+    - Epoch Advancement: guide/epoch-advancement.md
     - Neutralization: guide/neutralization.md
     - Integration: guide/integration.md
   - API Reference: api.md

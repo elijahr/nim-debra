@@ -14,8 +14,11 @@ type ThreadId* = object
   ## Platform-abstracted thread identifier for use with pthread_kill.
   handle: Pthread
 
-const InvalidThreadId* = ThreadId(handle: Pthread(0))
+let InvalidThreadId* = ThreadId(handle: cast[Pthread](0))
   ## Sentinel value representing no thread.
+  ## `cast` (rather than `Pthread(0)`) is required because on some POSIX
+  ## platforms (e.g. macOS) `Pthread` is an opaque struct pointer, and the
+  ## C++ backend rejects integer-to-pointer conversions outside of a cast.
 
 proc currentThreadId*(): ThreadId =
   ## Get the ThreadId of the current thread.
@@ -27,7 +30,7 @@ proc `==`*(a, b: ThreadId): bool =
 
 proc isValid*(tid: ThreadId): bool =
   ## Check if this ThreadId represents a valid thread.
-  tid.handle != Pthread(0)
+  tid.handle != cast[Pthread](0)
 
 proc sendSignal*(tid: ThreadId, sig: cint): cint =
   ## Send a signal to the thread identified by tid.

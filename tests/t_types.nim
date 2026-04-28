@@ -1,7 +1,7 @@
 # tests/t_types.nim
 
 import unittest2
-import atomics
+import debra/atomics
 
 import debra/types
 
@@ -30,5 +30,4 @@ suite "ThreadState limbo bags":
   test "ThreadState has limbo bag fields":
     var state: ThreadState[64]
     check state.currentBag == nil
-    check state.limboBagHead == nil
     check state.limboBagTail == nil

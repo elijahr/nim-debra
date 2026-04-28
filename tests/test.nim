@@ -12,4 +12,6 @@ import ./t_reclaim
 import ./t_neutralize
 import ./t_advance
 import ./t_slot
+import ./t_convenience
+import ./t_refptr
 import ./t_integration

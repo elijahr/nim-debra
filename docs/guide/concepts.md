@@ -55,9 +55,9 @@ Pinning tells the reclamation system: "I might be accessing objects from this ep
 
 Retired objects are stored in thread-local limbo bags:
 
-- Each bag holds up to 64 objects
+- Each bag holds up to 64 entries (a retired pointer plus its destructor)
 - Bags are linked together forming a retire queue
-- Managed objects use `GC_unref` for cleanup when reclaimed
+- Reclamation invokes each destructor (e.g. `releaseDestructor[T]()` calls `GC_unref`)
 - Organized by retirement epoch
 
 ### Limbo Bag Structure

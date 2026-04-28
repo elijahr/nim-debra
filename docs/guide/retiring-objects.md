@@ -8,49 +8,77 @@ Understanding how to retire objects for safe reclamation.
 
 ## Overview
 
-When you remove an object from a lock-free data structure, you cannot immediately free it - other threads might still be accessing it. Instead, you **retire** the object, marking it for later reclamation when safe.
+When you remove an object from a lock-free data structure, you cannot
+immediately free it: other threads might still be accessing it. Instead,
+you **retire** it, handing DEBRA a raw pointer plus a destructor closure.
+The destructor runs once all threads have advanced past the retiring epoch.
 
-## The Managed Type
+## The `retire` API
 
-DEBRA uses the `Managed[T]` wrapper type to track objects that need epoch-based reclamation:
+`retire` takes a type-erased pointer and a `Destructor`:
 
 ```nim
+proc retire(ready: RetireReady[N], p: pointer, dtor: Destructor): Retired[N]
+```
+
+The destructor is a `proc(p: pointer) {.nimcall.}`. DEBRA does not interpret
+the pointer; the destructor is responsible for any cleanup (calling
+`dealloc`, `GC_unref`, custom finalizers, etc.).
+
+## Bridging `ref T` with `retain` and `releaseDestructor`
+
+Lock-free data structures usually want to store `Atomic[ptr T]` field slots
+because `Atomic[ref T]` falls back to a spinlock under arc/orc, silently
+breaking lock-freedom. The `debra/refptr` module bridges Nim's GC-managed
+`ref` types into raw pointers with explicit refcount tracking:
+
+- `retain(obj: ref T) -> ptr T` GC-refs the object and returns a raw
+  pointer suitable for `Atomic[ptr T]` storage.
+- `releaseDestructor[T]() -> Destructor` returns a closure that
+  `GC_unref`s a `ptr T` once the epoch is safe.
+
+Pair every `retain` with exactly one `release` (typically by handing
+`releaseDestructor[T]()` to `retire`).
+
+```nim
+import debra
+import debra/atomics
+
 type
   NodeObj = object
     value: int
-    next: Atomic[Managed[ref NodeObj]]
+    next: Atomic[ptr NodeObj]
   Node = ref NodeObj
 
-# Create a managed node - GC won't collect until retired
-let node = managed Node(value: 42)
+# Allocate and GC-pin a node; `node` is a raw `ptr NodeObj`.
+let node = retain Node(value: 42)
+
+# Later, after unlinking it from shared state:
+let ready = retireReady(pinned)
+discard ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 ```
 
-The `managed()` proc calls `GC_ref` internally, preventing Nim's garbage collector from freeing the object. Only DEBRA's reclamation process (via `GC_unref`) can free it.
+`releaseDestructor[T]()` allocates a fresh closure on each call. Cache the
+result per type if you retire many objects in a hot loop.
 
 ## Self-Referential Types
 
-When a type references itself (like linked list nodes), use the `ref Obj` pattern:
+For linked structures, use the `ref Obj` pattern with `Atomic[ptr NodeObj]`:
 
 ```nim
-# CORRECT - use ref Obj pattern for self-reference
 type
   NodeObj = object
     value: int
-    next: Atomic[Managed[ref NodeObj]]  # Self-reference works
+    next: Atomic[ptr NodeObj]
   Node = ref NodeObj
-
-# INCORRECT - ref object inline won't work
-type
-  Node = ref object
-    value: int
-    next: Atomic[Managed[Node]]  # Won't compile
 ```
 
-This is a Nim limitation with generic distinct types and forward references.
+`ptr` is opaque to Nim's type checker, so the recursive shape resolves
+naturally. There is no forward-declaration dance.
 
 ## Basic Retirement
 
-You must be pinned to retire objects:
+You must be pinned to retire:
 
 ```nim
 {% include-markdown "../../examples/retire_single.nim" %}
@@ -60,7 +88,8 @@ You must be pinned to retire objects:
 
 ## Multiple Object Retirement
 
-When retiring multiple objects in a single critical section, use `retireReadyFromRetired()` to chain retirements:
+When retiring multiple objects in a single critical section, use
+`retireReadyFromRetired()` to chain retirements:
 
 ```nim
 {% include-markdown "../../examples/retire_multiple.nim" %}
@@ -68,28 +97,13 @@ When retiring multiple objects in a single critical section, use `retireReadyFro
 
 [:material-file-code: View full source](https://github.com/elijahr/nim-debra/blob/main/examples/retire_multiple.nim)
 
-## Accessing Managed Fields
-
-The `Managed[T]` type provides transparent field access:
-
-```nim
-let node = managed Node(value: 42, name: "test")
-
-# Direct field access via dot template
-echo node.value  # 42
-echo node.name   # "test"
-
-# When you need the actual ref
-doSomething(node.inner)
-```
-
 ## Limbo Bags
 
-Retired objects are stored in thread-local limbo bags:
+Retired pointers (and their destructors) are stored in thread-local limbo bags:
 
-- Each bag holds up to 64 objects
+- Each bag holds up to 64 entries
 - Bags are chained together by epoch
-- Reclamation walks bags from oldest to newest
+- Reclamation walks bags from oldest to newest, invoking each destructor
 
 ## Retirement Timing
 
@@ -97,13 +111,13 @@ Always unlink first, then retire:
 
 ```nim
 # RIGHT - retire after unlinking
-if head.compareExchange(oldHead, next, moRelease, moRelaxed):
+if head.compareExchangeStrong(oldHead, next, moRelease, moRelaxed):
   let ready = retireReady(pinned)
-  discard ready.retire(oldHead)
+  discard ready.retire(cast[pointer](oldHead), releaseDestructor[NodeObj]())
 
 # WRONG - retire before unlinking (unsafe!)
 let ready = retireReady(pinned)
-discard ready.retire(oldHead)
+discard ready.retire(cast[pointer](oldHead), releaseDestructor[NodeObj]())
 head.store(next, moRelease)
 ```
 

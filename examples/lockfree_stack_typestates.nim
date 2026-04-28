@@ -7,28 +7,34 @@
 ## 3. Manual bridge from stack to item processing typestate
 ##
 ## This is a "correct by design" lock-free data structure.
+##
+## Atomic node slots use `ptr NodeObj[T]`, not `ref NodeObj[T]`:
+## `Atomic[ref T]` falls back to spinlock-based atomics on arc/orc, which
+## silently defeats lock-free guarantees. `retain` / `releaseDestructor`
+## from `debra/refptr` bridge a Nim `ref` into a raw pointer with explicit
+## GC tracking.
 
 import typestates
 import debra
+import debra/atomics
 import ./item_processing
-import std/[atomics, options]
+import std/options
 
 type
   NodeObj[T] = object
     value: T
-    next: Atomic[Managed[ref NodeObj[T]]]
+    next: Atomic[ptr NodeObj[T]]
+
   Node[T] = ref NodeObj[T]
 
   StackBase[T] = object
-    top: Atomic[Managed[ref NodeObj[T]]]
+    top: Atomic[ptr NodeObj[T]]
     manager: ptr DebraManager[64]
     handle: ThreadHandle[64]
 
-  Empty*[T] = distinct StackBase[T]
-    ## Stack with no elements.
+  Empty*[T] = distinct StackBase[T] ## Stack with no elements.
 
-  NonEmpty*[T] = distinct StackBase[T]
-    ## Stack with at least one element.
+  NonEmpty*[T] = distinct StackBase[T] ## Stack with at least one element.
 
 typestate StackBase[T]:
   consumeOnTransition = false
@@ -50,13 +56,15 @@ proc push*[T](stack: Empty[T], value: T): NonEmpty[T] {.transition.} =
 
   let pinned = unpinned(base.handle).pin()
 
-  let newNode = managed Node[T](value: value)
+  let newNode = retain Node[T](value: value)
   base.top.store(newNode, moRelease)
 
   let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  case unpinResult.kind
+  of uUnpinned:
+    discard
+  of uNeutralized:
+    discard unpinResult.neutralized.acknowledge()
 
   NonEmpty[T](base)
 
@@ -66,18 +74,21 @@ proc push*[T](stack: NonEmpty[T], value: T): NonEmpty[T] {.transition.} =
 
   let pinned = unpinned(base.handle).pin()
 
-  let newNode = managed Node[T](value: value)
+  let newNode = retain Node[T](value: value)
 
   while true:
-    var oldTop = base.top.load(moAcquire)
-    newNode.inner.next.store(oldTop, moRelaxed)
-    if base.top.compareExchange(oldTop, newNode, moRelease, moRelaxed):
+    let oldTop = base.top.load(moAcquire)
+    newNode.next.store(oldTop, moRelaxed)
+    var observed = oldTop
+    if base.top.compareExchangeStrong(observed, newNode, moRelease, moRelaxed):
       break
 
   let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  case unpinResult.kind
+  of uUnpinned:
+    discard
+  of uNeutralized:
+    discard unpinResult.neutralized.acknowledge()
 
   NonEmpty[T](base)
 
@@ -93,32 +104,36 @@ proc pop*[T](stack: NonEmpty[T]): (PopResult[T], Option[Unprocessed[T]]) =
 
   block popLoop:
     while true:
-      var oldTop = base.top.load(moAcquire)
+      let oldTop = base.top.load(moAcquire)
 
-      if oldTop.isNil:
+      if oldTop == nil:
         resultStack = PopResult[T](kind: pEmpty, empty: Empty[T](base))
         item = none(Unprocessed[T])
         break popLoop
 
-      let next = oldTop.inner.next.load(moRelaxed)
+      let next = oldTop.next.load(moRelaxed)
 
-      if base.top.compareExchange(oldTop, next, moRelease, moRelaxed):
+      var observed = oldTop
+      if base.top.compareExchangeStrong(observed, next, moRelease, moRelaxed):
         item = some(Unprocessed[T](Item[T](value: oldTop.value)))
 
-        # Retire the node
+        # Retire the node. The destructor balances the `retain` from
+        # `push` once the epoch is safe.
         let ready = retireReady(pinned)
-        discard ready.retire(oldTop)
+        discard ready.retire(cast[pointer](oldTop), releaseDestructor[NodeObj[T]]())
 
-        if next.isNil:
+        if next == nil:
           resultStack = PopResult[T](kind: pEmpty, empty: Empty[T](base))
         else:
           resultStack = PopResult[T](kind: pNonempty, nonempty: NonEmpty[T](base))
         break popLoop
 
   let unpinResult = pinned.unpin()
-  case unpinResult.kind:
-  of uUnpinned: discard
-  of uNeutralized: discard unpinResult.neutralized.acknowledge()
+  case unpinResult.kind
+  of uUnpinned:
+    discard
+  of uNeutralized:
+    discard unpinResult.neutralized.acknowledge()
 
   (resultStack, item)
 
@@ -152,7 +167,7 @@ when isMainModule:
       let processing = item.startProcessing()
       let processResult = processing.finish(success = true)
 
-      case processResult.kind:
+      case processResult.kind
       of pCompleted:
         echo "  Popped and completed: ", Item[int](processResult.completed).value
       of pFailed:
@@ -160,7 +175,7 @@ when isMainModule:
     else:
       echo "  Race condition: another thread popped the item first"
 
-    case popResult.kind:
+    case popResult.kind
     of pEmpty:
       echo "  Stack is now empty"
       break
@@ -169,12 +184,12 @@ when isMainModule:
 
   echo ""
 
-  for _ in 0..3:
+  for _ in 0 .. 3:
     manager.advance()
 
   let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
 
-  case reclaimResult.kind:
+  case reclaimResult.kind
   of rReclaimReady:
     let count = reclaimResult.reclaimready.tryReclaim()
     echo "Reclaimed ", count, " nodes"

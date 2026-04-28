@@ -1,34 +1,33 @@
 # examples/basic_usage.nim
-## Basic DEBRA+ usage: initialize manager, register thread, pin/unpin, retire, reclaim.
+## Basic DEBRA+ usage: initialize manager, register thread, pin/retire/unpin,
+## reclaim. Single-threaded, no atomic field — just the lifecycle.
 
 import debra
-import std/atomics
 
-# Node type using ref object pattern for self-reference
 type
   NodeObj = object
     value: int
-    next: Atomic[Managed[ref NodeObj]]
+
   Node = ref NodeObj
 
-# Helper to perform one pin/unpin cycle with retirement
-proc doCycle(handle: ThreadHandle[4], manager: var DebraManager[4], value: int) =
-  # Enter critical section
+# One pin/retire/unpin cycle.
+proc doCycle(handle: ThreadHandle[4], value: int) =
   let u = unpinned(handle)
   let pinned = u.pin()
 
-  # Create a managed node (GC won't collect until retired)
-  let node = managed Node(value: value)
+  # Retain the ref so it survives until DEBRA reclaims it. `retain` returns
+  # a raw `ptr NodeObj`; the matching `releaseDestructor[NodeObj]()` runs
+  # GC_unref at reclamation time.
+  let node = retain Node(value: value)
 
-  # Retire the node for later reclamation
+  # Retire the node for later reclamation.
   let ready = retireReady(pinned)
-  discard ready.retire(node)
+  discard ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 
-  # Exit critical section
+  # Exit critical section. The unpin path may report a neutralization
+  # (a stalled-thread escalation); acknowledge if so.
   let unpinResult = pinned.unpin()
-
-  # Handle neutralization if it occurred
-  case unpinResult.kind:
+  case unpinResult.kind
   of uUnpinned:
     discard
   of uNeutralized:
@@ -43,19 +42,17 @@ proc main() =
   let handle = registerThread(manager)
 
   # 3. Simulate some operations
-  for i in 0..<10:
-    doCycle(handle, manager, i)
+  for i in 0 ..< 10:
+    doCycle(handle, i)
 
     # Advance epoch periodically
     if i mod 3 == 0:
       manager.advance()
 
   # 4. Attempt reclamation
-  let reclaimResult = reclaimStart(addr manager)
-    .loadEpochs()
-    .checkSafe()
+  let reclaimResult = reclaimStart(addr manager).loadEpochs().checkSafe()
 
-  case reclaimResult.kind:
+  case reclaimResult.kind
   of rReclaimReady:
     let count = reclaimResult.reclaimready.tryReclaim()
     echo "Reclaimed ", count, " objects"

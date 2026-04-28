@@ -6,7 +6,7 @@
 when not compileOption("threads"):
   {.error: "nim-debra requires --threads:on".}
 
-import atomics
+import ./debra/atomics
 import ./debra/types
 import ./debra/signal
 import ./debra/limbo
@@ -20,7 +20,7 @@ import ./debra/typestates/reclaim
 import ./debra/typestates/neutralize
 import ./debra/typestates/advance
 import ./debra/typestates/slot
-import ./debra/managed
+import ./debra/refptr
 import ./debra/convenience
 
 export types
@@ -36,7 +36,7 @@ export reclaim
 export neutralize
 export advance
 export slot
-export managed
+export refptr
 export convenience
 
 proc registerThread*[MaxThreads: static int](
@@ -49,10 +49,10 @@ proc registerThread*[MaxThreads: static int](
   installSignalHandler()
 
   let u = unregistered(addr manager)
-  let result = u.register()
-  case result.kind
+  let regResult = u.register()
+  case regResult.kind
   of rRegistered:
-    return result.registered.getHandle()
+    return regResult.registered.getHandle()
   of rRegistrationFull:
     raise newException(
       DebraRegistrationError, "Maximum threads (" & $MaxThreads & ") already registered"

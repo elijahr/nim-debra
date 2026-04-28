@@ -1,7 +1,7 @@
 # tests/t_neutralize.nim
 
 import unittest2
-import atomics
+import debra/atomics
 import std/os
 
 import debra/types

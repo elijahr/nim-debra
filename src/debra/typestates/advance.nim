@@ -2,7 +2,7 @@
 ##
 ## Ensures atomic increment of the global epoch counter.
 
-import atomics
+import ../atomics
 import typestates
 
 import ../types

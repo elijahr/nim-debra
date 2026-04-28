@@ -10,21 +10,16 @@
 import typestates
 
 type
-  Item*[T] = object
-    ## Base type for items in the processing pipeline.
+  Item*[T] = object ## Base type for items in the processing pipeline.
     value*: T
 
-  Unprocessed*[T] = distinct Item[T]
-    ## Item just received, not yet being processed.
+  Unprocessed*[T] = distinct Item[T] ## Item just received, not yet being processed.
 
-  Processing*[T] = distinct Item[T]
-    ## Item currently being worked on.
+  Processing*[T] = distinct Item[T] ## Item currently being worked on.
 
-  Completed*[T] = distinct Item[T]
-    ## Item successfully processed (terminal state).
+  Completed*[T] = distinct Item[T] ## Item successfully processed (terminal state).
 
-  Failed*[T] = distinct Item[T]
-    ## Item processing failed (terminal state).
+  Failed*[T] = distinct Item[T] ## Item processing failed (terminal state).
 
 typestate Item[T]:
   consumeOnTransition = false
@@ -41,7 +36,9 @@ proc startProcessing*[T](item: Unprocessed[T]): Processing[T] {.transition.} =
   Processing[T](Item[T](item))
 
 # Transition: finish processing with success or failure
-proc finish*[T](item: Processing[T], success: bool): ProcessingResult[T] {.transition.} =
+proc finish*[T](
+    item: Processing[T], success: bool
+): ProcessingResult[T] {.transition.} =
   ## Complete processing. Returns Completed on success, Failed otherwise.
   if success:
     ProcessingResult[T] -> Completed[T](Item[T](item))
@@ -74,7 +71,7 @@ when isMainModule:
   # Finish with success
   let successResult = inProgress.finish(success = true)
   echo "3. Finished processing with success"
-  case successResult.kind:
+  case successResult.kind
   of pCompleted:
     echo "   -> Result: Completed state"
   of pFailed:
@@ -87,7 +84,7 @@ when isMainModule:
   let inProgress2 = raw2.startProcessing()
   let failResult = inProgress2.finish(success = false)
   echo "4. Alternative path: finish with failure"
-  case failResult.kind:
+  case failResult.kind
   of pCompleted:
     echo "   -> Result: Completed state (unexpected)"
   of pFailed:

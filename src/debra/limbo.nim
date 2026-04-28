@@ -9,7 +9,12 @@ proc c_free(p: pointer) {.importc: "free", header: "<stdlib.h>".}
 const LimboBagSize* = 64
 
 type
-  Destructor* = proc(p: pointer) {.nimcall.}
+  Destructor* = proc(p: pointer) {.nimcall, raises: [].}
+    ## Destructor for retired objects. Marked `raises: []` so the cleanup
+    ## paths in `=destroy` (which itself cannot raise) can call them
+    ## without an `unlisted exception` effect warning. EBR destructors
+    ## are reclamation hooks and should not raise; if cleanup can fail,
+    ## handle it inside the destructor.
 
   RetiredObject* = object
     data*: pointer
@@ -36,11 +41,3 @@ proc reclaimBag*(bag: ptr LimboBag) =
     if obj.destructor != nil:
       obj.destructor(obj.data)
   freeLimboBag(bag)
-
-proc unreffer*[T: ref](): Destructor =
-  ## Generate a destructor that calls GC_unref for type T.
-  ##
-  ## Used internally by retire() to create type-specific
-  ## destructors for Managed[T] objects.
-  result = proc(p: pointer) {.nimcall.} =
-    GC_unref(cast[T](p))
