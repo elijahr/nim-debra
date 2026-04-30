@@ -7,6 +7,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Manual version to deploy (e.g. 0.3.0). When set, deploys that version with the "latest" alias regardless of ref. Leave blank for default behavior (dev on main, $tag on tags).'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -95,6 +100,12 @@ jobs:
         run: |
           git fetch origin gh-pages --depth=1 || true
 
+      - name: Deploy docs (manual version)
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        run: |
+          mike deploy --push --update-aliases "${{ inputs.version }}" latest
+          mike set-default --push latest
+
       - name: Deploy docs (versioned)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -103,6 +114,6 @@ jobs:
           mike set-default --push latest
 
       - name: Deploy docs (dev)
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mike deploy --push dev
