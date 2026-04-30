@@ -18,7 +18,7 @@ requires "unittest2 >= 0.2.0"
 # Tasks
 
 task test, "Run tests with all memory managers":
-  for mm in ["orc", "arc", "refc"]:
+  for mm in ["orc", "arc", "atomicArc", "refc"]:
     echo "Testing with --mm:" & mm
     exec "nim c -r --mm:" & mm &
       " --threads:on --path:src -d:testing tests/test.nim"
