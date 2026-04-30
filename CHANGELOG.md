@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-30
+
+### Fixed
+
+- Documentation drift after the 0.3.0 API rewrite. Five `let pinned = handle.pin()` snippets in `docs/guide/integration.md` and `docs/guide/neutralization.md` now use `unpinned(handle).pin()` (the form `pin`'s `sink Unpinned[MT]` parameter actually accepts).
+- `docs/guide/retiring-objects.md` warned that `releaseDestructor[T]()` allocates a fresh closure per call and recommended caching it. Inverted: it returns a captureless `nimcall` proc with one address per `T`, reused across calls.
+- `docs/guide/getting-started.md` described the `Destructor` value as a "closure"; corrected to "captureless function pointer".
+- Suggested `requires "debra >= 0.1.0"` in `docs/guide/getting-started.md` and `docs/index.md` bumped to `>= 0.3.0`, since the surrounding examples assume `withPin` / `retain` / `releaseDestructor`.
+- `docs/guide/epoch-advancement.md` heading "Worked example" → "Working example".
+
 ## [0.3.0] - 2026-04-27
 
 ### Added
@@ -210,7 +220,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/elijahr/nim-debra/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/elijahr/nim-debra/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0
