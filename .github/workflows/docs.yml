@@ -27,10 +27,23 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Setup Nim
-        uses: jiro4989/setup-nim-action@v2
-        with:
-          nim-version: 'stable'
+      # Use asdf-nim instead of setup-nim-action because mkdocstrings-nim's
+      # extractor does `import compiler/ast`, which only resolves when Nim is
+      # installed in a layout that exposes the compiler modules. asdf-nim
+      # builds Nim from source and `nimble install compiler` provides the
+      # required modules on the import path.
+      - name: Setup asdf
+        uses: asdf-vm/actions/setup@v4
+
+      - name: Install asdf-nim plugin
+        run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
+
+      - name: Install Nim
+        run: |
+          asdf install nim latest:2
+          asdf set nim latest:2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache Nimble packages
         uses: actions/cache@v4
@@ -40,17 +53,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nimble-docs-
 
-      - name: Install Nim compiler source
-        run: |
-          # mkdocstrings-nim needs the `compiler/` package (Nim compiler
-          # source), which is separate from the `nim` binary installed by
-          # setup-nim-action. `nimble path nim` reports success based on the
-          # binary, so check for the compiler source file directly.
-          if ! nim_pkg_dir="$(nimble path nim 2>/dev/null)" || [[ ! -f "$nim_pkg_dir/compiler/ast.nim" ]]; then
-            nimble install nim -y
-          else
-            echo "Nim compiler source already installed at $nim_pkg_dir (from cache)"
-          fi
+      - name: Install compiler modules
+        run: nimble install compiler -y
 
       - name: Install Python dependencies
         run: pip install -r docs-requirements.txt
