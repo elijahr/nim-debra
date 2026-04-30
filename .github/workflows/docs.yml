@@ -57,7 +57,9 @@ jobs:
           if [[ "${{ steps.cache-nim.outputs.cache-hit }}" != "true" ]]; then
             asdf install nim 2.2.10
           fi
-          asdf set nim 2.2.10
+          # -u writes to ~/.tool-versions so asdf can resolve the version
+          # from any cwd (e.g. /tmp during the compiler install step).
+          asdf set -u nim 2.2.10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
