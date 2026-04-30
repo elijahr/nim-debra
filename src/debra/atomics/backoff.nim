@@ -15,13 +15,12 @@
 ##                   on non-x86 (no hardware `yield`/`pause` hint emitted);
 ##                   this implementation provides the real `yield` hint.
 ##
-##   * `schedYield` - POSIX `sched_yield(2)`. Releases the current
-##                    thread's CPU quantum back to the OS scheduler.
-##                    Use when a CAS-retry loop has spun long enough
-##                    that the holder is likely descheduled (oversubscribed
-##                    runqueue). POSIX targets (Linux, macOS, BSDs); see
-##                    `when defined(posix)` guard. Windows `SwitchToThread`
-##                    is a future item.
+##   * `schedYield` - releases the current thread's CPU quantum back to
+##                    the OS scheduler. Use when a CAS-retry loop has
+##                    spun long enough that the holder is likely
+##                    descheduled (oversubscribed runqueue). Maps to
+##                    `sched_yield(2)` on POSIX (Linux, macOS, BSDs) and
+##                    `SwitchToThread` on Windows. No-op on other targets.
 ##
 ## Both procs are `{.inline.}` and have zero overhead when not invoked
 ## (no per-iteration cost on the success path of a CAS loop).
@@ -37,13 +36,22 @@ proc cpuPause*() {.inline.} =
     elif defined(arm64):
       {.emit: """asm volatile("yield" ::: "memory");""".}
     else:
-      discard # No-op fallback; correctness preserved.
+      # Empty asm with "memory" clobber: compiler barrier preventing
+      # spin-loop hoisting on archs without a hardware hint (RISC-V,
+      # PowerPC, etc). Matches std/sysatomics.cpuRelax fallback semantics.
+      {.emit: """asm volatile("" ::: "memory");""".}
   else:
-    discard # No-op fallback on backends/compilers without inline-asm support.
+    discard # No-op on backends/compilers without inline-asm support.
 
 proc schedYield*() {.inline.} =
   when defined(posix):
     proc sched_yield(): cint {.importc, header: "<sched.h>".}
     discard sched_yield()
+  elif defined(windows):
+    proc SwitchToThread(): int32 {.
+      importc: "SwitchToThread", stdcall, dynlib: "kernel32"
+    .}
+
+    discard SwitchToThread()
   else:
-    discard # No-op fallback for non-POSIX targets.
+    discard # No-op fallback for non-POSIX, non-Windows targets.
