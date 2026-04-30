@@ -42,10 +42,14 @@ jobs:
 
       - name: Install Nim compiler source
         run: |
-          if ! nimble path nim > /dev/null 2>&1; then
+          # mkdocstrings-nim needs the `compiler/` package (Nim compiler
+          # source), which is separate from the `nim` binary installed by
+          # setup-nim-action. `nimble path nim` reports success based on the
+          # binary, so check for the compiler source file directly.
+          if ! nim_pkg_dir="$(nimble path nim 2>/dev/null)" || [[ ! -f "$nim_pkg_dir/compiler/ast.nim" ]]; then
             nimble install nim -y
           else
-            echo "Nim compiler source already installed (from cache)"
+            echo "Nim compiler source already installed at $nim_pkg_dir (from cache)"
           fi
 
       - name: Install Python dependencies
