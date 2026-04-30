@@ -7,31 +7,27 @@
       
       
       
-        <link rel="canonical" href="https://elijahr.github.io/nim-debra/latest/guide/concepts/">
+        <link rel="canonical" href="https://elijahr.github.io/nim-debra/latest/safety-model/">
       
       
-        <link rel="prev" href="../getting-started/">
-      
-      
-        <link rel="next" href="../thread-registration/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>Concepts - nim-debra</title>
+        <title>Safety Model - nim-debra</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -50,19 +46,19 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../../css/timeago.css">
+      <link rel="stylesheet" href="../css/timeago.css">
     
-      <link rel="stylesheet" href="../../css/custom.css">
+      <link rel="stylesheet" href="../css/custom.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
     
     
-  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+  <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
             html.glightbox-open { overflow: initial; height: 100%; }
             .gslide-title { margin-top: 0px; user-select: text; }
             .gslide-desc { color: #666; user-select: text; }
@@ -91,7 +87,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#debra-concepts" class="md-skip">
+        <a href="#safety-model" class="md-skip">
           Skip to content
         </a>
       
@@ -111,7 +107,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="nim-debra" class="md-header__button md-logo" aria-label="nim-debra" data-md-component="logo">
+    <a href=".." title="nim-debra" class="md-header__button md-logo" aria-label="nim-debra" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
@@ -131,7 +127,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Concepts
+              Safety Model
             
           </span>
         </div>
@@ -247,7 +243,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="nim-debra" class="md-nav__button md-logo" aria-label="nim-debra" data-md-component="logo">
+    <a href=".." title="nim-debra" class="md-nav__button md-logo" aria-label="nim-debra" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
@@ -277,7 +273,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -301,8 +297,6 @@
       
   
   
-    
-  
   
   
     
@@ -315,11 +309,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked="">
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2">
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -340,7 +336,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -358,7 +354,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../getting-started/" class="md-nav__link">
+      <a href="../guide/getting-started/" class="md-nav__link">
         
   
   
@@ -383,37 +379,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Concepts
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../guide/concepts/" class="md-nav__link">
         
   
   
@@ -429,176 +398,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
-      
-        <li class="md-nav__item">
-  <a href="#the-memory-reclamation-problem" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        The Memory Reclamation Problem
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#epoch-based-reclamation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Epoch-Based Reclamation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Epoch-Based Reclamation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-timeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Timeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pinunpin-protocol" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pin/Unpin Protocol
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#limbo-bags" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limbo Bags
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Limbo Bags">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#limbo-bag-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limbo Bag Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#safe-reclamation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Safe Reclamation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#neutralization" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Neutralization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Neutralization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neutralization-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Neutralization Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#memory-bounds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Memory Bounds
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#typestate-enforcement" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Typestate Enforcement
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -611,7 +410,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../thread-registration/" class="md-nav__link">
+      <a href="../guide/thread-registration/" class="md-nav__link">
         
   
   
@@ -639,7 +438,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pin-unpin/" class="md-nav__link">
+      <a href="../guide/pin-unpin/" class="md-nav__link">
         
   
   
@@ -667,7 +466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../retiring-objects/" class="md-nav__link">
+      <a href="../guide/retiring-objects/" class="md-nav__link">
         
   
   
@@ -695,7 +494,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reclamation/" class="md-nav__link">
+      <a href="../guide/reclamation/" class="md-nav__link">
         
   
   
@@ -723,7 +522,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../epoch-advancement/" class="md-nav__link">
+      <a href="../guide/epoch-advancement/" class="md-nav__link">
         
   
   
@@ -751,7 +550,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../neutralization/" class="md-nav__link">
+      <a href="../guide/neutralization/" class="md-nav__link">
         
   
   
@@ -779,7 +578,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../integration/" class="md-nav__link">
+      <a href="../guide/integration/" class="md-nav__link">
         
   
   
@@ -814,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/" class="md-nav__link">
+      <a href="../api/" class="md-nav__link">
         
   
   
@@ -841,7 +640,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../contributing/" class="md-nav__link">
+      <a href="../contributing/" class="md-nav__link">
         
   
   
@@ -888,10 +687,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
       
         <li class="md-nav__item">
-  <a href="#the-memory-reclamation-problem" class="md-nav__link">
+  <a href="#the-one-rule" class="md-nav__link">
     <span class="md-ellipsis">
       
-        The Memory Reclamation Problem
+        The one rule
       
     </span>
   </a>
@@ -899,38 +698,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#epoch-based-reclamation" class="md-nav__link">
+  <a href="#why-atomicref-t-is-rejected" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Epoch-Based Reclamation
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Epoch-Based Reclamation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-timeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example Timeline
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pinunpin-protocol" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pin/Unpin Protocol
+        Why Atomic[ref T] is rejected
       
     </span>
   </a>
@@ -938,38 +709,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#limbo-bags" class="md-nav__link">
+  <a href="#the-retain-release-bridge" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Limbo Bags
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Limbo Bags">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#limbo-bag-structure" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Limbo Bag Structure
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#safe-reclamation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Safe Reclamation
+        The retain / release bridge
       
     </span>
   </a>
@@ -977,38 +720,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#neutralization" class="md-nav__link">
+  <a href="#memory-manager-notes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Neutralization
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Neutralization">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neutralization-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Neutralization Flow
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#memory-bounds" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Memory Bounds
+        Memory manager notes
       
     </span>
   </a>
@@ -1016,10 +731,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#typestate-enforcement" class="md-nav__link">
+  <a href="#toolchain-support" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Typestate Enforcement
+        Toolchain support
       
     </span>
   </a>
@@ -1027,10 +742,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
+  <a href="#testing-recipes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Next Steps
+        Testing recipes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
       
     </span>
   </a>
@@ -1057,112 +783,95 @@
   
 
 
-<h1 id="debra-concepts">DEBRA+ Concepts<a class="headerlink" href="#debra-concepts" title="Permanent link">¶</a></h1>
-<p>Understanding the core concepts behind DEBRA+ memory reclamation.</p>
-<h2 id="the-memory-reclamation-problem">The Memory Reclamation Problem<a class="headerlink" href="#the-memory-reclamation-problem" title="Permanent link">¶</a></h2>
-<p>In lock-free data structures, traditional memory management approaches fail:</p>
-<ul>
-<li><strong>Garbage collection</strong>: Adds unpredictable latency and runtime overhead</li>
-<li><strong>Reference counting</strong>: Expensive atomic operations on every access</li>
-<li><strong>Manual management</strong>: Race conditions lead to use-after-free or memory leaks</li>
-</ul>
-<p>DEBRA+ provides a middle ground: explicit reclamation with safety guarantees.</p>
-<h2 id="epoch-based-reclamation">Epoch-Based Reclamation<a class="headerlink" href="#epoch-based-reclamation" title="Permanent link">¶</a></h2>
-<p>DEBRA+ uses epochs to track when memory can be safely reclaimed:</p>
-<ol>
-<li><strong>Global epoch counter</strong>: Monotonically increasing integer</li>
-<li><strong>Thread epochs</strong>: Each active thread pins a specific epoch</li>
-<li><strong>Retire queues</strong>: Objects retired in each epoch</li>
-<li><strong>Reclamation rule</strong>: Objects retired in epoch E are safe to free once all threads have advanced past E</li>
-</ol>
-<h3 id="example-timeline">Example Timeline<a class="headerlink" href="#example-timeline" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Time    Global  Thread1  Thread2  Action
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>----    ------  -------  -------  ------
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>t0      1       -        -        Start
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>t1      1       1        -        Thread1 pins epoch 1
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>t2      1       1        1        Thread2 pins epoch 1
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>t3      2       1        1        Epoch advances to 2
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>t4      2       2        1        Thread1 unpins, repins at 2
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>t5      2       2        2        Thread2 unpins, repins at 2
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>t6      2       2        2        Objects retired at epoch 1 can now be freed
+<h1 id="safety-model">Safety Model<a class="headerlink" href="#safety-model" title="Permanent link">¶</a></h1>
+<p>nim-debra is built for lock-free data structures. The library actively rules
+out the most common spinlock-fallback footgun in Nim's <code>std/atomics</code> — atomic
+storage of <code>ref T</code> — and ships a small <code>retain</code> / <code>release</code> bridge so that
+<code>ref</code> values can still live inside <code>Atomic[ptr T]</code> slots without losing the
+lock-free guarantee.</p>
+<p>This document explains the underlying constraints, the recipes for using the
+bridge correctly, and the testing matrix used to keep them honest.</p>
+<h2 id="the-one-rule">The one rule<a class="headerlink" href="#the-one-rule" title="Permanent link">¶</a></h2>
+<p><code>Atomic[ref T]</code> does not compile under <code>--mm:arc</code> or <code>--mm:orc</code>. <code>Atomic[T]</code>
+also rejects any <code>T</code> whose width is not <code>__atomic_always_lock_free</code> on the
+target. Use <code>Atomic[ptr T]</code> together with <code>retain</code> and <code>releaseDestructor</code>
+when you need to put a <code>ref</code> into an atomic slot.</p>
+<p>The error messages from <code>debra/atomics</code> (see <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/atomics.nim"><code>src/debra/atomics.nim</code></a>)
+point you at the bridge directly.</p>
+<h2 id="why-atomicref-t-is-rejected">Why <code>Atomic[ref T]</code> is rejected<a class="headerlink" href="#why-atomicref-t-is-rejected" title="Permanent link">¶</a></h2>
+<p>Nim's <code>std/atomics</code> silently spinlocks any <code>T</code> that is not <code>Trivial</code>. <code>ref T</code>
+falls into that bucket on arc/orc, so what looks like a lock-free CAS is
+quietly using a per-object spinlock under the hood. That defeats the whole
+point of an EBR library: a thread holding a pinned epoch can be blocked on
+that spinlock by an unrelated thread, which is the kind of priority inversion
+EBR is supposed to make impossible.</p>
+<p><code>debra/atomics</code> wraps GCC/Clang <code>__atomic_*</code> builtins directly. It refuses
+non-trivially-copyable <code>T</code> at compile time, refuses <code>ref T</code> at compile time,
+and emits a <code>__atomic_always_lock_free</code> static assertion in the C output so
+that any width which would secretly fall back to a libatomic call also fails
+to compile. The full design rationale lives in
+<a href="../design/2026-04-25-custom-atomics/"><code>docs/design/2026-04-25-custom-atomics.md</code></a>.</p>
+<p>If you genuinely need a non-lock-free atomic for some reason — testing,
+prototyping, an unusual target — you can pass <code>-d:debraAllowNonLockFreeAtomics</code>
+to silence the C-level assertion. The Nim-level checks against <code>ref T</code> and
+<code>supportsCopyMem</code> cannot be bypassed.</p>
+<h2 id="the-retain-release-bridge">The <code>retain</code> / <code>release</code> bridge<a class="headerlink" href="#the-retain-release-bridge" title="Permanent link">¶</a></h2>
+<p><code>retain(obj)</code> increments the GC ref count and casts to <code>ptr typeof(obj[])</code>,
+yielding a value safe to store in <code>Atomic[ptr T]</code>. The matching <code>release</code>
+decrements the ref count. The library ships a <code>releaseDestructor[T]()</code>
+factory that returns a <code>Destructor</code> (the type <code>retire</code> accepts), so the most
+common pattern looks like this:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">retain</span><span class="w"> </span><span class="n">Node</span><span class="p">(</span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">slot</span><span class="p">.</span><span class="n">store</span><span class="p">(</span><span class="n">raw</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c"># ...later, after we swap a new value into the slot...</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">withPin</span><span class="p">(</span><span class="n">handle</span><span class="p">):</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="n">it</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">cast</span><span class="o">[</span><span class="n">pointer</span><span class="o">]</span><span class="p">(</span><span class="n">raw</span><span class="p">),</span><span class="w"> </span><span class="n">releaseDestructor</span><span class="o">[</span><span class="n">Node</span><span class="o">]</span><span class="p">())</span>
 </code></pre></div>
-<h2 id="pinunpin-protocol">Pin/Unpin Protocol<a class="headerlink" href="#pinunpin-protocol" title="Permanent link">¶</a></h2>
-<p>Threads must pin the current epoch before accessing lock-free data structures:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c"># WRONG - not protected</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queue</span><span class="p">.</span><span class="n">dequeue</span><span class="p">()</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c"># RIGHT - pinned during access</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unpinned</span><span class="p">(</span><span class="n">handle</span><span class="p">).</span><span class="n">pin</span><span class="p">()</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="k">let</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queue</span><span class="p">.</span><span class="n">dequeue</span><span class="p">()</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">discard</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
+<p>The destructor runs once the epoch is safe, and that is the moment <code>release</code>
+fires. Each <code>retain</code> must be balanced by exactly one <code>release</code>. Double-release
+frees the object early; missing release leaks the underlying GC cell.</p>
+<h2 id="memory-manager-notes">Memory manager notes<a class="headerlink" href="#memory-manager-notes" title="Permanent link">¶</a></h2>
+<p>The CI matrix exercises the library under <code>--mm:arc</code>, <code>--mm:orc</code>,
+<code>--mm:atomicArc</code>, and <code>--mm:refc</code>. Three of those use shared atomic refcounts
+and behave identically as far as the bridge is concerned.</p>
+<p><code>--mm:refc</code> is the exception. refc keeps the GC heap thread-local, so a
+<code>GC_unref</code> issued from a thread other than the one that called <code>GC_ref</code> is
+undefined behaviour and crashes inside <code>decRef</code>. Concretely: every <code>retain</code>
+on thread A must be balanced by a <code>release</code> on thread A. If your design hands
+retired pointers off to a background reclaim thread, that pattern works on
+arc/orc/atomicArc but not on refc.</p>
+<p><code>examples/reclamation_background.nim</code> runs into exactly this issue and skips
+itself with a clear diagnostic when compiled with <code>--mm:refc</code>. If your
+project supports refc, run reclamation on the same threads that retire.</p>
+<h2 id="toolchain-support">Toolchain support<a class="headerlink" href="#toolchain-support" title="Permanent link">¶</a></h2>
+<p><code>debra/atomics</code> wraps the <code>__atomic_*</code> family of builtins, so the supported C
+backends are GCC, Clang, LLVM-GCC, and the Nintendo Switch toolchain. MSVC is
+not supported; an MSVC backend would need its own intrinsic wrapper and is
+not on the current roadmap.</p>
+<h2 id="testing-recipes">Testing recipes<a class="headerlink" href="#testing-recipes" title="Permanent link">¶</a></h2>
+<p>The bug class this library exists to prevent — use-after-free between a
+reader and a reclaimer — is the classic territory of TSAN, ASAN, and stress
+tests. A good way to convince yourself the bridge is wired correctly in your
+own data structure:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Pick any of the supported memory managers.</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>nim<span class="w"> </span>c<span class="w"> </span>--threads:on<span class="w"> </span>--mm:orc<span class="w"> </span>-d:useMalloc<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--debugger:native<span class="w"> </span>-t:-fsanitize<span class="o">=</span>thread<span class="w"> </span>-l:-fsanitize<span class="o">=</span>thread<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>your_test.nim
 </code></pre></div>
-<p>Pinning tells the reclamation system: "I might be accessing objects from this epoch."</p>
-<h2 id="limbo-bags">Limbo Bags<a class="headerlink" href="#limbo-bags" title="Permanent link">¶</a></h2>
-<p>Retired objects are stored in thread-local limbo bags:</p>
+<p>For ASAN, swap <code>thread</code> for <code>address</code>. The interesting tests run hundreds of
+thousands of operations across several producer/consumer threads; short
+single-threaded tests rarely surface the races the SC fences in <code>pin</code> /
+<code>loadEpochs</code> are there to defeat. The lockfreequeues project bundles a set
+of unbounded-queue stress tests that exercise nim-debra under exactly this
+configuration; if you are designing your own EBR client, those tests are a
+useful shape to copy.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">¶</a></h2>
 <ul>
-<li>Each bag holds up to 64 entries (a retired pointer plus its destructor)</li>
-<li>Bags are linked together forming a retire queue</li>
-<li>Reclamation invokes each destructor (e.g. <code>releaseDestructor[T]()</code> calls <code>GC_unref</code>)</li>
-<li>Organized by retirement epoch</li>
-</ul>
-<h3 id="limbo-bag-structure">Limbo Bag Structure<a class="headerlink" href="#limbo-bag-structure" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Thread State
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  currentBag --&gt; [Bag: epoch=5, count=23] --&gt; [Bag: epoch=4, count=64] --&gt; ...
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>                         ^                            ^
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>                     limboBagHead                limboBagTail
-</code></pre></div>
-<h2 id="safe-reclamation">Safe Reclamation<a class="headerlink" href="#safe-reclamation" title="Permanent link">¶</a></h2>
-<p>Reclamation walks the limbo bags and frees objects from old epochs:</p>
-<ol>
-<li><strong>Load epochs</strong>: Read global epoch and all thread epochs</li>
-<li><strong>Compute safe epoch</strong>: Minimum of all pinned thread epochs</li>
-<li><strong>Walk limbo bags</strong>: From oldest (tail) toward newest (head)</li>
-<li><strong>Reclaim eligible</strong>: Free bags where <code>bag.epoch &lt; safeEpoch - 1</code></li>
-<li><strong>Stop at barrier</strong>: Once we hit a bag that's still unsafe, stop</li>
-</ol>
-<h2 id="neutralization">Neutralization<a class="headerlink" href="#neutralization" title="Permanent link">¶</a></h2>
-<p>What if a thread stalls while pinned? It blocks reclamation indefinitely.</p>
-<p>DEBRA+ solves this with <strong>neutralization</strong>:</p>
-<ol>
-<li><strong>Detection</strong>: During reclamation, detect threads pinned at old epochs</li>
-<li><strong>Signal</strong>: Send SIGUSR1 to stalled thread's OS process</li>
-<li><strong>Handler</strong>: Signal handler sets neutralization flag</li>
-<li><strong>Acknowledgment</strong>: Thread checks flag on unpin and handles it</li>
-<li><strong>Recovery</strong>: Thread acknowledges, allowing epoch to advance</li>
-</ol>
-<h3 id="neutralization-flow">Neutralization Flow<a class="headerlink" href="#neutralization-flow" title="Permanent link">¶</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c"># Thread 1: Pinned and working</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unpinned</span><span class="p">(</span><span class="n">handle</span><span class="p">).</span><span class="n">pin</span><span class="p">()</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c"># ... long computation ...</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">let</span><span class="w"> </span><span class="n">unpinResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">case</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">kind</span><span class="p">:</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">of</span><span class="w"> </span><span class="nl">uUnpinned</span><span class="o">:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="c"># Normal unpin</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="k">discard</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="k">of</span><span class="w"> </span><span class="nl">uNeutralized</span><span class="o">:</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="c"># We were neutralized - acknowledge it</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="k">discard</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">neutralized</span><span class="p">.</span><span class="n">acknowledge</span><span class="p">()</span>
-</code></pre></div>
-<h2 id="memory-bounds">Memory Bounds<a class="headerlink" href="#memory-bounds" title="Permanent link">¶</a></h2>
-<p>DEBRA+ guarantees O(mn) memory overhead where:</p>
-<ul>
-<li>m = number of threads</li>
-<li>n = maximum objects retired per epoch per thread</li>
-</ul>
-<p>Without neutralization, a stalled thread could accumulate unbounded memory. Neutralization ensures bounded growth.</p>
-<h2 id="typestate-enforcement">Typestate Enforcement<a class="headerlink" href="#typestate-enforcement" title="Permanent link">¶</a></h2>
-<p>nim-debra uses compile-time typestates to enforce correct protocol usage:</p>
-<ul>
-<li>Cannot retire without being pinned</li>
-<li>Cannot pin without registering</li>
-<li>Must acknowledge neutralization before re-pinning</li>
-</ul>
-<p>These invariants are checked at compile time, not runtime.</p>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">¶</a></h2>
-<ul>
-<li>Learn about <a href="../thread-registration/">thread registration</a></li>
-<li>Understand <a href="../pin-unpin/">pin/unpin lifecycle</a></li>
-<li>Deep dive into <a href="../neutralization/">neutralization</a></li>
+<li><a href="../design/2026-04-25-custom-atomics/">Custom Atomics design doc</a> — full
+  rationale for <code>debra/atomics</code>, alignment trap, fence encoding.</li>
+<li><a href="../guide/concepts/">Concepts</a> — a higher-level walk through DEBRA+ itself.</li>
+<li><a href="../guide/pin-unpin/">Pin / unpin</a> — the publication and subscription
+  fences that make epoch tracking sound.</li>
 </ul>
 
 
@@ -1196,7 +905,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"></path></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 7, 2025 04:44:05 UTC"><span class="timeago" datetime="2025-12-07T04:44:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 7, 2025 04:44:05 UTC">2025-12-07</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="April 28, 2026 00:51:03 UTC"><span class="timeago" datetime="2026-04-28T00:51:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="April 28, 2026 00:51:03 UTC">2026-04-28</span>
   </span>
 
     
@@ -1261,14 +970,14 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.annotate", "navigation.instant", "navigation.sections", "navigation.expand", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["content.code.copy", "content.code.annotate", "navigation.instant", "navigation.sections", "navigation.expand", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="../../js/timeago.min.js"></script>
+        <script src="../js/timeago.min.js"></script>
       
-        <script src="../../js/timeago_mkdocs_material.js"></script>
+        <script src="../js/timeago_mkdocs_material.js"></script>
       
     
   

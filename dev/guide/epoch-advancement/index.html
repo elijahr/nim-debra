@@ -7,13 +7,13 @@
       
       
       
-        <link rel="canonical" href="https://elijahr.github.io/nim-debra/latest/guide/thread-registration/">
+        <link rel="canonical" href="https://elijahr.github.io/nim-debra/latest/guide/epoch-advancement/">
       
       
-        <link rel="prev" href="../concepts/">
+        <link rel="prev" href="../reclamation/">
       
       
-        <link rel="next" href="../pin-unpin/">
+        <link rel="next" href="../neutralization/">
       
       
         
@@ -24,7 +24,7 @@
     
     
       
-        <title>Thread Registration - nim-debra</title>
+        <title>Epoch Advancement - nim-debra</title>
       
     
     
@@ -91,7 +91,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#thread-registration" class="md-skip">
+        <a href="#epoch-advancement" class="md-skip">
           Skip to content
         </a>
       
@@ -131,7 +131,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Thread Registration
+              Epoch Advancement
             
           </span>
         </div>
@@ -411,37 +411,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Thread Registration
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../thread-registration/" class="md-nav__link">
         
   
   
@@ -457,170 +430,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
-      
-        <li class="md-nav__item">
-  <a href="#state-machine" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        State Machine
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#registration-process" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Registration Process
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#thread-limits" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Thread Limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multi-thread-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multi-Thread Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#per-thread-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Per-Thread State
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#current-limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Limitations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Current Limitations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#thread-slot-lifetime" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Thread Slot Lifetime
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#maximum-threads-already-registered" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Maximum threads already registered"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -714,10 +523,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../epoch-advancement/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Epoch Advancement
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -733,6 +569,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#cadence-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cadence patterns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#worked-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Worked example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pitfalls" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pitfalls
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -882,10 +782,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
       
         <li class="md-nav__item">
-  <a href="#state-machine" class="md-nav__link">
+  <a href="#cadence-patterns" class="md-nav__link">
     <span class="md-ellipsis">
       
-        State Machine
+        Cadence patterns
       
     </span>
   </a>
@@ -893,10 +793,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#worked-example" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Worked example
       
     </span>
   </a>
@@ -904,10 +804,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#registration-process" class="md-nav__link">
+  <a href="#pitfalls" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Registration Process
+        Pitfalls
       
     </span>
   </a>
@@ -915,110 +815,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#thread-limits" class="md-nav__link">
+  <a href="#see-also" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Thread Limits
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#multi-thread-example" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multi-Thread Example
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#per-thread-state" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Per-Thread State
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#best-practices" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Best Practices
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#current-limitations" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current Limitations
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Current Limitations">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#thread-slot-lifetime" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Thread Slot Lifetime
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Troubleshooting">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#maximum-threads-already-registered" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Maximum threads already registered"
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Next Steps
+        See also
       
     </span>
   </a>
@@ -1045,104 +845,62 @@
   
 
 
-<h1 id="thread-registration">Thread Registration<a class="headerlink" href="#thread-registration" title="Permanent link">¶</a></h1>
-<p>Understanding thread registration lifecycle in DEBRA+.</p>
-<h2 id="state-machine">State Machine<a class="headerlink" href="#state-machine" title="Permanent link">¶</a></h2>
-<p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../../assets/diagrams/registration.svg" data-desc-position="bottom"><img alt="Registration Typestate" src="../../assets/diagrams/registration.svg"></a></p>
-<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">¶</a></h2>
-<p>Each thread must register with the DEBRA manager before performing pin/unpin operations. Registration allocates a thread slot and provides a handle for all subsequent operations.</p>
-<h2 id="registration-process">Registration Process<a class="headerlink" href="#registration-process" title="Permanent link">¶</a></h2>
-<p>Registration performs several steps:</p>
-<ol>
-<li>Search for an unused slot in the thread array</li>
-<li>Claim the slot by setting the thread ID</li>
-<li>Initialize the slot's epoch and flags</li>
-<li>Return a handle containing the slot index</li>
-</ol>
-<h2 id="thread-limits">Thread Limits<a class="headerlink" href="#thread-limits" title="Permanent link">¶</a></h2>
-<p>The manager is created with a compile-time maximum thread count:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kd">var</span><span class="w"> </span><span class="n">manager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initDebraManager</span><span class="o">[</span><span class="mi">64</span><span class="o">]</span><span class="p">()</span><span class="w">  </span><span class="c"># Support up to 64 threads</span>
+<h1 id="epoch-advancement">Epoch Advancement<a class="headerlink" href="#epoch-advancement" title="Permanent link">¶</a></h1>
+<p>Epoch-based reclamation only frees memory once the global epoch has advanced
+past every retire's epoch. If nothing advances the global epoch, every retire
+stamps the same epoch onto the limbo bag, <code>safeEpoch</code> never exceeds 1, and
+reclamation is silently blocked. The limbo bag grows forever; reclaimers see
+<code>ReclaimBlocked</code> on every pass.</p>
+<p><code>manager.advance()</code> increments the global epoch with one atomic <code>fetchAdd</code>.
+Any registered thread may call it. The cost is one cache-line write that
+contends across cores, so the question is not whether to advance but how
+often.</p>
+<h2 id="cadence-patterns">Cadence patterns<a class="headerlink" href="#cadence-patterns" title="Permanent link">¶</a></h2>
+<p>Three patterns cover almost every consumer:</p>
+<p><strong>Per-retirement.</strong> Call <code>manager.advance()</code> immediately after every
+<code>retire</code>. Simplest model, highest atomic-store traffic. Pick this only when
+retires are rare (one per request, one per allocation batch).</p>
+<p><strong>Per-N retirements (recommended for hot paths).</strong> Use
+<code>handle.advanceEvery(n)</code> to amortize. The helper increments a non-atomic
+per-handle counter and only performs the atomic store every <code>n</code>th call.
+Typical <code>n</code> is 32 to 128 for queue-style hot paths. Larger <code>n</code> lets the
+limbo bag grow more between advances; smaller <code>n</code> increases atomic-store
+contention.</p>
+<p><strong>Periodic-thread.</strong> A dedicated background thread calls
+<code>manager.advance()</code> on a timer (e.g. every 1 ms or every 1000 ops). Keeps
+the hot path free of advance work at the cost of one extra thread. Each
+worker still calls <code>reclaimNow(handle)</code> on its own cadence to drain its own
+limbo bags; reclamation is per-thread (cross-thread reclamation is not
+supported, see <a href="../reclamation/">reclamation guide</a>).</p>
+<h2 id="worked-example">Worked example<a class="headerlink" href="#worked-example" title="Permanent link">¶</a></h2>
+<p>A queue's pop hot path that retires a segment when its last slot drains:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">proc</span><span class="w"> </span><span class="nf">pop</span><span class="p">(...):</span><span class="w"> </span><span class="n">Option</span><span class="o">[</span><span class="n">T</span><span class="o">]</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="n">withPin</span><span class="p">(</span><span class="n">handle</span><span class="p">):</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="c"># ... read slot, advance head ...</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">mySlot</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">LastSlot</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="n">it</span><span class="p">.</span><span class="n">retire</span><span class="p">(</span><span class="k">cast</span><span class="o">[</span><span class="n">pointer</span><span class="o">]</span><span class="p">(</span><span class="n">seg</span><span class="p">),</span><span class="w"> </span><span class="n">segmentDestructor</span><span class="p">)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="n">handle</span><span class="p">.</span><span class="n">advanceEvery</span><span class="p">(</span><span class="mi">64</span><span class="p">)</span><span class="w">   </span><span class="c"># cadence-controlled global advance</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="n">eager</span><span class="p">:</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="k">discard</span><span class="w"> </span><span class="n">reclaimNow</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span><span class="w">  </span><span class="c"># per-thread reclamation</span>
 </code></pre></div>
-<p>Attempting to register more threads than the limit will raise <code>DebraRegistrationError</code>.</p>
-<h2 id="multi-thread-example">Multi-Thread Example<a class="headerlink" href="#multi-thread-example" title="Permanent link">¶</a></h2>
-<p>The following example demonstrates multiple threads registering and using DEBRA:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c"># examples/thread_registration.nim</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="sd">## Thread registration lifecycle: multiple threads registering and using DEBRA.</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">import</span><span class="w"> </span><span class="n">debra</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="kn">import</span><span class="w"> </span><span class="n">debra</span><span class="o">/</span><span class="n">atomics</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="kd">var</span><span class="w"> </span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="mi">4</span><span class="o">]</span>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">proc</span><span class="w"> </span><span class="nf">workerThread</span><span class="p">()</span><span class="w"> </span><span class="sx">{.thread.}</span><span class="w"> </span><span class="o">=</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="c"># Register this thread with the manager</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">handle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">registerThread</span><span class="p">(</span><span class="n">manager</span><span class="p">)</span>
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="c"># Perform some pin/unpin cycles</span>
-<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">..</span><span class="o">&lt;</span><span class="w"> </span><span class="mi">100</span><span class="p">:</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">u</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unpinned</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">pinned</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">u</span><span class="p">.</span><span class="n">pin</span><span class="p">()</span>
-<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="c"># Simulate work in critical section</span>
-<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="k">discard</span>
-<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
-<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">unpinResult</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pinned</span><span class="p">.</span><span class="n">unpin</span><span class="p">()</span>
-<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">    </span><span class="k">case</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">kind</span>
-<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="k">of</span><span class="w"> </span><span class="nl">uUnpinned</span><span class="o">:</span>
-<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">      </span><span class="k">discard</span>
-<a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">    </span><span class="k">of</span><span class="w"> </span><span class="nl">uNeutralized</span><span class="o">:</span>
-<a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">      </span><span class="k">discard</span><span class="w"> </span><span class="n">unpinResult</span><span class="p">.</span><span class="n">neutralized</span><span class="p">.</span><span class="n">acknowledge</span><span class="p">()</span>
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="k">when</span><span class="w"> </span><span class="n">isMainModule</span><span class="p">:</span>
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">  </span><span class="c"># Initialize manager</span>
-<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">  </span><span class="n">manager</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">initDebraManager</span><span class="o">[</span><span class="mi">4</span><span class="o">]</span><span class="p">(..</span><span class="o">/</span><span class="p">..</span><span class="o">/</span><span class="n">examples</span><span class="p">)</span>
-<a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">  </span><span class="n">setGlobalManager</span><span class="p">(</span><span class="k">addr</span><span class="w"> </span><span class="n">manager</span><span class="p">)</span>
-<a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>
-<a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">  </span><span class="c"># Start worker threads</span>
-<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">threads</span><span class="p">:</span><span class="w"> </span><span class="nb">array</span><span class="o">[</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="n">Thread</span><span class="o">[</span><span class="n">void</span><span class="o">]]</span>
-<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">..</span><span class="o">&lt;</span><span class="w"> </span><span class="mi">4</span><span class="p">:</span>
-<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">    </span><span class="n">createThread</span><span class="p">(</span><span class="n">threads</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">,</span><span class="w"> </span><span class="n">workerThread</span><span class="p">)</span>
-<a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>
-<a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="w">  </span><span class="c"># Wait for all threads to complete</span>
-<a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">..</span><span class="o">&lt;</span><span class="w"> </span><span class="mi">4</span><span class="p">:</span>
-<a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">    </span><span class="n">joinThread</span><span class="p">(</span><span class="n">threads</span><span class="o">[</span><span class="n">i</span><span class="o">]</span><span class="p">)</span>
-<a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a>
-<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">  </span><span class="n">echo</span><span class="w"> </span><span class="s">"Thread registration example completed successfully"</span>
-</code></pre></div>
-<p><a href="https://github.com/elijahr/nim-debra/blob/main/examples/thread_registration.nim"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"></path></svg></span> View full source</a></p>
-<h2 id="per-thread-state">Per-Thread State<a class="headerlink" href="#per-thread-state" title="Permanent link">¶</a></h2>
-<p>Each thread slot maintains:</p>
+<p><code>advanceEvery(64)</code> makes 63 of every 64 calls a single non-atomic
+increment plus a branch; only call 64 pays the atomic <code>fetchAdd</code>.</p>
+<h2 id="pitfalls">Pitfalls<a class="headerlink" href="#pitfalls" title="Permanent link">¶</a></h2>
 <ul>
-<li><strong>epoch</strong>: Current/pinned epoch</li>
-<li><strong>pinned</strong>: Is thread in critical section?</li>
-<li><strong>neutralized</strong>: Neutralization flag</li>
-<li><strong>threadId</strong>: Thread identifier for signaling</li>
-<li><strong>limboBags</strong>: Chain of retired objects</li>
+<li><strong>Missing entirely.</strong> Limbo bags grow unboundedly. <code>reclaimNow</code> always
+  returns 0. The bug is silent until you measure RSS.</li>
+<li><strong>Too frequent.</strong> Every retire calls <code>advance()</code>. The atomic store on
+  <code>globalEpoch</code> ping-pongs the cache line between cores.</li>
+<li><strong>Too rare.</strong> A 1ms timer thread is fine for most workloads, but if
+  retires fire faster than the timer can advance, the limbo bag still
+  grows. Pair a timer with a per-N helper for safety.</li>
 </ul>
-<h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">¶</a></h2>
-<ol>
-<li><strong>Register once per thread</strong>: Don't register multiple times</li>
-<li><strong>Keep handle alive</strong>: Store the handle for the thread's lifetime</li>
-<li><strong>Don't share handles</strong>: Each thread needs its own handle</li>
-<li><strong>Respect limits</strong>: Don't exceed MaxThreads parameter</li>
-</ol>
-<h2 id="current-limitations">Current Limitations<a class="headerlink" href="#current-limitations" title="Permanent link">¶</a></h2>
-<h3 id="thread-slot-lifetime">Thread Slot Lifetime<a class="headerlink" href="#thread-slot-lifetime" title="Permanent link">¶</a></h3>
-<p>Thread slots are held for the thread's lifetime. Once a thread registers, its slot remains occupied until the manager is destroyed. There is currently no explicit deregistration API.</p>
-<p>If a thread exits after registration, its slot remains allocated and cannot be reused until the entire manager shuts down. This means the effective thread limit is determined by the peak number of threads that register over the manager's lifetime, not the number of concurrent threads.</p>
-<p><strong>Implication</strong>: Plan your <code>MaxThreads</code> parameter based on the total number of threads that will register throughout your application's lifetime, not just the concurrent thread count.</p>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">¶</a></h2>
-<h3 id="maximum-threads-already-registered">"Maximum threads already registered"<a class="headerlink" href="#maximum-threads-already-registered" title="Permanent link">¶</a></h3>
-<p>All slots are occupied. Either:</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">¶</a></h2>
 <ul>
-<li>Increase <code>MaxThreads</code> when creating the manager</li>
-<li>Reduce the total number of threads that register over the application lifetime</li>
-<li>Check for thread leaks or unnecessary thread creation</li>
-</ul>
-<h2 id="next-steps">Next Steps<a class="headerlink" href="#next-steps" title="Permanent link">¶</a></h2>
-<ul>
-<li>Learn about <a href="../pin-unpin/">pin/unpin lifecycle</a></li>
-<li>Understand <a href="../retiring-objects/">retiring objects</a></li>
+<li><a href="../pin-unpin/"><code>withPin</code></a> - the pinned scope inside which retires happen.</li>
+<li><a href="../reclamation/"><code>reclaimNow</code></a> - the reclamation pass that needs an
+  advanced epoch to make progress.</li>
+<li><a href="../../api/"><code>advance</code></a> - the underlying typestate transition.</li>
 </ul>
 
 
@@ -1166,7 +924,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"></path></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 13, 2025 01:35:15 UTC"><span class="timeago" datetime="2025-12-13T01:35:15+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 13, 2025 01:35:15 UTC">2025-12-13</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="April 28, 2026 00:51:03 UTC"><span class="timeago" datetime="2026-04-28T00:51:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="April 28, 2026 00:51:03 UTC">2026-04-28</span>
   </span>
 
     
@@ -1176,7 +934,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"></path></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="December 7, 2025 04:44:05 UTC"><span class="timeago" datetime="2025-12-07T04:44:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="December 7, 2025 04:44:05 UTC">2025-12-07</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="April 28, 2026 00:51:03 UTC"><span class="timeago" datetime="2026-04-28T00:51:03+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="April 28, 2026 00:51:03 UTC">2026-04-28</span>
   </span>
 
     
