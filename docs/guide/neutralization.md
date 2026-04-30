@@ -117,13 +117,13 @@ Avoid neutralization by keeping pin/unpin sections minimal:
 
 ```nim
 # GOOD - short critical section
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 let node = queue.dequeue()
 discard pinned.unpin()
 processNode(node)  # Outside critical section
 
 # BAD - long critical section
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 let node = queue.dequeue()
 processNode(node)  # Inside critical section!
 discard pinned.unpin()

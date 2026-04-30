@@ -33,7 +33,7 @@ worker still calls `reclaimNow(handle)` on its own cadence to drain its own
 limbo bags; reclamation is per-thread (cross-thread reclamation is not
 supported, see [reclamation guide](reclamation.md)).
 
-## Worked example
+## Working example
 
 A queue's pop hot path that retires a segment when its last slot drains:
 
