@@ -7,13 +7,7 @@
 
 DEBRA+ safe memory reclamation for lock-free data structures in Nim.
 
-**Status:** Beta — used by [lockfreequeues](https://github.com/elijahr/lockfreequeues)
-in production-grade tests; API may still change before 1.0.
-
-> **Upgrading from 0.2.x?** `Managed[ref T]` has been removed. Replace
-> `Atomic[Managed[ref T]]` slots with `Atomic[ptr T]` and use the
-> `retain` / `releaseDestructor` bridge described below. See
-> [CHANGELOG.md](CHANGELOG.md) for the full migration path.
+**Status:** Beta — used by [lockfreequeues](https://github.com/elijahr/lockfreequeues), API may still change before 1.0.
 
 ## The problem this solves
 
