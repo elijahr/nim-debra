@@ -27,17 +27,23 @@
 ## (no per-iteration cost on the success path of a CAS loop).
 
 # Nim normalizes x86_64→amd64 and aarch64→arm64; aliases unnecessary.
+# `pause` on i386 is encoded as `rep nop`, safe on pre-SSE2 hardware.
+# Inline-asm is GCC/Clang syntax; guard for c/cpp backend + supported compiler
+# to avoid build failures under MSVC, JS, or other backends.
 proc cpuPause*() {.inline.} =
-  when defined(amd64):
-    {.emit: """asm volatile("pause" ::: "memory");""".}
-  elif defined(arm64):
-    {.emit: """asm volatile("yield" ::: "memory");""".}
+  when (defined(c) or defined(cpp)) and (defined(gcc) or defined(clang)):
+    when defined(amd64) or defined(i386):
+      {.emit: """asm volatile("pause" ::: "memory");""".}
+    elif defined(arm64):
+      {.emit: """asm volatile("yield" ::: "memory");""".}
+    else:
+      discard # No-op fallback; correctness preserved.
   else:
-    discard  # No-op fallback; correctness preserved.
+    discard # No-op fallback on backends/compilers without inline-asm support.
 
 proc schedYield*() {.inline.} =
   when defined(posix):
     proc sched_yield(): cint {.importc, header: "<sched.h>".}
     discard sched_yield()
   else:
-    discard  # No-op fallback for non-POSIX targets.
+    discard # No-op fallback for non-POSIX targets.
