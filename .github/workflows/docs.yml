@@ -35,26 +35,46 @@ jobs:
       - name: Setup asdf
         uses: asdf-vm/actions/setup@v4
 
+      # Cache the asdf-built Nim install to skip the slow source build on
+      # every run. Bump NIM_CACHE_VERSION below (or change NIM_VERSION) to
+      # force a rebuild.
+      - name: Cache asdf Nim install
+        id: cache-nim
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.asdf/installs/nim
+            ~/.asdf/plugins/nim
+            ~/.asdf/shims
+          key: ${{ runner.os }}-asdf-nim-2.2.10-v1
+
       - name: Install asdf-nim plugin
+        if: steps.cache-nim.outputs.cache-hit != 'true'
         run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
 
       - name: Install Nim
         run: |
-          asdf install nim latest:2
-          asdf set nim latest:2
+          if [[ "${{ steps.cache-nim.outputs.cache-hit }}" != "true" ]]; then
+            asdf install nim 2.2.10
+          fi
+          asdf set nim 2.2.10
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Cache the Nimble package store. asdf-nim sets NIMBLE_DIR under the
+      # asdf install root, so cache that path (not ~/.nimble).
       - name: Cache Nimble packages
         uses: actions/cache@v4
         with:
-          path: ~/.nimble
-          key: ${{ runner.os }}-nimble-docs-${{ hashFiles('*.nimble') }}
-          restore-keys: |
-            ${{ runner.os }}-nimble-docs-
+          path: ~/.asdf/installs/nim/2.2.10/nimble
+          key: ${{ runner.os }}-nim-2.2.10-nimble-compiler-v1
 
       - name: Install compiler modules
-        run: nimble install compiler -y
+        # Run from /tmp so nimble does NOT enter project-lockfile mode (which
+        # would install the project's deps instead of the `compiler` package).
+        run: |
+          cd /tmp
+          nimble install compiler -y
 
       - name: Install Python dependencies
         run: pip install -r docs-requirements.txt
