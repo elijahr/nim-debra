@@ -58,8 +58,9 @@ let ready = retireReady(pinned)
 discard ready.retire(cast[pointer](node), releaseDestructor[NodeObj]())
 ```
 
-`releaseDestructor[T]()` allocates a fresh closure on each call. Cache the
-result per type if you retire many objects in a hot loop.
+`releaseDestructor[T]()` returns a captureless `nimcall` function pointer:
+each `T` instantiation produces one proc address that is reused across calls,
+so handing it inline to `retire` does not allocate.
 
 ## Self-Referential Types
 
