@@ -97,7 +97,14 @@ proc unbindClient*[MaxThreads: static int](
 ) {.inline.} =
   ## Unregister a client previously bound via `bindClient`. Decrements
   ## `boundClients` by 1. See `bindClient` for usage.
-  discard manager.boundClients.fetchSub(1, moAcquireRelease)
+  ##
+  ## Asserts the previous count was positive: an underflow indicates an
+  ## unbalanced unbind (e.g. double-destroy of a client) and is caught
+  ## here with a precise stack trace, rather than later as a non-zero
+  ## value seen by the manager destructor.
+  let prev = manager.boundClients.fetchSub(1, moAcquireRelease)
+  doAssert prev > 0,
+    "unbindClient: boundClients underflow (was " & $prev & ", expected > 0); unbalanced bindClient/unbindClient"
 
 proc clientCount*[MaxThreads: static int](
     manager: var DebraManager[MaxThreads]
