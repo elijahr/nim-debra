@@ -4,8 +4,11 @@
 ##
 ##   * `cpuPause`  - per-CPU spin-loop hint (no syscall, no thread yield).
 ##                   Tells the CPU to back off cache-coherency traffic
-##                   inside a tight retry loop (`pause` on x86, `yield`
-##                   on aarch64). Compiles to a no-op on architectures
+##                   inside a tight retry loop (`pause` on x86/x64,
+##                   `yield` on 32-bit ARM and aarch64). Emitted as
+##                   inline asm under GCC/Clang and as the matching
+##                   `_mm_pause` / `__yield` intrinsic under MSVC.
+##                   Compiles to a no-op on architectures or compilers
 ##                   without an established hint instruction; correctness
 ##                   is preserved, only micro-efficiency is lost.
 ##                   Named `cpuPause` (not `cpuRelax`) to avoid collision
@@ -27,21 +30,36 @@
 
 # Nim normalizes x86_64→amd64 and aarch64→arm64; aliases unnecessary.
 # `pause` on i386 is encoded as `rep nop`, safe on pre-SSE2 hardware.
-# Inline-asm is GCC/Clang syntax; guard for c/cpp backend + supported compiler
-# to avoid build failures under MSVC, JS, or other backends.
+# `yield` on 32-bit ARM (ARMv7+) is encoded as a NOP on older revisions,
+# so the same emit is safe across the 32-bit ARM line.
+# GCC/Clang/objc-clang use inline-asm; MSVC uses intrinsics from <intrin.h>;
+# other backends/compilers fall through to a no-op (correctness preserved,
+# only micro-efficiency is lost).
 proc cpuPause*() {.inline.} =
-  when (defined(c) or defined(cpp)) and (defined(gcc) or defined(clang)):
-    when defined(amd64) or defined(i386):
-      {.emit: """asm volatile("pause" ::: "memory");""".}
-    elif defined(arm64):
-      {.emit: """asm volatile("yield" ::: "memory");""".}
+  when defined(c) or defined(cpp) or defined(objc):
+    when defined(gcc) or defined(clang):
+      when defined(amd64) or defined(i386):
+        {.emit: """asm volatile("pause" ::: "memory");""".}
+      elif defined(arm64) or defined(arm):
+        {.emit: """asm volatile("yield" ::: "memory");""".}
+      else:
+        # Empty asm with "memory" clobber: compiler barrier preventing
+        # spin-loop hoisting on archs without a hardware hint (RISC-V,
+        # PowerPC, etc). Matches std/sysatomics.cpuRelax fallback semantics.
+        {.emit: """asm volatile("" ::: "memory");""".}
+    elif defined(vcc):
+      when defined(amd64) or defined(i386):
+        proc mm_pause() {.importc: "_mm_pause", header: "<intrin.h>".}
+        mm_pause()
+      elif defined(arm64):
+        proc yield_hint() {.importc: "__yield", header: "<intrin.h>".}
+        yield_hint()
+      else:
+        discard # No MSVC intrinsic for this arch.
     else:
-      # Empty asm with "memory" clobber: compiler barrier preventing
-      # spin-loop hoisting on archs without a hardware hint (RISC-V,
-      # PowerPC, etc). Matches std/sysatomics.cpuRelax fallback semantics.
-      {.emit: """asm volatile("" ::: "memory");""".}
+      discard # Unknown C compiler — no portable hint available.
   else:
-    discard # No-op on backends/compilers without inline-asm support.
+    discard # No-op on JS or other non-C backends.
 
 proc schedYield*() {.inline.} =
   when defined(posix):
