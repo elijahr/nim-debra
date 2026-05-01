@@ -744,6 +744,39 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#bindClient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bindClient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unbindClient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unbindClient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clientCount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clientCount
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2459,6 +2492,39 @@
     <span class="md-ellipsis">
       
         currentEpoch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bindClient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bindClient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unbindClient" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unbindClient
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clientCount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        clientCount
       
     </span>
   </a>
@@ -4382,6 +4448,216 @@ Raises DebraRegistrationError if max threads already registered.</p>
 </div>
       
     
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="bindClient" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">bindClient</span>
+      
+        
+          <span class="doc-label" data-label="inline">inline</span>
+        
+      
+    <a href="#bindClient" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">bindClient</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">)</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Register a client (e.g. a lock-free data structure) as bound to</p>
+<p>this manager. Increments <code>boundClients</code> by 1.</p>
+<p>Lock-free libraries built on nim-debra should call <code>bindClient</code> in
+their constructor and <code>unbindClient</code> in their destructor. The
+manager's destructor asserts the count is zero, so a non-zero
+count at teardown means a client outlived its manager: the client
+would continue calling into freed manager state.</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-parameters">
+        <h5>Parameters</h5>
+        <ul>
+          
+            <li>
+              <code>manager</code>
+              (<code>var DebraManager[MaxThreads]</code>)
+              
+            </li>
+          
+        </ul>
+      </div>
+    
+
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L82" target="_blank" rel="noopener">
+            src/debra.nim:82
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="unbindClient" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">unbindClient</span>
+      
+        
+          <span class="doc-label" data-label="inline">inline</span>
+        
+      
+    <a href="#unbindClient" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">unbindClient</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">)</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Unregister a client previously bound via <code>bindClient</code>. Decrements</p>
+<p><code>boundClients</code> by 1. See <code>bindClient</code> for usage.</p>
+<p>Asserts the previous count was positive: an underflow indicates an
+unbalanced unbind (e.g. double-destroy of a client) and is caught
+here with a precise stack trace, rather than later as a non-zero
+value seen by the manager destructor.</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-parameters">
+        <h5>Parameters</h5>
+        <ul>
+          
+            <li>
+              <code>manager</code>
+              (<code>var DebraManager[MaxThreads]</code>)
+              
+            </li>
+          
+        </ul>
+      </div>
+    
+
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L95" target="_blank" rel="noopener">
+            src/debra.nim:95
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="clientCount" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">clientCount</span>
+      
+        
+          <span class="doc-label" data-label="inline">inline</span>
+        
+      
+    <a href="#clientCount" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">clientCount</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">):</span><span class="w"> </span><span class="nb">int</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Number of clients currently bound to this manager. Relaxed load,</p>
+<p>suitable for inspection and tests; not synchronized against
+concurrent <code>bindClient</code> / <code>unbindClient</code>.</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-parameters">
+        <h5>Parameters</h5>
+        <ul>
+          
+            <li>
+              <code>manager</code>
+              (<code>var DebraManager[MaxThreads]</code>)
+              
+            </li>
+          
+        </ul>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-returns">
+        <h5>Returns</h5>
+        <p><code>int</code></p>
+      </div>
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L110" target="_blank" rel="noopener">
+            src/debra.nim:110
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
 
     
   </div>
@@ -4583,8 +4859,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L49" target="_blank" rel="noopener">
-            src/debra/types.nim:49
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L55" target="_blank" rel="noopener">
+            src/debra/types.nim:55
           </a>
         
       </div>
@@ -4625,8 +4901,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L54" target="_blank" rel="noopener">
-            src/debra/types.nim:54
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L60" target="_blank" rel="noopener">
+            src/debra/types.nim:60
           </a>
         
       </div>
@@ -4679,8 +4955,8 @@ Raises DebraRegistrationError if max threads already registered.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L68" target="_blank" rel="noopener">
-            src/debra/types.nim:68
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L74" target="_blank" rel="noopener">
+            src/debra/types.nim:74
           </a>
         
       </div>
@@ -4717,6 +4993,12 @@ Raises DebraRegistrationError if max threads already registered.</p>
 bag lists are owned by their respective slots without synchronization,
 so concurrent retire during destruction is undefined). Process-exit
 and end-of-scope cleanup is the typical caller.</p>
+<p>Asserts via <code>doAssert</code> that no clients are still bound (<code>boundClients
+== 0</code>). A non-zero count means a data structure built on this manager
+(e.g. a lock-free queue) is being destroyed after its manager, which
+is a programmer error: the client will continue to call into freed
+manager state. The assertion fires in release builds because the
+downstream UB is silent.</p>
 <p>Without this, retire-but-not-yet-reclaimed objects (and the limbo bags
 that hold them) leak under ASAN at exit. With aggressive Manual
 strategies or short-lived managers, the leak is observable.</p>
@@ -4746,8 +5028,8 @@ strategies or short-lived managers, the leak is observable.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L84" target="_blank" rel="noopener">
-            src/debra/types.nim:84
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/types.nim#L91" target="_blank" rel="noopener">
+            src/debra/types.nim:91
           </a>
         
       </div>
@@ -6348,8 +6630,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L51" target="_blank" rel="noopener">
-            src/debra/typestates/manager.nim:51
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L52" target="_blank" rel="noopener">
+            src/debra/typestates/manager.nim:52
           </a>
         
       </div>
@@ -6413,8 +6695,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L71" target="_blank" rel="noopener">
-            src/debra/typestates/manager.nim:71
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/typestates/manager.nim#L72" target="_blank" rel="noopener">
+            src/debra/typestates/manager.nim:72
           </a>
         
       </div>
