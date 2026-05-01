@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-30
+
+### Added
+
+- `debra/atomics/backoff` module: spin-loop hint primitives for lock-free retry loops.
+  - `cpuPause()` — per-CPU spin-loop hint. Emits inline `pause` (amd64/i386) or `yield` (arm64 and 32-bit arm) asm with `"memory"` clobber under GCC/Clang/objc-clang, and the matching `_mm_pause` (amd64/i386) / `__yield` (arm64) intrinsic from `<intrin.h>` under MSVC. No-op fallback on architectures or compilers without an established hint (correctness preserved). Named `cpuPause` (not `cpuRelax`) to avoid collision with `std/sysatomics.cpuRelax` (re-exported via `system` unless `-d:nimPreviewSlimSystem`). The stdlib version is a compiler-barrier-only fallback on non-x86 (no hardware `yield`/`pause` hint emitted); this implementation provides the real `yield` hint.
+  - `schedYield()` — releases the current thread's CPU quantum to the OS scheduler. POSIX targets (Linux, macOS, BSDs) wrap `sched_yield(2)` under `when defined(posix)`; Windows wraps `SwitchToThread` under `when defined(windows)`. No-op fallback on other targets. Function-local `importc` keeps `<sched.h>` out of unrelated translation units.
+  - Both procs are `{.inline.}` and exported. Zero overhead on the success path of CAS-retry loops (only invoked on failure edges by the caller).
+  - Unblocks bounded-MPMC livelock fix in lockfreequeues (downstream PR coordinated separately).
+
 ## [0.3.1] - 2026-04-30
 
 ### Fixed
