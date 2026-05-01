@@ -16,3 +16,4 @@ import ./t_convenience
 import ./t_refptr
 import ./t_integration
 import ./t_backoff
+import ./t_bind_client

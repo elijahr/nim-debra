@@ -78,3 +78,39 @@ proc currentEpoch*[MaxThreads: static int](
 ): uint64 {.inline.} =
   ## Get current global epoch.
   manager.globalEpoch.load(moAcquire)
+
+proc bindClient*[MaxThreads: static int](
+    manager: var DebraManager[MaxThreads]
+) {.inline.} =
+  ## Register a client (e.g. a lock-free data structure) as bound to
+  ## this manager. Increments `boundClients` by 1.
+  ##
+  ## Lock-free libraries built on nim-debra should call `bindClient` in
+  ## their constructor and `unbindClient` in their destructor. The
+  ## manager's destructor asserts the count is zero, so a non-zero
+  ## count at teardown means a client outlived its manager: the client
+  ## would continue calling into freed manager state.
+  discard manager.boundClients.fetchAdd(1, moAcquireRelease)
+
+proc unbindClient*[MaxThreads: static int](
+    manager: var DebraManager[MaxThreads]
+) {.inline.} =
+  ## Unregister a client previously bound via `bindClient`. Decrements
+  ## `boundClients` by 1. See `bindClient` for usage.
+  ##
+  ## Asserts the previous count was positive: an underflow indicates an
+  ## unbalanced unbind (e.g. double-destroy of a client) and is caught
+  ## here with a precise stack trace, rather than later as a non-zero
+  ## value seen by the manager destructor.
+  let prev = manager.boundClients.fetchSub(1, moAcquireRelease)
+  doAssert prev > 0,
+    "unbindClient: boundClients underflow (was " & $prev &
+      ", expected > 0); unbalanced bindClient/unbindClient"
+
+proc clientCount*[MaxThreads: static int](
+    manager: var DebraManager[MaxThreads]
+): int {.inline.} =
+  ## Number of clients currently bound to this manager. Relaxed load,
+  ## suitable for inspection and tests; not synchronized against
+  ## concurrent `bindClient` / `unbindClient`.
+  manager.boundClients.load(moRelaxed)
