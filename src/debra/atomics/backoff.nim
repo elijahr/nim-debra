@@ -51,7 +51,7 @@ proc cpuPause*() {.inline.} =
       when defined(amd64) or defined(i386):
         proc mm_pause() {.importc: "_mm_pause", header: "<intrin.h>".}
         mm_pause()
-      elif defined(arm64):
+      elif defined(arm64) or defined(arm):
         proc yield_hint() {.importc: "__yield", header: "<intrin.h>".}
         yield_hint()
       else:
