@@ -294,34 +294,6 @@ proc compareExchangeStrong*[T](
     toAtomMemModel(failure),
   )
 
-proc compareExchange*[T](
-    loc: var Atomic[T],
-    expected: var T,
-    desired: T,
-    success: static MemoryOrder,
-    failure: static MemoryOrder,
-): bool {.inline.} =
-  ## Strong compare-and-exchange. Unsuffixed-name alias for
-  ## `compareExchangeStrong`, matching the spelling used by clients
-  ## migrating from `std/atomics`.
-  compareExchangeStrong(loc, expected, desired, success, failure)
-
-proc compareExchange*[T](
-    loc: var Atomic[T], expected: var T, desired: T, order: static MemoryOrder
-): bool {.inline.} =
-  ## Strong CAS, single-order form. Failure order is derived from
-  ## success per C11 (drop the release component). Alias for
-  ## `compareExchangeStrong`.
-  compareExchangeStrong(loc, expected, desired, order)
-
-proc compareExchange*[T](
-    loc: var Atomic[T], expected: var T, desired: T
-): bool {.inline.} =
-  ## Strong CAS, default-order form. Equivalent to passing
-  ## `moSequentiallyConsistent` for both success and failure. Alias
-  ## for `compareExchangeStrong`.
-  compareExchangeStrong(loc, expected, desired)
-
 proc compareExchangeWeak*[T](
     loc: var Atomic[T],
     expected: var T,
@@ -376,6 +348,40 @@ proc compareExchangeWeak*[T](
   compareExchangeWeak(
     loc, expected, desired, moSequentiallyConsistent, moSequentiallyConsistent
   )
+
+# ---------------------------------------------------------------------------
+# compareExchange aliases (unsuffixed name, std/atomics-compatible spelling)
+# Defined after all compareExchangeStrong overloads so each alias resolves
+# against a fully-defined target.
+# ---------------------------------------------------------------------------
+
+proc compareExchange*[T](
+    loc: var Atomic[T],
+    expected: var T,
+    desired: T,
+    success: static MemoryOrder,
+    failure: static MemoryOrder,
+): bool {.inline.} =
+  ## Strong compare-and-exchange. Unsuffixed-name alias for
+  ## `compareExchangeStrong`, matching the spelling used by clients
+  ## migrating from `std/atomics`.
+  compareExchangeStrong(loc, expected, desired, success, failure)
+
+proc compareExchange*[T](
+    loc: var Atomic[T], expected: var T, desired: T, order: static MemoryOrder
+): bool {.inline.} =
+  ## Strong CAS, single-order form. Failure order is derived from
+  ## success per C11 (drop the release component). Alias for
+  ## `compareExchangeStrong`.
+  compareExchangeStrong(loc, expected, desired, order)
+
+proc compareExchange*[T](
+    loc: var Atomic[T], expected: var T, desired: T
+): bool {.inline.} =
+  ## Strong CAS, default-order form. Equivalent to passing
+  ## `moSequentiallyConsistent` for both success and failure. Alias
+  ## for `compareExchangeStrong`.
+  compareExchangeStrong(loc, expected, desired)
 
 # ---------------------------------------------------------------------------
 # Numeric (SomeInteger only)
