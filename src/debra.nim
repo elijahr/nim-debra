@@ -104,7 +104,8 @@ proc unbindClient*[MaxThreads: static int](
   ## value seen by the manager destructor.
   let prev = manager.boundClients.fetchSub(1, moAcquireRelease)
   doAssert prev > 0,
-    "unbindClient: boundClients underflow (was " & $prev & ", expected > 0); unbalanced bindClient/unbindClient"
+    "unbindClient: boundClients underflow (was " & $prev &
+      ", expected > 0); unbalanced bindClient/unbindClient"
 
 proc clientCount*[MaxThreads: static int](
     manager: var DebraManager[MaxThreads]
