@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-01
+
+### Added
+
+- Client refcount tracking on `DebraManager`. New procs `bindClient`, `unbindClient`, `clientCount`. The manager's destructor asserts `clientCount == 0` to catch the case where a client (e.g. a lock-free data structure) outlives its manager. Lock-free libraries built on nim-debra should bind in their constructor and unbind in their destructor.
+- `compareExchange` as an unsuffixed-name alias for `compareExchangeStrong` in `debra/atomics`. Convenience for clients migrating from `std/atomics`.
+
+### Changed
+
+- Bump minimum `typestates` to 0.6.0.
+
 ## [0.4.0] - 2026-04-30
 
 ### Added

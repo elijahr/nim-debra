@@ -40,6 +40,12 @@ type
     globalEpoch* {.align: CacheLineBytes.}: Atomic[uint64] ## Global epoch counter.
     activeThreadMask* {.align: CacheLineBytes.}: Atomic[uint64]
       ## Bitmask of registered threads.
+    boundClients* {.align: CacheLineBytes.}: Atomic[int]
+      ## Refcount of clients (e.g. lock-free data structures) currently
+      ## bound to this manager via `bindClient` / `unbindClient`. The
+      ## destructor asserts this is zero so a client cannot outlive its
+      ## manager. Cache-line aligned to keep client bind/unbind off the
+      ## hot `globalEpoch` and `activeThreadMask` lines.
     threads* {.align: CacheLineBytes.}: array[MaxThreads, ThreadState[MaxThreads]]
       ## Per-thread state. Cache-line aligned to prevent false sharing
       ## across the per-thread slots (each slot is owned by a different
@@ -72,6 +78,7 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
   ## "never observed" in thread state.
   result.globalEpoch.store(1'u64, moRelaxed)
   result.activeThreadMask.store(0'u64, moRelaxed)
+  result.boundClients.store(0, moRelaxed)
   for i in 0 ..< MaxThreads:
     result.threads[i].epoch.store(0'u64, moRelaxed)
     result.threads[i].pinned.store(false, moRelaxed)
@@ -89,9 +96,21 @@ proc `=destroy`*[MaxThreads: static int](manager: var DebraManager[MaxThreads]) 
   ## so concurrent retire during destruction is undefined). Process-exit
   ## and end-of-scope cleanup is the typical caller.
   ##
+  ## Asserts via `doAssert` that no clients are still bound (`boundClients
+  ## == 0`). A non-zero count means a data structure built on this manager
+  ## (e.g. a lock-free queue) is being destroyed after its manager, which
+  ## is a programmer error: the client will continue to call into freed
+  ## manager state. The assertion fires in release builds because the
+  ## downstream UB is silent.
+  ##
   ## Without this, retire-but-not-yet-reclaimed objects (and the limbo bags
   ## that hold them) leak under ASAN at exit. With aggressive Manual
   ## strategies or short-lived managers, the leak is observable.
+  let bound = manager.boundClients.load(moAcquire)
+  doAssert bound == 0,
+    "DebraManager destroyed while " & $bound &
+      " client(s) still bound; clients (e.g. lock-free data structures) " &
+      "must be torn down before their manager"
   for i in 0 ..< MaxThreads:
     var bag = manager.threads[i].limboBagTail
     while bag != nil:
