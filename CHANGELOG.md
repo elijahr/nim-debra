@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Wired previously-orphaned test files into the nimble test runner: `tests/t_atomics`, `tests/t_atomics_dsl`, `tests/t_thread_id`, `tests/t_item_processing`, and `tests/t_lockfree_stack_typestates` were not imported by `tests/test.nim` and so were not exercised in CI. The compile-time-only negative test `tests/t_atomics_dsl_negative.nim` is now run via `nim check` from the `test` nimble task (it cannot be wired into `tests/test.nim` directly because doing so would import the DSL it asserts is not transitively reachable).
+- `sendSignal(InvalidThreadId, ...)` now short-circuits with `ESRCH` instead of forwarding the zero handle into `pthread_kill`. Apple's libpthread happens to validate and return `ESRCH` for invalid handles, but glibc dereferences and may segfault. The corresponding test was previously fabricating a non-zero `pthread_t` (`999999`) and relying on the platform to gracefully reject it; that path is undefined behavior per POSIX (and *did* segfault on glibc, breaking CI). The test now exercises the `InvalidThreadId` path, which is the only invalid sentinel `sendSignal` supports.
 
 ### Added
 

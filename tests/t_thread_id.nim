@@ -1,6 +1,7 @@
 # tests/t_thread_id.nim
 
 import unittest2
+import std/posix
 
 import debra/thread_id
 
@@ -51,12 +52,13 @@ suite "ThreadId":
     # Should return 0 (success) for the current thread
     check rc == 0
 
-  test "sendSignal to invalid thread returns error":
-    # Sending a signal to an invalid/non-existent thread should fail
-    let invalidTid = unsafeThreadIdFromInt(999999)
-    let rc = invalidTid.sendSignal(0)
-    # Should return non-zero error code (typically ESRCH - No such process)
-    check rc != 0
+  test "sendSignal to InvalidThreadId returns ESRCH":
+    # InvalidThreadId is the only documented invalid sentinel; sendSignal
+    # short-circuits with ESRCH for it. Passing a fabricated non-zero
+    # handle to pthread_kill is UB per POSIX (Apple validates and returns
+    # ESRCH; glibc segfaults), so we don't test that path.
+    let rc = InvalidThreadId.sendSignal(0)
+    check rc == ESRCH
 
   test "unsafeThreadIdFromInt creates ThreadId from integer":
     let tid = unsafeThreadIdFromInt(12345)
