@@ -45,12 +45,16 @@ jobs:
           nim-version: ${{ matrix.nim-version }}
 
       - name: Cache Nimble packages
+        # Cache key is bound to *.nimble so any dep change forces a fresh
+        # install. We deliberately do NOT use restore-keys: a partial-match
+        # restore brings in stale ~/.nimble/pkgs2 source clones, and nimble
+        # then resolves against the cached clone's tag set rather than
+        # re-fetching upstream — so newly-published dep versions are
+        # invisible. Full miss + fresh install is the correct behavior.
         uses: actions/cache@v4
         with:
           path: ~/.nimble
           key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
-          restore-keys: |
-            ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-
 
       - name: Install dependencies
         run: nimble install -y

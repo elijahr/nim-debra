@@ -7,7 +7,7 @@ This guide walks through setting up and using nim-debra in your lock-free data s
 Add nim-debra to your `.nimble` file:
 
 ```nim
-requires "debra >= 0.1.0"
+requires "debra >= 0.3.0"
 ```
 
 Or install globally:
@@ -38,7 +38,7 @@ The following example demonstrates the complete DEBRA+ lifecycle:
 - **Handle**: Per-thread registration for DEBRA operations
 - **Pin/Unpin**: Mark critical sections where shared data is accessed
 - **`retain[T]`**: GC-pin a `ref T` and return a raw `ptr T` suitable for atomic storage (`debra/refptr`)
-- **`releaseDestructor[T]()`**: Build a `Destructor` closure that pairs the `retain` at reclamation time
+- **`releaseDestructor[T]()`**: Return a captureless `Destructor` function pointer that pairs the `retain` at reclamation time
 - **Retire**: Mark a removed pointer (and its destructor) for later safe reclamation
 - **Reclaim**: Run pending destructors once all threads have advanced past the retiring epoch
 

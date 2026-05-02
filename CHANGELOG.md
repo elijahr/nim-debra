@@ -23,6 +23,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `fetchAdd[T: SomeFloat]` implemented via a `compareExchangeWeak` CAS-loop because GCC's `__atomic_fetch_add_n` builtin family is integer-only on float operands. Unlike the pure bitwise ops above, `fetchAdd` performs an IEEE-754 float add: the returned old value is bit-exact, but the new stored value reflects FPU state (rounding mode, FTZ/DAZ flush-to-zero), does not preserve NaN payloads across the add, and produces +/-Inf on overflow.
   - The bitwise fetch ops (`fetchAnd`/`fetchOr`/`fetchXor`) and `fetchSub` are deliberately not provided for floats: bitwise ops have no meaningful float semantics, and `fetchSub` is expressible as `fetchAdd(-x)`.
 
+## [0.5.0] - 2026-05-01
+
+### Added
+
+- Client refcount tracking on `DebraManager`. New procs `bindClient`, `unbindClient`, `clientCount`. The manager's destructor asserts `clientCount == 0` to catch the case where a client (e.g. a lock-free data structure) outlives its manager. Lock-free libraries built on nim-debra should bind in their constructor and unbind in their destructor.
+- `compareExchange` as an unsuffixed-name alias for `compareExchangeStrong` in `debra/atomics`. Convenience for clients migrating from `std/atomics`.
+
+### Changed
+
+- Bump minimum `typestates` to 0.6.0.
+
+## [0.4.0] - 2026-04-30
+
+### Added
+
+- `debra/atomics/backoff` module: spin-loop hint primitives for lock-free retry loops.
+  - `cpuPause()` — per-CPU spin-loop hint. Emits inline `pause` (amd64/i386) or `yield` (arm64 and 32-bit arm) asm with `"memory"` clobber under GCC/Clang/objc-clang, and the matching `_mm_pause` (amd64/i386) / `__yield` (arm64) intrinsic from `<intrin.h>` under MSVC. No-op fallback on architectures or compilers without an established hint (correctness preserved). Named `cpuPause` (not `cpuRelax`) to avoid collision with `std/sysatomics.cpuRelax` (re-exported via `system` unless `-d:nimPreviewSlimSystem`). The stdlib version is a compiler-barrier-only fallback on non-x86 (no hardware `yield`/`pause` hint emitted); this implementation provides the real `yield` hint.
+  - `schedYield()` — releases the current thread's CPU quantum to the OS scheduler. POSIX targets (Linux, macOS, BSDs) wrap `sched_yield(2)` under `when defined(posix)`; Windows wraps `SwitchToThread` under `when defined(windows)`. No-op fallback on other targets. Function-local `importc` keeps `<sched.h>` out of unrelated translation units.
+  - Both procs are `{.inline.}` and exported. Zero overhead on the success path of CAS-retry loops (only invoked on failure edges by the caller).
+  - Unblocks bounded-MPMC livelock fix in lockfreequeues (downstream PR coordinated separately).
+
+## [0.3.1] - 2026-04-30
+
+### Fixed
+
+- Documentation drift after the 0.3.0 API rewrite. Five `let pinned = handle.pin()` snippets in `docs/guide/integration.md` and `docs/guide/neutralization.md` now use `unpinned(handle).pin()` (the form `pin`'s `sink Unpinned[MT]` parameter actually accepts).
+- `docs/guide/retiring-objects.md` warned that `releaseDestructor[T]()` allocates a fresh closure per call and recommended caching it. Inverted: it returns a captureless `nimcall` proc with one address per `T`, reused across calls.
+- `docs/guide/getting-started.md` described the `Destructor` value as a "closure"; corrected to "captureless function pointer".
+- Suggested `requires "debra >= 0.1.0"` in `docs/guide/getting-started.md` and `docs/index.md` bumped to `>= 0.3.0`, since the surrounding examples assume `withPin` / `retain` / `releaseDestructor`.
+- `docs/guide/epoch-advancement.md` heading "Worked example" → "Working example".
+
 ## [0.3.0] - 2026-04-27
 
 ### Added
@@ -226,7 +257,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/elijahr/nim-debra/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/elijahr/nim-debra/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/elijahr/nim-debra/compare/v0.1.2...v0.2.0

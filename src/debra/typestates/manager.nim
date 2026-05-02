@@ -39,6 +39,7 @@ proc initialize*[MaxThreads: static int](
   let mgr = ctx.manager
   mgr.globalEpoch.store(1'u64, moRelaxed)
   mgr.activeThreadMask.store(0'u64, moRelaxed)
+  mgr.boundClients.store(0, moRelaxed)
   for i in 0 ..< MaxThreads:
     mgr.threads[i].epoch.store(0'u64, moRelaxed)
     mgr.threads[i].pinned.store(false, moRelaxed)

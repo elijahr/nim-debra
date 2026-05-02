@@ -2,7 +2,7 @@
 
 # Package
 
-version = "0.4.0"
+version = "0.6.0"
 author = "elijahr <elijahr+debra@gmail.com>"
 description = "DEBRA+ safe memory reclamation for lock-free data structures"
 license = "MIT"
@@ -12,13 +12,13 @@ installExt = @["nim"]
 # Dependencies
 
 requires "nim >= 2.2.0"
-requires "typestates >= 0.2.1"
+requires "typestates >= 0.6.0"
 requires "unittest2 >= 0.2.0"
 
 # Tasks
 
 task test, "Run tests with all memory managers":
-  for mm in ["orc", "arc", "refc"]:
+  for mm in ["orc", "arc", "atomicArc", "refc"]:
     echo "Testing with --mm:" & mm
     exec "nim c -r --mm:" & mm &
       " --threads:on --path:src -d:testing tests/test.nim"

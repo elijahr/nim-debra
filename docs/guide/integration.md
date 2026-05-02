@@ -110,13 +110,13 @@ for the canonical pattern.
 
 ```nim
 # GOOD - process outside critical section
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 let data = loadSharedData()
 discard pinned.unpin()
 processData(data)
 
 # BAD - process inside critical section
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 let data = loadSharedData()
 processData(data)
 discard pinned.unpin()
@@ -154,7 +154,7 @@ Don't reclaim after every operation - amortize the cost.
 let value = queue.head.load(moAcquire).value
 
 # RIGHT - pin before access
-let pinned = handle.pin()
+let pinned = unpinned(handle).pin()
 let value = queue.head.load(moAcquire).value
 discard pinned.unpin()
 ```

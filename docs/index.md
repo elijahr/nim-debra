@@ -100,7 +100,7 @@ nimble install debra
 Or add to your `.nimble` file:
 
 ```nim
-requires "debra >= 0.1.0"
+requires "debra >= 0.3.0"
 ```
 
 ## Quick Links

@@ -7,6 +7,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Manual version to deploy (e.g. 0.3.0). When set, deploys that version with the "latest" alias regardless of ref. Leave blank for default behavior (dev on main, $tag on tags).'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -27,32 +32,41 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install asdf
-        uses: asdf-vm/actions/setup@v3
+      # Use asdf-nim instead of setup-nim-action because mkdocstrings-nim's
+      # extractor does `import compiler/ast`, which only resolves when Nim is
+      # installed in a layout that exposes the compiler modules. asdf-nim
+      # builds Nim from source and `nimble install compiler` provides the
+      # required modules on the import path.
+      - name: Setup asdf
+        uses: asdf-vm/actions/setup@v4
 
       - name: Install asdf-nim plugin
         run: asdf plugin add nim https://github.com/asdf-community/asdf-nim.git
 
       - name: Install Nim
         run: |
-          asdf install nim latest:2
-          asdf global nim latest:2
+          asdf install nim 2.2.10
+          # -u writes to ~/.tool-versions so asdf can resolve the version
+          # from any cwd (e.g. /tmp during the compiler install step).
+          asdf set -u nim 2.2.10
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Cache only the nimble package store (not the asdf install — caching
+      # the asdf install dir breaks asdf-nim's nimble shim because the shim
+      # expects state created on first invocation).
       - name: Cache Nimble packages
         uses: actions/cache@v4
         with:
-          path: ~/.nimble
-          key: ${{ runner.os }}-nimble-docs-${{ hashFiles('*.nimble') }}
-          restore-keys: |
-            ${{ runner.os }}-nimble-docs-
+          path: ~/.asdf/installs/nim/2.2.10/nimble/pkgs2
+          key: ${{ runner.os }}-nim-2.2.10-nimble-compiler-v1
 
-      - name: Install Nim compiler source
+      - name: Install compiler modules
+        # Run from /tmp so nimble does NOT enter project-lockfile mode (which
+        # would install the project's deps instead of the `compiler` package).
         run: |
-          if ! nimble path nim > /dev/null 2>&1; then
-            nimble install nim -y
-          else
-            echo "Nim compiler source already installed (from cache)"
-          fi
+          cd /tmp
+          nimble install compiler -y
 
       - name: Install Python dependencies
         run: pip install -r docs-requirements.txt
@@ -71,6 +85,12 @@ jobs:
         run: |
           git fetch origin gh-pages --depth=1 || true
 
+      - name: Deploy docs (manual version)
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        run: |
+          mike deploy --push --update-aliases "${{ inputs.version }}" latest
+          mike set-default --push latest
+
       - name: Deploy docs (versioned)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -79,6 +99,6 @@ jobs:
           mike set-default --push latest
 
       - name: Deploy docs (dev)
-        if: github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           mike deploy --push dev
