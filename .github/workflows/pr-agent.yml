@@ -1,0 +1,13 @@
+name: PR Agent
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  call:
+    uses: elijahr/.github/.github/workflows/pr-agent.yml@devel
+    secrets:
+      OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
