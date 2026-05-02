@@ -8,6 +8,10 @@ on:
 
 jobs:
   call:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
     uses: elijahr/.github/.github/workflows/pr-agent.yml@devel
     secrets:
       OPENROUTER_KEY: ${{ secrets.OPENROUTER_KEY }}
