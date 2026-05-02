@@ -15,5 +15,10 @@ import ./t_slot
 import ./t_convenience
 import ./t_refptr
 import ./t_integration
+import ./t_atomics
+import ./t_atomics_dsl
+import ./t_thread_id
+import ./t_item_processing
+import ./t_lockfree_stack_typestates
 import ./t_backoff
 import ./t_bind_client

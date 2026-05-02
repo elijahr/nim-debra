@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Hardened `ThreadState.cacheLinePad` size derivation against future field additions. Padding length is now derived from `sizeof(ThreadStateLive[MaxThreads])` (a sibling type that mirrors `ThreadState`'s live fields) instead of a hand-summed `56` constant, so adding or removing fields automatically resizes the pad. A drift-detection `static: assert` fails fast at compile time if the two types fall out of sync.
+
+### Fixed
+
+- Wired previously-orphaned test files into the nimble test runner: `tests/t_atomics`, `tests/t_atomics_dsl`, `tests/t_thread_id`, `tests/t_item_processing`, and `tests/t_lockfree_stack_typestates` were not imported by `tests/test.nim` and so were not exercised in CI. The compile-time-only negative test `tests/t_atomics_dsl_negative.nim` is now run via `nim check` from the `test` nimble task (it cannot be wired into `tests/test.nim` directly because doing so would import the DSL it asserts is not transitively reachable).
+- `sendSignal(InvalidThreadId, ...)` now short-circuits with `ESRCH` instead of forwarding the zero handle into `pthread_kill`. Apple's libpthread happens to validate and return `ESRCH` for invalid handles, but glibc dereferences and may segfault. The corresponding test was previously fabricating a non-zero `pthread_t` (`999999`) and relying on the platform to gracefully reject it; that path is undefined behavior per POSIX (and *did* segfault on glibc, breaking CI). The test now exercises the `InvalidThreadId` path, which is the only invalid sentinel `sendSignal` supports.
+
+### Added
+
+- `Atomic[float32]` and `Atomic[float64]` support in `debra/atomics`.
+  - `load`, `store`, `exchange`, and `compareExchangeStrong`/`compareExchangeWeak` accept floats through the existing generic path: the `nonAtomicType(T)` indirection routes float operations through the same-width integer atomic builtins via a bitcast, so `-0.0`, denormals, and NaN payloads round-trip bit-exactly. CAS uses bit-equality, matching `std::atomic<float>` semantics in C++ and the `AtomicU32::as_float`-style pattern in other languages: `+0.0` does NOT match `-0.0`, and two NaN values with distinct bit patterns do NOT compare equal.
+  - `fetchAdd[T: SomeFloat]` implemented via a `compareExchangeWeak` CAS-loop because GCC's `__atomic_fetch_add_n` builtin family is integer-only on float operands. Unlike the pure bitwise ops above, `fetchAdd` performs an IEEE-754 float add: the returned old value is bit-exact, but the new stored value reflects FPU state (rounding mode, FTZ/DAZ flush-to-zero), does not preserve NaN payloads across the add, and produces +/-Inf on overflow.
+  - The bitwise fetch ops (`fetchAnd`/`fetchOr`/`fetchXor`) and `fetchSub` are deliberately not provided for floats: bitwise ops have no meaningful float semantics, and `fetchSub` is expressible as `fetchAdd(-x)`.
+
 ## [0.5.0] - 2026-05-01
 
 ### Added
@@ -241,7 +257,9 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/elijahr/nim-debra/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/elijahr/nim-debra/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/elijahr/nim-debra/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/elijahr/nim-debra/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/elijahr/nim-debra/compare/v0.2.0...v0.2.1

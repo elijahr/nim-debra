@@ -9,6 +9,19 @@ import ./limbo
 import ./thread_id
 
 type
+  ThreadStateLive[MaxThreads: static int] = object
+    ## Sibling type used SOLELY to derive the live-field byte total for
+    ## `ThreadState.cacheLinePad`. Must mirror `ThreadState`'s fields
+    ## exactly, minus `cacheLinePad`. The `static: assert` block below
+    ## catches drift between the two declarations.
+    epoch {.align: 8.}: Atomic[uint64]
+    pinned {.align: 8.}: Atomic[bool]
+    neutralized {.align: 8.}: Atomic[bool]
+    threadId {.align: 8.}: Atomic[ThreadId]
+    currentBag: ptr LimboBag
+    limboBagTail: ptr LimboBag
+    advanceCounter: uint64
+
   ThreadState*[MaxThreads: static int] = object
     ## Per-thread state tracked by the DEBRA manager.
     epoch* {.align: 8.}: Atomic[uint64] ## Last observed global epoch.
@@ -27,13 +40,21 @@ type
     # do not share a cache line. The `{.align: CacheLineBytes.}` on the
     # `threads` array only aligns the first element; without per-slot
     # padding, every slot after the first floats to its natural alignment
-    # and adjacent slots would false-share on every atomic write. The live
-    # fields above total 56 bytes today (4 atomics at 8 bytes, 2 pointers
-    # at 8 bytes, `advanceCounter` at 8 bytes); pad to `CacheLineBytes` so
-    # 64-byte (x86_64, AArch64) and 128-byte (Apple Silicon, PowerPC, or
-    # `-d:CacheLineBytes=128`) targets both work without manual edits.
-    # The static assert below catches any layout drift.
-    cacheLinePad: array[CacheLineBytes - 56, byte]
+    # and adjacent slots would false-share on every atomic write.
+    #
+    # Padding size is derived from `sizeof(ThreadStateLive[MaxThreads])`
+    # rather than a hand-summed constant, so adding/removing fields above
+    # automatically resizes the pad (provided the same change is mirrored
+    # into `ThreadStateLive`). The outer `mod CacheLineBytes` collapses
+    # the "exactly aligned" case to a 0-byte array instead of a full
+    # extra cache line. Works for 64-byte (x86_64, AArch64) and 128-byte
+    # (Apple Silicon, PowerPC, `-d:CacheLineBytes=128`) targets without
+    # manual edits. The static asserts below catch any drift.
+    cacheLinePad: array[
+      (CacheLineBytes - sizeof(ThreadStateLive[MaxThreads]) mod CacheLineBytes) mod
+        CacheLineBytes,
+      byte,
+    ]
 
   DebraManager*[MaxThreads: static int] = object
     ## Coordinates epoch-based reclamation across threads.
@@ -62,14 +83,27 @@ type
 
 # The cache-line alignment of `DebraManager.threads` only prevents false
 # sharing if each `ThreadState` is itself an exact multiple of the cache
-# line. If this static assertion ever fails, switch to padding `ThreadState`
-# (e.g. add a `_pad: array[CacheLineBytes - sizeof(...), byte]` field, or
-# wrap each slot in a padded object).
+# line. The first assertion below verifies that. The second assertion
+# verifies that `ThreadStateLive` mirrors `ThreadState`'s live fields
+# (everything except `cacheLinePad`); if a field is added/removed/resized
+# in one type but not the other, the drift trips a clear compile error
+# instead of silently producing the wrong padding size.
 static:
   assert sizeof(ThreadState[DefaultMaxThreads]) mod CacheLineBytes == 0,
     "ThreadState size (" & $sizeof(ThreadState[DefaultMaxThreads]) &
       ") must be a multiple of CacheLineBytes (" & $CacheLineBytes &
       ") to prevent false sharing across DebraManager.threads slots"
+  # Drift check: ThreadStateLive must contain the SAME fields as ThreadState
+  # minus cacheLinePad. If you add a field to one, add it to the other.
+  assert sizeof(ThreadState[DefaultMaxThreads]) -
+    sizeof(ThreadState[DefaultMaxThreads].cacheLinePad) ==
+    sizeof(ThreadStateLive[DefaultMaxThreads]),
+    "ThreadStateLive (" & $sizeof(ThreadStateLive[DefaultMaxThreads]) &
+      " bytes) is out of sync with ThreadState's live fields (" &
+      $(
+        sizeof(ThreadState[DefaultMaxThreads]) -
+        sizeof(ThreadState[DefaultMaxThreads].cacheLinePad)
+      ) & " bytes); update ThreadStateLive to mirror ThreadState"
 
 proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
   ## Initialize a new DEBRA+ manager.

@@ -3,6 +3,8 @@
 ## Tests for debra/atomics: a custom atomics module that rejects ref T,
 ## enforces lock-free at compile time, and validates memory orders per op.
 
+import std/math
+
 import unittest2
 
 import debra/atomics
@@ -435,6 +437,302 @@ suite "static rejection":
   # is parsed unconditionally; failing builds on non-lock-free
   # primitives is exercised by the 32-bit CI lane in Phase D.
 
+suite "float load/store":
+  test "float32 load/store roundtrip with sentinel values":
+    var a: Atomic[float32]
+    # Zero
+    a.store(0.0'f32)
+    check a.load() == 0.0'f32
+    # Positive integer-valued float
+    a.store(1.0'f32)
+    check a.load() == 1.0'f32
+    # Negative
+    a.store(-1.0'f32)
+    check a.load() == -1.0'f32
+    # Approximate pi
+    a.store(3.1415927'f32)
+    check a.load() == 3.1415927'f32
+    # Negative zero: bit-distinct from +0.0 but `==` returns true.
+    # Verify both: `==` is true AND the bit pattern is preserved through
+    # the bitcast roundtrip.
+    a.store(-0.0'f32)
+    check a.load() == -0.0'f32
+    check cast[uint32](a.load()) == cast[uint32](-0.0'f32)
+    check cast[uint32](a.load()) != cast[uint32](0.0'f32)
+    # Smallest positive subnormal float32 (~1.4e-45). Subnormals have
+    # special bit layouts; verify bitcast preserves them exactly.
+    let subnormal = cast[float32](1'u32)
+    a.store(subnormal)
+    check cast[uint32](a.load()) == 1'u32
+
+  test "float32 NaN load/store preserves bit pattern":
+    # `==` on NaN returns false, so we can't compare with `==`. The
+    # bitcast roundtrip must preserve the exact NaN bit pattern.
+    var a: Atomic[float32]
+    let nanBits: uint32 = 0x7FC0_0000'u32 # canonical quiet NaN
+    let nanVal = cast[float32](nanBits)
+    a.store(nanVal)
+    check cast[uint32](a.load()) == nanBits
+
+  test "float64 load/store roundtrip with sentinel values":
+    var a: Atomic[float64]
+    a.store(0.0'f64)
+    check a.load() == 0.0'f64
+    a.store(1.0'f64)
+    check a.load() == 1.0'f64
+    a.store(-1.0'f64)
+    check a.load() == -1.0'f64
+    a.store(3.141592653589793'f64)
+    check a.load() == 3.141592653589793'f64
+    # Negative zero bit preservation.
+    a.store(-0.0'f64)
+    check a.load() == -0.0'f64
+    check cast[uint64](a.load()) == cast[uint64](-0.0'f64)
+    check cast[uint64](a.load()) != cast[uint64](0.0'f64)
+    # Smallest positive subnormal float64.
+    let subnormal = cast[float64](1'u64)
+    a.store(subnormal)
+    check cast[uint64](a.load()) == 1'u64
+
+  test "float64 NaN load/store preserves bit pattern":
+    var a: Atomic[float64]
+    let nanBits: uint64 = 0x7FF8_0000_0000_0000'u64 # canonical quiet NaN
+    let nanVal = cast[float64](nanBits)
+    a.store(nanVal)
+    check cast[uint64](a.load()) == nanBits
+
+  test "float load/store with explicit memory orders":
+    var a32: Atomic[float32]
+    a32.store(2.5'f32, moRelease)
+    check a32.load(moAcquire) == 2.5'f32
+    a32.store(7.0'f32, moRelaxed)
+    check a32.load(moRelaxed) == 7.0'f32
+    var a64: Atomic[float64]
+    a64.store(2.5'f64, moRelease)
+    check a64.load(moAcquire) == 2.5'f64
+
+suite "float exchange":
+  test "float32 exchange returns previous value":
+    var a: Atomic[float32]
+    a.store(10.5'f32)
+    check a.exchange(20.25'f32) == 10.5'f32
+    check a.load() == 20.25'f32
+
+  test "float64 exchange returns previous value":
+    var a: Atomic[float64]
+    a.store(10.5'f64)
+    check a.exchange(20.25'f64) == 10.5'f64
+    check a.load() == 20.25'f64
+
+  test "float exchange preserves -0.0 bit pattern":
+    # exchange must use bit-level transfer so -0.0 round-trips bit-exactly.
+    var a: Atomic[float32]
+    a.store(1.0'f32)
+    let prev = a.exchange(-0.0'f32)
+    check prev == 1.0'f32
+    check cast[uint32](a.load()) == cast[uint32](-0.0'f32)
+
+suite "float compareExchange":
+  test "float32 compareExchangeStrong success":
+    var a: Atomic[float32]
+    a.store(1.5'f32)
+    var expected = 1.5'f32
+    check a.compareExchangeStrong(expected, 2.5'f32) == true
+    check expected == 1.5'f32 # unchanged on success
+    check a.load() == 2.5'f32
+
+  test "float32 compareExchangeStrong failure overwrites expected":
+    var a: Atomic[float32]
+    a.store(1.5'f32)
+    var expected = 9.0'f32
+    check a.compareExchangeStrong(expected, 2.5'f32) == false
+    check expected == 1.5'f32 # overwritten with current value
+    check a.load() == 1.5'f32 # unchanged on failure
+
+  test "float64 compareExchangeStrong success":
+    var a: Atomic[float64]
+    a.store(1.5'f64)
+    var expected = 1.5'f64
+    check a.compareExchangeStrong(expected, 2.5'f64) == true
+    check expected == 1.5'f64
+    check a.load() == 2.5'f64
+
+  test "float64 compareExchangeStrong failure overwrites expected":
+    var a: Atomic[float64]
+    a.store(1.5'f64)
+    var expected = 9.0'f64
+    check a.compareExchangeStrong(expected, 2.5'f64) == false
+    check expected == 1.5'f64
+    check a.load() == 1.5'f64
+
+  test "float compareExchangeWeak two-order success":
+    var a: Atomic[float32]
+    a.store(1.5'f32)
+    var expected = 1.5'f32
+    var ok = false
+    for _ in 0 .. 32:
+      if a.compareExchangeWeak(expected, 2.5'f32, moAcquireRelease, moAcquire):
+        ok = true
+        break
+    check ok
+    check a.load() == 2.5'f32
+
+  test "float CAS is bit-equality: distinct NaN payloads do not match":
+    # CAS routes through the integer specialization, so equality is
+    # bit-equality. Two distinct NaN bit patterns will NOT compare
+    # equal even though `==` on floats also returns false for NaNs.
+    # The current value's bits must match `expected`'s bits exactly.
+    var a: Atomic[float32]
+    let nanA = cast[float32](0x7FC0_0000'u32) # quiet NaN, payload 0
+    let nanB = cast[float32](0x7FC0_0001'u32) # quiet NaN, payload 1
+    a.store(nanA)
+    var expected = nanB # different bit pattern
+    let ok = a.compareExchangeStrong(expected, 0.0'f32)
+    check ok == false
+    # On failure, expected is overwritten with the actual current bits.
+    check cast[uint32](expected) == cast[uint32](nanA)
+    # Storage unchanged.
+    check cast[uint32](a.load()) == cast[uint32](nanA)
+
+  test "float CAS is bit-equality: same NaN bit pattern matches":
+    # Counterpart: when the bit patterns DO match, CAS succeeds even
+    # though `==` on NaNs is false. This is the intended semantics:
+    # CAS sees raw bits, not float equality.
+    var a: Atomic[float32]
+    let nanBits: uint32 = 0x7FC0_0000'u32
+    let nanVal = cast[float32](nanBits)
+    a.store(nanVal)
+    var expected = nanVal # exact same bits
+    let ok = a.compareExchangeStrong(expected, 0.0'f32)
+    check ok == true
+    check a.load() == 0.0'f32
+
+  test "float CAS is bit-equality: +0.0 does not match -0.0":
+    # `0.0 == -0.0` is true semantically, but their bit patterns
+    # differ. CAS uses bit-equality, so a CAS expecting +0.0 against a
+    # storage holding -0.0 must FAIL. Document this behavior.
+    var a: Atomic[float32]
+    a.store(-0.0'f32)
+    var expected = 0.0'f32 # different bits from -0.0
+    let ok = a.compareExchangeStrong(expected, 1.0'f32)
+    check ok == false
+    # On failure, expected is overwritten with the current bits (-0.0).
+    check cast[uint32](expected) == cast[uint32](-0.0'f32)
+    check cast[uint32](a.load()) == cast[uint32](-0.0'f32)
+
+suite "float fetchAdd":
+  test "float32 fetchAdd returns old value and accumulates":
+    var a: Atomic[float32]
+    a.store(0.0'f32)
+    check a.fetchAdd(1.5'f32) == 0.0'f32
+    check a.load() == 1.5'f32
+    check a.fetchAdd(0.25'f32) == 1.5'f32
+    check a.load() == 1.75'f32
+
+  test "float32 fetchAdd with negative delta":
+    var a: Atomic[float32]
+    a.store(5.0'f32)
+    check a.fetchAdd(-0.5'f32) == 5.0'f32
+    check a.load() == 4.5'f32
+    check a.fetchAdd(-4.5'f32) == 4.5'f32
+    check a.load() == 0.0'f32
+
+  test "float64 fetchAdd returns old value and accumulates":
+    var a: Atomic[float64]
+    a.store(0.0'f64)
+    check a.fetchAdd(1.5'f64) == 0.0'f64
+    check a.load() == 1.5'f64
+    check a.fetchAdd(0.25'f64) == 1.5'f64
+    check a.load() == 1.75'f64
+
+  test "float64 fetchAdd with mixed signs":
+    var a: Atomic[float64]
+    a.store(10.0'f64)
+    check a.fetchAdd(-3.0'f64) == 10.0'f64
+    check a.fetchAdd(2.5'f64) == 7.0'f64
+    check a.fetchAdd(-9.5'f64) == 9.5'f64
+    check a.load() == 0.0'f64
+
+  test "float fetchAdd with explicit memory order":
+    var a: Atomic[float32]
+    a.store(1.0'f32)
+    check a.fetchAdd(2.0'f32, moAcquireRelease) == 1.0'f32
+    check a.load() == 3.0'f32
+
+  test "float32 fetchAdd overflow produces +Inf":
+    # `fetchAdd` performs an IEEE-754 add; overflowing the format
+    # range produces +Inf. Document this as part of the FPU-state
+    # contract: the new stored value is whatever the FPU computes.
+    let maxF32 = cast[float32](0x7F7F_FFFF'u32) # largest finite float32
+    var a: Atomic[float32]
+    a.store(maxF32)
+    let old = a.fetchAdd(maxF32)
+    # Old value is bit-exact (relaxed-load contract): the pre-RMW
+    # storage bits round-trip into the return value.
+    check cast[uint32](old) == cast[uint32](maxF32)
+    # New stored value overflowed to +Inf.
+    check classify(a.load()) == fcInf
+    check a.load() > 0.0'f32
+
+  test "float64 fetchAdd overflow produces +Inf":
+    let maxF64 = cast[float64](0x7FEF_FFFF_FFFF_FFFF'u64)
+    var a: Atomic[float64]
+    a.store(maxF64)
+    let old = a.fetchAdd(maxF64)
+    check cast[uint64](old) == cast[uint64](maxF64)
+    check classify(a.load()) == fcInf
+    check a.load() > 0.0'f64
+
+  test "float32 fetchAdd of NaN: old value is bit-exact, new value is some NaN":
+    # Locks in the FPU-state contract for NaN inputs:
+    #   * The OLD value returned by fetchAdd is bit-exact (it comes
+    #     from a relaxed load before the add) - the original NaN
+    #     bit pattern is preserved in the return value.
+    #   * The NEW stored value is `NaN + 1.0`, which IEEE-754 says
+    #     is some NaN with implementation-defined payload. We do
+    #     NOT promise the payload is preserved across the add.
+    let nanBits: uint32 = 0x7FC0_0042'u32 # quiet NaN, payload 0x42
+    let nanVal = cast[float32](nanBits)
+    var a: Atomic[float32]
+    a.store(nanVal)
+    let old = a.fetchAdd(1.0'f32)
+    # Old value: bit-exact match to the original NaN.
+    check cast[uint32](old) == nanBits
+    # New stored value: some NaN (any bit pattern). Do NOT assert on
+    # the payload - that's implementation-defined.
+    check classify(a.load()) == fcNan
+
+  test "float64 fetchAdd of NaN: old value is bit-exact, new value is some NaN":
+    let nanBits: uint64 = 0x7FF8_0000_0000_0042'u64
+    let nanVal = cast[float64](nanBits)
+    var a: Atomic[float64]
+    a.store(nanVal)
+    let old = a.fetchAdd(1.0'f64)
+    check cast[uint64](old) == nanBits
+    check classify(a.load()) == fcNan
+
+  test "float64 fetchAdd of +Inf + (-Inf) yields NaN":
+    # IEEE-754: `+Inf + -Inf` is NaN (invalid operation). The old
+    # value returned must be the original +Inf bit pattern.
+    var a: Atomic[float64]
+    a.store(Inf)
+    let old = a.fetchAdd(NegInf)
+    # Old is bit-exact: the +Inf we stored.
+    check cast[uint64](old) == cast[uint64](float64(Inf))
+    check classify(old) == fcInf
+    check old > 0.0'f64
+    # New stored value: NaN (any pattern).
+    check classify(a.load()) == fcNan
+
+  test "float32 fetchAdd of +Inf + (-Inf) yields NaN":
+    var a: Atomic[float32]
+    a.store(float32(Inf))
+    let old = a.fetchAdd(float32(NegInf))
+    check cast[uint32](old) == cast[uint32](float32(Inf))
+    check classify(old) == fcInf
+    check old > 0.0'f32
+    check classify(a.load()) == fcNan
+
 when compileOption("threads"):
   suite "multi-threaded smoke":
     test "4 threads each fetchAdd 1000 increments share a counter":
@@ -454,3 +752,27 @@ when compileOption("threads"):
         joinThread(threads[i])
 
       check counter.load() == NumThreads * Increments
+
+    test "4 threads each fetchAdd 1.0 on a shared float64 counter":
+      # Float fetchAdd is implemented via CAS-loop, not a hardware atomic
+      # add, so this test exercises the loop's correctness under
+      # contention. With 4 threads each adding 1.0 a thousand times to a
+      # float64, the result must be exactly 4000.0 because float64 can
+      # represent integers up to 2^53 without loss; every intermediate
+      # sum is also representable exactly.
+      var counter: Atomic[float64]
+      counter.store(0.0'f64)
+      const NumThreads = 4
+      const Increments = 1000
+      var threads: array[NumThreads, Thread[ptr Atomic[float64]]]
+
+      proc worker(c: ptr Atomic[float64]) {.thread.} =
+        for _ in 0 ..< Increments:
+          discard c[].fetchAdd(1.0'f64, moAcquireRelease)
+
+      for i in 0 ..< NumThreads:
+        createThread(threads[i], worker, addr counter)
+      for i in 0 ..< NumThreads:
+        joinThread(threads[i])
+
+      check counter.load() == float64(NumThreads * Increments)

@@ -34,7 +34,17 @@ proc isValid*(tid: ThreadId): bool =
 
 proc sendSignal*(tid: ThreadId, sig: cint): cint =
   ## Send a signal to the thread identified by tid.
-  ## Returns 0 on success, error code on failure.
+  ##
+  ## Returns 0 on success. Returns `ESRCH` immediately when `tid` equals
+  ## `InvalidThreadId`; otherwise returns the error code from `pthread_kill`.
+  ##
+  ## Note: POSIX explicitly leaves `pthread_kill` with an invalid `pthread_t`
+  ## as undefined behavior. Apple's libpthread happens to validate and return
+  ## `ESRCH`, but glibc dereferences the handle and may segfault. Callers
+  ## must only pass either a live thread's id or `InvalidThreadId`; passing a
+  ## fabricated non-zero handle is unsupported.
+  if not tid.isValid:
+    return ESRCH
   pthread_kill(tid.handle, sig)
 
 proc unsafeThreadId*(handle: Pthread): ThreadId =

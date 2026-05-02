@@ -438,6 +438,75 @@ proc fetchXor*[T: SomeInteger](
   ))
 
 # ---------------------------------------------------------------------------
+# Numeric (SomeFloat)
+# ---------------------------------------------------------------------------
+#
+# `load`, `store`, `exchange`, and `compareExchange*` already accept
+# float32/float64 through the generic `T` overloads above: those route
+# through `nonAtomicType(T)` which maps any 4-byte type to `int32` and
+# any 8-byte type to `int64`, and the `cast[T](...)` on the way out
+# reinterprets the integer bits back as the float. The bit-level
+# transfer is exactly what we want for atomics on floats: -0.0 and NaN
+# payloads round-trip exactly, and CAS uses bit-equality (matching the
+# semantics of `std::atomic<float>` in C++ and `AtomicU32::as_float`
+# patterns in other languages). `assertLockFree`'s
+# `__atomic_always_lock_free(sizeof(T), 0)` is sizeof-based and
+# accepts floats on every target where the equivalent integer width
+# is lock-free.
+#
+# What's missing for floats is a hardware atomic add: GCC's
+# `__atomic_fetch_add_n` builtins are integer-only on float operands.
+# We provide `fetchAdd` for `SomeFloat` via a CAS-loop. Other
+# fetch-bitwise ops (`fetchAnd`/`fetchOr`/`fetchXor`) are deliberately
+# NOT provided for floats: bitwise operations on float values have no
+# meaningful semantics. `fetchSub` is omitted because `fetchAdd(-x)`
+# expresses the same operation cleanly.
+
+proc fetchAdd*[T: SomeFloat](
+    loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
+): T {.inline.} =
+  ## Atomically add `v` to the float value at `loc` and return the
+  ## previous value. Implemented as a `compareExchangeWeak` CAS-loop
+  ## because GCC's `__atomic_fetch_add_n` is integer-only.
+  ##
+  ## Semantics: the read-add-CAS cycle is repeated until the CAS
+  ## succeeds, so the returned old value and the new stored value
+  ## together reflect a coherent atomic update of `loc`. Under
+  ## contention, the loop may iterate multiple times.
+  ##
+  ## `order` is applied to the successful CAS; the failure order is
+  ## derived per C11 (drops the release component).
+  ##
+  ## Bit-pattern fidelity caveat: `fetchAdd` performs an IEEE-754
+  ## float addition; unlike `load`/`store`/`exchange`/`compareExchange*`
+  ## (pure bitwise transfer), the bit-pattern guarantees do NOT apply
+  ## to the *new stored value*. Specifically:
+  ##
+  ##   * The returned old value IS bit-exact: it comes from a relaxed
+  ##     load before the add and reflects the pre-RMW storage bits
+  ##     verbatim (so e.g. a NaN payload in `loc` is preserved in the
+  ##     return value).
+  ##   * The new stored value is `old + v` computed by the FPU, which
+  ##     means: NaN payloads are not preserved across the add (e.g.
+  ##     `NaN_payload_A + 1.0` yields a quiet NaN with implementation-
+  ##     defined payload, not `payload_A`); denormal results may flush
+  ##     to zero if FTZ/DAZ is enabled in the calling thread's FPU
+  ##     state; the rounding mode is whatever the FPU is currently set
+  ##     to (round-to-nearest by default; modifiable via `fesetround`
+  ##     on x86 or FPCR on ARM); and overflow produces +/-Inf.
+  ##
+  ## The CAS-loop preserves atomicity; these caveats are inherent to
+  ## float arithmetic, not to this implementation.
+  enforceAtomicConstraints(T)
+  var old = load(loc, moRelaxed)
+  while true:
+    let desired = old + v
+    if compareExchangeWeak(loc, old, desired, order):
+      return old
+    # On failure, `old` was overwritten with the current value of
+    # `loc`; loop with the fresh value.
+
+# ---------------------------------------------------------------------------
 # Fences
 # ---------------------------------------------------------------------------
 
