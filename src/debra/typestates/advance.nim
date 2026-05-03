@@ -19,7 +19,12 @@ type
 
 typestate AdvanceContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states Current[MaxThreads], Advancing[MaxThreads], Advanced[MaxThreads]
+  initial:
+    Current[MaxThreads]
+  terminal:
+    Advanced[MaxThreads]
   transitions:
     Current[MaxThreads] -> Advancing[MaxThreads]
     Advancing[MaxThreads] -> Advanced[MaxThreads]

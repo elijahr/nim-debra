@@ -25,7 +25,12 @@ type
 
 typestate NeutralizeContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states ScanStart[MaxThreads], Scanning[MaxThreads], ScanComplete[MaxThreads]
+  initial:
+    ScanStart[MaxThreads]
+  terminal:
+    ScanComplete[MaxThreads]
   transitions:
     ScanStart[MaxThreads] -> Scanning[MaxThreads]
     Scanning[MaxThreads] -> ScanComplete[MaxThreads]

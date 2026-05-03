@@ -21,7 +21,13 @@ type
 
 typestate RegistrationContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states Unregistered[MaxThreads], Registered[MaxThreads], RegistrationFull[MaxThreads]
+  initial:
+    Unregistered[MaxThreads]
+  terminal:
+    Registered[MaxThreads]
+    RegistrationFull[MaxThreads]
   transitions:
     Unregistered[MaxThreads] ->
       Registered[MaxThreads] | RegistrationFull[MaxThreads] as RegisterResult[

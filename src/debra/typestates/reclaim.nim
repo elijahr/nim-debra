@@ -68,8 +68,14 @@ type
 
 typestate ReclaimContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states ReclaimStart[MaxThreads],
     EpochsLoaded[MaxThreads], ReclaimReady[MaxThreads], ReclaimBlocked[MaxThreads]
+  initial:
+    ReclaimStart[MaxThreads]
+  terminal:
+    ReclaimReady[MaxThreads]
+    ReclaimBlocked[MaxThreads]
   transitions:
     ReclaimStart[MaxThreads] -> EpochsLoaded[MaxThreads]
     EpochsLoaded[MaxThreads] ->

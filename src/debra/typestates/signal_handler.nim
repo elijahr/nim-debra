@@ -16,7 +16,12 @@ type
 
 typestate SignalHandlerContext:
   inheritsFromRootObj = true
+  opaqueStates = true
   states HandlerUninstalled, HandlerInstalled
+  initial:
+    HandlerUninstalled
+  terminal:
+    HandlerInstalled
   transitions:
     HandlerUninstalled -> HandlerInstalled
 
