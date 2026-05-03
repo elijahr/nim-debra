@@ -132,10 +132,12 @@ proc acknowledge*[MaxThreads: static int](
   ctx.handle.manager.threads[ctx.handle.idx].neutralized.store(false, moRelease)
   Unpinned[MaxThreads](EpochGuardContext[MaxThreads](handle: ctx.handle, epoch: 0))
 
-func epoch*[MaxThreads: static int](p: Pinned[MaxThreads]): uint64 =
+func epoch*[MaxThreads: static int](p: Pinned[MaxThreads]): uint64 {.notATransition.} =
   ## Get the epoch this thread is pinned at.
   EpochGuardContext[MaxThreads](p).epoch
 
-func handle*[MaxThreads: static int](p: Pinned[MaxThreads]): ThreadHandle[MaxThreads] =
+func handle*[MaxThreads: static int](
+    p: Pinned[MaxThreads]
+): ThreadHandle[MaxThreads] {.notATransition.} =
   ## Get the thread handle.
   EpochGuardContext[MaxThreads](p).handle

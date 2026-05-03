@@ -37,6 +37,6 @@ proc install*(h: HandlerUninstalled): HandlerInstalled {.transition.} =
   discard sigaction(QuiescentSignal, sa, nil)
   result = HandlerInstalled(SignalHandlerContext(installed: true))
 
-func isInstalled*(h: HandlerInstalled): bool =
+func isInstalled*(h: HandlerInstalled): bool {.notATransition.} =
   ## Check if handler is installed.
   h.SignalHandlerContext.installed

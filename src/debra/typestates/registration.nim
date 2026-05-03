@@ -72,7 +72,7 @@ proc register*[MaxThreads: static int](
   RegisterResult[MaxThreads] ->
     RegistrationFull[MaxThreads](RegistrationContext[MaxThreads](manager: mgr, idx: -1))
 
-func idx*[MaxThreads: static int](r: Registered[MaxThreads]): int =
+func idx*[MaxThreads: static int](r: Registered[MaxThreads]): int {.notATransition.} =
   ## Get the thread slot index.
   RegistrationContext[MaxThreads](r).idx
 

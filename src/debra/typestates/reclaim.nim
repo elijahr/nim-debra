@@ -204,7 +204,9 @@ proc loadEpochs*[MaxThreads: static int](
 
   result = EpochsLoaded[MaxThreads](ctx)
 
-func safeEpoch*[MaxThreads: static int](e: EpochsLoaded[MaxThreads]): uint64 =
+func safeEpoch*[MaxThreads: static int](
+    e: EpochsLoaded[MaxThreads]
+): uint64 {.notATransition.} =
   ReclaimContext[MaxThreads](e).safeEpoch
 
 proc checkSafe*[MaxThreads: static int](

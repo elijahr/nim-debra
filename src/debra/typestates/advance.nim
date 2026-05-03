@@ -57,10 +57,14 @@ proc complete*[MaxThreads: static int](
     )
   )
 
-func newEpoch*[MaxThreads: static int](a: Advanced[MaxThreads]): uint64 =
+func newEpoch*[MaxThreads: static int](
+    a: Advanced[MaxThreads]
+): uint64 {.notATransition.} =
   ## Get the new epoch value after advancement.
   AdvanceContext[MaxThreads](a).newEpoch
 
-func oldEpoch*[MaxThreads: static int](a: Advanced[MaxThreads]): uint64 =
+func oldEpoch*[MaxThreads: static int](
+    a: Advanced[MaxThreads]
+): uint64 {.notATransition.} =
   ## Get the old epoch value before advancement.
   AdvanceContext[MaxThreads](a).oldEpoch
