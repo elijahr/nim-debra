@@ -28,7 +28,7 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
       - name: Install typestates
-        run: nimble install -y typestates
+        run: nimble install -y "typestates@0.7.1"
 
       - name: Typestates verify
         run: typestates verify -W --format=github src/
