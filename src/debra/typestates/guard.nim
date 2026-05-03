@@ -100,12 +100,12 @@ proc unpin*[MaxThreads: static int](
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
     let pinned = unpinned(handle).pin()
-    let res = pinned.unpin()
-    case res.kind
-    of uUnpinned:
-      discard
-    of uNeutralized:
-      discard res.neutralized.acknowledge()
+    var res = pinned.unpin()
+    match res:
+      Unpinned(_):
+        discard
+      Neutralized(nval):
+        discard nval.acknowledge()
   let ctx = EpochGuardContext[MaxThreads](p)
   let mgr = ctx.handle.manager
   let idx = ctx.handle.idx
