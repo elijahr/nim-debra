@@ -19,7 +19,12 @@ type
 
 typestate AdvanceContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states Current[MaxThreads], Advancing[MaxThreads], Advanced[MaxThreads]
+  initial:
+    Current[MaxThreads]
+  terminal:
+    Advanced[MaxThreads]
   transitions:
     Current[MaxThreads] -> Advancing[MaxThreads]
     Advancing[MaxThreads] -> Advanced[MaxThreads]
@@ -57,10 +62,14 @@ proc complete*[MaxThreads: static int](
     )
   )
 
-func newEpoch*[MaxThreads: static int](a: Advanced[MaxThreads]): uint64 =
+func newEpoch*[MaxThreads: static int](
+    a: Advanced[MaxThreads]
+): uint64 {.notATransition.} =
   ## Get the new epoch value after advancement.
   AdvanceContext[MaxThreads](a).newEpoch
 
-func oldEpoch*[MaxThreads: static int](a: Advanced[MaxThreads]): uint64 =
+func oldEpoch*[MaxThreads: static int](
+    a: Advanced[MaxThreads]
+): uint64 {.notATransition.} =
   ## Get the old epoch value before advancement.
   AdvanceContext[MaxThreads](a).oldEpoch

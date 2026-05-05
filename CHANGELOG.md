@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-02
+
+### Changed
+
+- Bump minimum `typestates` to 0.7.1. Requires the upstream match generic-context fix shipped in nim-typestates v0.7.1.
+- `opaqueStates = true` and `initial:`/`terminal:` DSL blocks added to 7 of 9 typestate decls (RegistrationContext, ManagerContext, ReclaimContext, RetireContext, AdvanceContext, NeutralizeContext, SignalHandlerContext). The remaining 2 (EpochGuardContext, SlotContext) are intentional cycle-shaped graphs where no state is initial-eligible, so the lint flag is omitted.
+- 5 hand-written `case .kind` dispatches replaced with the generated `match` macro for compile-time exhaustiveness (3 production sites in `convenience.nim` and `debra.nim`; 2 in runnableExamples in `guard.nim` and `reclaim.nim`).
+
+### Added
+
+- CI: `typestates verify -W --format=github src/` step in the lint job, with the typestates dep pinned to 0.7.1 for verifier determinism.
+
+### Fixed
+
+- 13 read-only typestate accessors in `src/debra/typestates/{guard,slot,advance,registration,neutralize,signal_handler,reclaim}.nim` now carry `{.notATransition.}`. typestates' verifier flagged these once `typestates verify -W` was wired into CI; the procs are pure data extraction and were never transitions.
+
+## [0.6.0] - 2026-05-02
+
 ### Changed
 
 - Hardened `ThreadState.cacheLinePad` size derivation against future field additions. Padding length is now derived from `sizeof(ThreadStateLive[MaxThreads])` (a sibling type that mirrors `ThreadState`'s live fields) instead of a hand-summed `56` constant, so adding or removing fields automatically resizes the pad. A drift-detection `static: assert` fails fast at compile time if the two types fall out of sync.
@@ -257,7 +275,9 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/elijahr/nim-debra/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/elijahr/nim-debra/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/elijahr/nim-debra/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/elijahr/nim-debra/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/elijahr/nim-debra/compare/v0.3.0...v0.3.1

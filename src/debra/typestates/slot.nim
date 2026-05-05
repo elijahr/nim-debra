@@ -64,11 +64,11 @@ proc release*[MaxThreads: static int](
   ## This completes the lifecycle, making the slot available for reuse.
   Free[MaxThreads](SlotContext[MaxThreads](d))
 
-func idx*[MaxThreads: static int](s: Active[MaxThreads]): int =
+func idx*[MaxThreads: static int](s: Active[MaxThreads]): int {.notATransition.} =
   ## Get the slot index from Active state.
   SlotContext[MaxThreads](s).idx
 
-func idx*[MaxThreads: static int](s: Draining[MaxThreads]): int =
+func idx*[MaxThreads: static int](s: Draining[MaxThreads]): int {.notATransition.} =
   ## Get the slot index from Draining state.
   SlotContext[MaxThreads](s).idx
 

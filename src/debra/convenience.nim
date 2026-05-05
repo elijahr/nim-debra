@@ -162,12 +162,12 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
       # not surface neutralization to the caller (see Pitfall above);
       # acknowledging here keeps the slot's `neutralized` flag tidy at
       # unpin time instead of relying on the next `pin` to clear it.
-      let res = pinnedGuard.unpin()
-      case res.kind
-      of uUnpinned:
-        discard
-      of uNeutralized:
-        discard res.neutralized.acknowledge()
+      var res = pinnedGuard.unpin()
+      match res:
+        Unpinned(_):
+          discard
+        Neutralized(nval):
+          discard nval.acknowledge()
 
 template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
   ## `withPin` variant that injects a caller-supplied identifier `name`
@@ -199,12 +199,12 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
     finally:
       # Honour the `Pinned -> Unpinned | Neutralized` typestate. Same
       # rationale as the unnamed `withPin` form above.
-      let res = pinnedGuard.unpin()
-      case res.kind
-      of uUnpinned:
-        discard
-      of uNeutralized:
-        discard res.neutralized.acknowledge()
+      var res = pinnedGuard.unpin()
+      match res:
+        Unpinned(_):
+          discard
+        Neutralized(nval):
+          discard nval.acknowledge()
 
 proc advanceEvery*[MT: static int](
     handle: ThreadHandle[MT], n: static int

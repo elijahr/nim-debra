@@ -25,7 +25,12 @@ type
 
 typestate NeutralizeContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states ScanStart[MaxThreads], Scanning[MaxThreads], ScanComplete[MaxThreads]
+  initial:
+    ScanStart[MaxThreads]
+  terminal:
+    ScanComplete[MaxThreads]
   transitions:
     ScanStart[MaxThreads] -> Scanning[MaxThreads]
     Scanning[MaxThreads] -> ScanComplete[MaxThreads]
@@ -56,11 +61,15 @@ proc loadEpoch*[MaxThreads: static int](
 
   result = Scanning[MaxThreads](ctx)
 
-func globalEpoch*[MaxThreads: static int](s: Scanning[MaxThreads]): uint64 =
+func globalEpoch*[MaxThreads: static int](
+    s: Scanning[MaxThreads]
+): uint64 {.notATransition.} =
   ## Get the global epoch loaded during scan start.
   NeutralizeContext[MaxThreads](s).globalEpoch
 
-func threshold*[MaxThreads: static int](s: Scanning[MaxThreads]): uint64 =
+func threshold*[MaxThreads: static int](
+    s: Scanning[MaxThreads]
+): uint64 {.notATransition.} =
   ## Get the epoch threshold for neutralization.
   NeutralizeContext[MaxThreads](s).threshold
 
@@ -89,10 +98,14 @@ proc scanAndSignal*[MaxThreads: static int](
 
   result = ScanComplete[MaxThreads](ctx)
 
-func signalsSent*[MaxThreads: static int](c: ScanComplete[MaxThreads]): int =
+func signalsSent*[MaxThreads: static int](
+    c: ScanComplete[MaxThreads]
+): int {.notATransition.} =
   ## Get number of signals sent during scan.
   NeutralizeContext[MaxThreads](c).signalsSent
 
-func extractSignalCount*[MaxThreads: static int](c: ScanComplete[MaxThreads]): int =
+func extractSignalCount*[MaxThreads: static int](
+    c: ScanComplete[MaxThreads]
+): int {.notATransition.} =
   ## Extract the count of signals sent. Terminal operation.
   NeutralizeContext[MaxThreads](c).signalsSent

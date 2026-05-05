@@ -68,8 +68,14 @@ type
 
 typestate ReclaimContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states ReclaimStart[MaxThreads],
     EpochsLoaded[MaxThreads], ReclaimReady[MaxThreads], ReclaimBlocked[MaxThreads]
+  initial:
+    ReclaimStart[MaxThreads]
+  terminal:
+    ReclaimReady[MaxThreads]
+    ReclaimBlocked[MaxThreads]
   transitions:
     ReclaimStart[MaxThreads] -> EpochsLoaded[MaxThreads]
     EpochsLoaded[MaxThreads] ->
@@ -204,7 +210,9 @@ proc loadEpochs*[MaxThreads: static int](
 
   result = EpochsLoaded[MaxThreads](ctx)
 
-func safeEpoch*[MaxThreads: static int](e: EpochsLoaded[MaxThreads]): uint64 =
+func safeEpoch*[MaxThreads: static int](
+    e: EpochsLoaded[MaxThreads]
+): uint64 {.notATransition.} =
   ReclaimContext[MaxThreads](e).safeEpoch
 
 proc checkSafe*[MaxThreads: static int](
@@ -234,13 +242,13 @@ proc tryReclaim*[MaxThreads: static int](
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
-    let op = reclaimStart(handle).loadEpochs().checkSafe()
-    case op.kind
-    of rReclaimReady:
-      discard op.reclaimready.tryReclaim()
-    of rReclaimBlocked:
-      # Brand-new manager: epoch hasn't advanced; this branch is normal.
-      discard
+    var op = reclaimStart(handle).loadEpochs().checkSafe()
+    match op:
+      ReclaimReady(rready):
+        discard rready.tryReclaim()
+      ReclaimBlocked(_):
+        # Brand-new manager: epoch hasn't advanced; this branch is normal.
+        discard
   let ctx = ReclaimContext[MaxThreads](r)
   if ctx.idx < 0 or ctx.idx >= MaxThreads:
     # Caller is not a registered thread; nothing to reclaim from their slot.

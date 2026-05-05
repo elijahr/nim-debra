@@ -38,7 +38,12 @@ type
 
 typestate RetireContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states RetireReady[MaxThreads], Retired[MaxThreads]
+  initial:
+    RetireReady[MaxThreads]
+  terminal:
+    Retired[MaxThreads]
   transitions:
     RetireReady[MaxThreads] -> Retired[MaxThreads]
 

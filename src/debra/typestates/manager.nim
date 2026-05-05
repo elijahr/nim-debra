@@ -19,8 +19,13 @@ type
 
 typestate ManagerContext[MaxThreads: static int]:
   inheritsFromRootObj = true
+  opaqueStates = true
   states ManagerUninitialized[MaxThreads],
     ManagerReady[MaxThreads], ManagerShutdown[MaxThreads]
+  initial:
+    ManagerUninitialized[MaxThreads]
+  terminal:
+    ManagerShutdown[MaxThreads]
   transitions:
     ManagerUninitialized[MaxThreads] -> ManagerReady[MaxThreads]
     ManagerReady[MaxThreads] -> ManagerShutdown[MaxThreads]
