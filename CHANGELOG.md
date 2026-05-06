@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Signal handler walked `DebraManager.threads[]` with stale, hard-coded
+  layout constants (`threadStateSize = 32`, `headerSize = 128`) that no
+  longer matched the real `ThreadState[N]` size (64 bytes after the
+  `currentBag` / `limboBagTail` / `advanceCounter` / `cacheLinePad`
+  fields were added) or the cache-line-aligned header (256 bytes under
+  `-d:CacheLineBytes=128`). For any registered thread index >= 1, the
+  SIGUSR1 handler corrupted the previous slot's limbo-bag pointers and
+  failed to flip the target thread's `pinned` / `neutralized` flags.
+  `setGlobalManager` now captures the real stride and header offset
+  from a typed `ptr DebraManager[N]` (under release ordering) so the
+  handler reads them under acquire ordering and uses real
+  `offsetOf(ThreadState, pinned)` / `offsetOf(ThreadState, neutralized)`
+  for in-slot field access. A regression test in `tests/t_signal.nim`
+  exercises the real signal-delivery path and asserts that thread 0's
+  limbo-bag pointers stay intact when thread 1 receives the signal.
+- Hardened the signal handler's publish ordering: `globalManagerPtr`
+  is now an `Atomic[pointer]` with `moRelease` stores in
+  `setGlobalManager` (pointer published last, after stride/header)
+  and a `moAcquire` load in the handler (pointer loaded first), so a
+  reader that observes the new pointer is guaranteed to see the
+  matching stride/header. Tightened the static asserts in
+  `signal.nim` to pin the absolute byte offsets of `pinned` (8) and
+  `neutralized` (16), making the asserts a real tripwire for field
+  reorders rather than a tautology. Documented `setGlobalManager`'s
+  race constraint: it must not race with signal delivery; quiesce
+  all registered threads before replacing the manager.
+
+### Changed
+
+- Strengthened the `tests/t_neutralize` "scanAndSignal signals real
+  thread beyond threshold" test to actually exercise cross-slot signal
+  delivery end-to-end (helper thread registered at slot 1 with its
+  pthread handle wired into `mgr.threads[1].threadId`, slot 0 sentinel
+  pointers asserted intact post-handler). The previous test stored
+  `currentThreadId()` into slot 0 so the scanner skipped it, asserting
+  only the threshold logic; that sidestep was structurally necessary
+  before the stride bug fix because actually signaling slot >= 1 would
+  have corrupted slot 0's pointer fields. Added
+  `forceReinstallSignalHandler` to `debra/signal` so
+  `tests/t_signal_handler` (which installs a placeholder no-op handler
+  via direct `sigaction`) can restore the real handler before sibling
+  tests run.
+
 ## [0.7.0] - 2026-05-02
 
 ### Changed
@@ -71,7 +116,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `docs/guide/getting-started.md` described the `Destructor` value as a "closure"; corrected to "captureless function pointer".
 - Suggested `requires "debra >= 0.1.0"` in `docs/guide/getting-started.md` and `docs/index.md` bumped to `>= 0.3.0`, since the surrounding examples assume `withPin` / `retain` / `releaseDestructor`.
 - `docs/guide/epoch-advancement.md` heading "Worked example" → "Working example".
-
 ## [0.3.0] - 2026-04-27
 
 ### Added
