@@ -14,14 +14,12 @@ import debra/typestates/neutralize
 var
   helperReady: Atomic[bool]
   helperShouldExit: Atomic[bool]
-  helperReceivedSignal: Atomic[bool]
   helperThreadIdSlot: Atomic[ThreadId]
   helperSlotIdx: Atomic[int]
 
 proc resetHelperState() =
   helperReady.store(false, moRelaxed)
   helperShouldExit.store(false, moRelaxed)
-  helperReceivedSignal.store(false, moRelaxed)
   helperThreadIdSlot.store(InvalidThreadId, moRelaxed)
   helperSlotIdx.store(-1, moRelaxed)
 
