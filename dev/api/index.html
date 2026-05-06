@@ -1145,6 +1145,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#forceReinstallSignalHandler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        forceReinstallSignalHandler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setGlobalManager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setGlobalManager
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#setGlobalManager" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2892,6 +2914,28 @@
     <span class="md-ellipsis">
       
         isSignalHandlerInstalled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#forceReinstallSignalHandler" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        forceReinstallSignalHandler
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setGlobalManager" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setGlobalManager
       
     </span>
   </a>
@@ -5594,7 +5638,7 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim highlight"><span class="kd">var</span><span class="w"> </span><span class="n">globalManagerPtr</span><span class="p">:</span><span class="w"> </span><span class="n">pointer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">nil</span>
+      <pre><code class="language-nim highlight"><span class="kd">var</span><span class="w"> </span><span class="n">globalManagerPtr</span><span class="p">:</span><span class="w"> </span><span class="n">Atomic</span><span class="o">[</span><span class="n">pointer</span><span class="o">]</span>
 </code></pre>
     </div>
   
@@ -5603,12 +5647,19 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
     
       <div class="doc-description">
         <p>Set during manager initialization. Used by signal handler.</p>
+<p>Stored as <code>Atomic[pointer]</code> (rather than a plain <code>pointer</code>) so the
+publish path in <code>setGlobalManager</code> can use <code>moRelease</code> and the
+consumer in the signal handler can use <code>moAcquire</code>. Without this,
+the stride/header release stores would not synchronize with the
+handler's reads through any defined happens-before edge — a
+handler could observe the new pointer paired with stale stride or
+header values from a previous manager.</p>
       </div>
     
 
     
       <div class="doc-section doc-section-type">
-        <p><strong>Type:</strong> <code>pointer</code></p>
+        <p><strong>Type:</strong> <code>Atomic[pointer]</code></p>
       </div>
     
 
@@ -5616,8 +5667,8 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L15" target="_blank" rel="noopener">
-            src/debra/signal.nim:15
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L16" target="_blank" rel="noopener">
+            src/debra/signal.nim:16
           </a>
         
       </div>
@@ -5656,8 +5707,8 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L24" target="_blank" rel="noopener">
-            src/debra/signal.nim:24
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L101" target="_blank" rel="noopener">
+            src/debra/signal.nim:101
           </a>
         
       </div>
@@ -5696,8 +5747,8 @@ can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L25" target="_blank" rel="noopener">
-            src/debra/signal.nim:25
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L102" target="_blank" rel="noopener">
+            src/debra/signal.nim:102
           </a>
         
       </div>
@@ -5745,8 +5796,8 @@ manager B's slot array.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L26" target="_blank" rel="noopener">
-            src/debra/signal.nim:26
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L103" target="_blank" rel="noopener">
+            src/debra/signal.nim:103
           </a>
         
       </div>
@@ -5794,8 +5845,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L67" target="_blank" rel="noopener">
-            src/debra/signal.nim:67
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L160" target="_blank" rel="noopener">
+            src/debra/signal.nim:160
           </a>
         
       </div>
@@ -5846,8 +5897,144 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L83" target="_blank" rel="noopener">
-            src/debra/signal.nim:83
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L176" target="_blank" rel="noopener">
+            src/debra/signal.nim:176
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="forceReinstallSignalHandler" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">forceReinstallSignalHandler</span>
+      
+    <a href="#forceReinstallSignalHandler" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">forceReinstallSignalHandler</span><span class="p">()</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Re-install the SIGUSR1 handler unconditionally, bypassing the</p>
+<p><code>signalHandlerInstalled</code> idempotency flag. Intended for test
+isolation: when a sibling test installs a different SIGUSR1
+handler via direct <code>sigaction</code> (e.g. the placeholder in
+<code>typestates/signal_handler</code>), the OS-level handler is overwritten
+even though <code>signalHandlerInstalled</code> remains true. Calling this
+restores the real <code>neutralizationHandler</code>. Not part of the
+library's public surface for normal use; prefer
+<code>installSignalHandler</code> in production code.</p>
+      </div>
+    
+
+    
+
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L180" target="_blank" rel="noopener">
+            src/debra/signal.nim:180
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
+    <h4 id="setGlobalManager" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">setGlobalManager</span>
+      
+    <a href="#setGlobalManager" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">setGlobalManager</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">)</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Set the global manager pointer for the signal handler and capture</p>
+<p>the byte-stride information the handler needs to find each
+thread's slot.</p>
+<p>Must be called once after manager initialization, before any
+thread sends SIGUSR1. Safe to call repeatedly with the same
+manager; passing a different manager replaces the captured
+layout. Pass <code>nil</code> via the untyped overload below to clear the
+global manager.</p>
+<p><strong>Race constraint:</strong> This routine MUST NOT race with signal
+delivery. Either call it before any thread is registered, or fully
+quiesce all threads (no in-flight or pending SIGUSR1) before
+replacing the manager. The three atomic stores (header, stride,
+pointer) are not a single transaction: a signal arriving partway
+through could observe stride/header from one manager paired with
+the pointer from another, and if the two managers were
+instantiated with different <code>MaxThreads</code> their layouts differ.
+The release/acquire edge below makes the <em>intra-call</em> publish
+order consistent (a reader who sees the new pointer also sees the
+new stride/header), but it does not make the call as a whole
+atomic with respect to a concurrent reader, and it does not
+protect against a reader pairing the <em>new</em> pointer with the <em>old</em>
+stride that was just overwritten.</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-parameters">
+        <h5>Parameters</h5>
+        <ul>
+          
+            <li>
+              <code>manager</code>
+              (<code>ptr DebraManager[MaxThreads]</code>)
+              
+            </li>
+          
+        </ul>
+      </div>
+    
+
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L197" target="_blank" rel="noopener">
+            src/debra/signal.nim:197
           </a>
         
       </div>
@@ -5879,8 +6066,14 @@ Called automatically during first DebraManager initialization.</p>
   <div class="doc doc-contents first">
     
       <div class="doc-description">
-        <p>Set the global manager pointer for signal handler.</p>
-<p>Must be called once after manager initialization.</p>
+        <p>Untyped overload, retained so callers (including tests) can clear</p>
+<p>the global manager by passing <code>nil</code>. Passing a non-nil raw pointer
+is unsupported because the handler needs the per-type stride;
+callers with a typed <code>ptr DebraManager[N]</code> should use the generic
+overload above.</p>
+<p><strong>Race constraint:</strong> Same as the typed overload — must not race
+with signal delivery. Quiesce all registered threads before
+clearing the manager.</p>
       </div>
     
 
@@ -5907,8 +6100,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L87" target="_blank" rel="noopener">
-            src/debra/signal.nim:87
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L240" target="_blank" rel="noopener">
+            src/debra/signal.nim:240
           </a>
         
       </div>
