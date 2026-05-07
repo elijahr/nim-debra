@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-05-07
+
+### Changed
+
+- Bumped minimum Nim version to 2.2.10 to dodge a Nim 2.2.6/2.2.8
+  destructor-instantiation ICE (`expr(nkIdent); unknown node kind`)
+  that fired when consumers wrap `DebraManager[N: static int]` in
+  their own generic destructors. Resolved upstream by Nim 2.2.10. No
+  source changes in debra; this release is packaging-only.
+
 ## [0.7.1] - 2026-05-06
 
 ### Fixed
@@ -321,7 +331,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/elijahr/nim-debra/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/elijahr/nim-debra/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/elijahr/nim-debra/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/elijahr/nim-debra/compare/v0.5.0...v0.6.0
