@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-05-08
+
+### Fixed
+
+- Data race on `signalHandlerInstalled` flag in `src/debra/signal.nim`.
+  `installSignalHandler` runs from every thread's `registerThread`, so
+  the unguarded `bool` read+write was racy under concurrent registration
+  (TSAN-detected via downstream `lockfreequeues` v4.3 SPMC threaded
+  test). The flag is now `Atomic[bool]`: fast-path bail-out reads with
+  `moAcquire`, post-`sigaction` write stores with `moRelease`. Same
+  change applied to `isSignalHandlerInstalled` and
+  `forceReinstallSignalHandler`. The install itself is intentionally
+  not CAS-guarded; a benign double-install is harmless because
+  `sigaction` is thread-safe and re-arming the same handler is
+  idempotent. Sibling of the 0.7.1 signal handler stride fix; same
+  "signal handler init is implicitly multi-threaded" defect surface.
+
 ## [0.7.2] - 2026-05-07
 
 ### Changed
@@ -331,7 +348,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/elijahr/nim-debra/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/elijahr/nim-debra/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/elijahr/nim-debra/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/elijahr/nim-debra/compare/v0.6.0...v0.7.0
