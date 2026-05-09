@@ -12,7 +12,15 @@ import ./constants
 import ./types
 
 var
-  signalHandlerInstalled = false
+  signalHandlerInstalled: Atomic[bool]
+    ## Process-wide idempotency flag for the SIGUSR1 handler. Multiple
+    ## threads may race into `installSignalHandler` (each thread calls it
+    ## from `registerThread`), so the flag must be atomic. The
+    ## load/store ordering is acquire/release, but the install itself is
+    ## not guarded by CAS: a benign double-install can happen if two
+    ## threads both observe the flag false before either stores true.
+    ## That is harmless because `sigaction` is thread-safe and re-arming
+    ## the same handler is idempotent at the OS level.
   globalManagerPtr*: Atomic[pointer]
     ## Set during manager initialization. Used by signal handler.
     ## Stored as `Atomic[pointer]` (rather than a plain `pointer`) so the
@@ -162,7 +170,14 @@ proc installSignalHandler*() =
   ##
   ## Safe to call multiple times - subsequent calls are no-ops.
   ## Called automatically during first DebraManager initialization.
-  if signalHandlerInstalled:
+  ##
+  ## Thread-safety: the `signalHandlerInstalled` flag is `Atomic[bool]`,
+  ## acquire-loaded for the fast-path bail-out and release-stored after
+  ## a successful `sigaction`. Two threads may both observe the flag
+  ## false and both call `sigaction`; that is benign because
+  ## `sigaction` is thread-safe and re-arming the same handler is
+  ## idempotent at the OS level.
+  if signalHandlerInstalled.load(moAcquire):
     return
 
   var sa: Sigaction
@@ -171,11 +186,11 @@ proc installSignalHandler*() =
   sa.sa_flags = 0 # No SA_RESTART - we want operations to be interrupted
 
   if sigaction(QuiescentSignal, sa, nil) == 0:
-    signalHandlerInstalled = true
+    signalHandlerInstalled.store(true, moRelease)
 
 proc isSignalHandlerInstalled*(): bool =
   ## Check if signal handler has been installed.
-  signalHandlerInstalled
+  signalHandlerInstalled.load(moAcquire)
 
 proc forceReinstallSignalHandler*() =
   ## Re-install the SIGUSR1 handler unconditionally, bypassing the
@@ -192,7 +207,7 @@ proc forceReinstallSignalHandler*() =
   discard sigemptyset(sa.sa_mask)
   sa.sa_flags = 0
   if sigaction(QuiescentSignal, sa, nil) == 0:
-    signalHandlerInstalled = true
+    signalHandlerInstalled.store(true, moRelease)
 
 proc setGlobalManager*[MaxThreads: static int](manager: ptr DebraManager[MaxThreads]) =
   ## Set the global manager pointer for the signal handler and capture
