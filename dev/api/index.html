@@ -5667,8 +5667,8 @@ header values from a previous manager.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L16" target="_blank" rel="noopener">
-            src/debra/signal.nim:16
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L24" target="_blank" rel="noopener">
+            src/debra/signal.nim:24
           </a>
         
       </div>
@@ -5707,8 +5707,8 @@ header values from a previous manager.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L101" target="_blank" rel="noopener">
-            src/debra/signal.nim:101
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L109" target="_blank" rel="noopener">
+            src/debra/signal.nim:109
           </a>
         
       </div>
@@ -5747,8 +5747,8 @@ header values from a previous manager.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L102" target="_blank" rel="noopener">
-            src/debra/signal.nim:102
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L110" target="_blank" rel="noopener">
+            src/debra/signal.nim:110
           </a>
         
       </div>
@@ -5796,8 +5796,8 @@ manager B's slot array.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L103" target="_blank" rel="noopener">
-            src/debra/signal.nim:103
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L111" target="_blank" rel="noopener">
+            src/debra/signal.nim:111
           </a>
         
       </div>
@@ -5832,6 +5832,12 @@ manager B's slot array.</p>
         <p>Install SIGUSR1 handler for DEBRA+ neutralization.</p>
 <p>Safe to call multiple times - subsequent calls are no-ops.
 Called automatically during first DebraManager initialization.</p>
+<p>Thread-safety: the <code>signalHandlerInstalled</code> flag is <code>Atomic[bool]</code>,
+acquire-loaded for the fast-path bail-out and release-stored after
+a successful <code>sigaction</code>. Two threads may both observe the flag
+false and both call <code>sigaction</code>; that is benign because
+<code>sigaction</code> is thread-safe and re-arming the same handler is
+idempotent at the OS level.</p>
       </div>
     
 
@@ -5845,8 +5851,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L160" target="_blank" rel="noopener">
-            src/debra/signal.nim:160
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L168" target="_blank" rel="noopener">
+            src/debra/signal.nim:168
           </a>
         
       </div>
@@ -5897,8 +5903,8 @@ Called automatically during first DebraManager initialization.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L176" target="_blank" rel="noopener">
-            src/debra/signal.nim:176
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L191" target="_blank" rel="noopener">
+            src/debra/signal.nim:191
           </a>
         
       </div>
@@ -5952,8 +5958,8 @@ library's public surface for normal use; prefer
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L180" target="_blank" rel="noopener">
-            src/debra/signal.nim:180
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L195" target="_blank" rel="noopener">
+            src/debra/signal.nim:195
           </a>
         
       </div>
@@ -6033,8 +6039,8 @@ stride that was just overwritten.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L197" target="_blank" rel="noopener">
-            src/debra/signal.nim:197
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L212" target="_blank" rel="noopener">
+            src/debra/signal.nim:212
           </a>
         
       </div>
@@ -6100,8 +6106,8 @@ clearing the manager.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L240" target="_blank" rel="noopener">
-            src/debra/signal.nim:240
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L255" target="_blank" rel="noopener">
+            src/debra/signal.nim:255
           </a>
         
       </div>
