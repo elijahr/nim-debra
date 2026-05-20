@@ -56,6 +56,7 @@ docs/plans/
 /logs
 deps/
 nimble.paths
+config.nims
 
 # Atlas local config
 nim.cfg
