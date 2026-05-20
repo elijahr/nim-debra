@@ -11,6 +11,7 @@ import ./debra/types
 import ./debra/signal
 import ./debra/limbo
 import ./debra/thread_id
+import ./debra/typestates/cardinality
 import ./debra/typestates/signal_handler
 import ./debra/typestates/manager
 import ./debra/typestates/registration
@@ -27,6 +28,7 @@ export types
 export signal.setGlobalManager, signal.installSignalHandler
 export limbo
 export thread_id
+export cardinality
 export signal_handler
 export manager
 export registration
@@ -39,13 +41,17 @@ export slot
 export refptr
 export convenience
 
-proc registerThread*[MaxThreads: static int](
-    manager: var DebraManager[MaxThreads]
-): ThreadHandle[MaxThreads] {.raises: [DebraRegistrationError].} =
+proc registerThread*[MaxThreads: static int, CC: static PinScopeCardinality](
+    manager: var DebraManager[MaxThreads, CC]
+): ThreadHandle[MaxThreads, CC] {.raises: [DebraRegistrationError].} =
   ## Register current thread with the DEBRA manager.
   ##
   ## Must be called once per thread before any epoch operations.
   ## Raises DebraRegistrationError if max threads already registered.
+  ##
+  ## The `CC` parameter binds via the `manager` argument, so callers
+  ## that pass `DebraManager[N]` (which defaults `CC = ccSingle`)
+  ## receive `ThreadHandle[N, ccSingle]` unchanged from 0.7.x.
   installSignalHandler()
 
   let u = unregistered(addr manager)

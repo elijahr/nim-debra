@@ -81,8 +81,8 @@ typestate ReclaimContext[MaxThreads: static int]:
     EpochsLoaded[MaxThreads] ->
       ReclaimReady[MaxThreads] | ReclaimBlocked[MaxThreads] as ReclaimCheck[MaxThreads]
 
-proc reclaimStart*[MaxThreads: static int](
-    handle: ThreadHandle[MaxThreads]
+proc reclaimStart*[MaxThreads: static int, CC: static PinScopeCardinality](
+    handle: ThreadHandle[MaxThreads, CC]
 ): ReclaimStart[MaxThreads] =
   ## Begin reclamation attempt for the calling thread's own retired objects.
   ##

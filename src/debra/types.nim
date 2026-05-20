@@ -7,6 +7,9 @@ import ./atomics
 import ./constants
 import ./limbo
 import ./thread_id
+import ./typestates/cardinality
+
+export cardinality
 
 type
   ThreadStateLive[MaxThreads: static int] = object
@@ -56,8 +59,15 @@ type
       byte,
     ]
 
-  DebraManager*[MaxThreads: static int] = object
+  DebraManager*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object
     ## Coordinates epoch-based reclamation across threads.
+    ##
+    ## The `CC` parameter (introduced in 0.8.0) is the consumer-cardinality
+    ## phantom that propagates through `ThreadHandle`, `registerThread`,
+    ## and the EBR typestate graphs. It defaults to `ccSingle` so 0.7.x
+    ## call shapes compile unchanged; downstream queues set it to
+    ## `ccMulti` when multi-consumer retire-races are possible. See
+    ## `debra/typestates/cardinality.PinScopeCardinality`_.
     globalEpoch* {.align: CacheLineBytes.}: Atomic[uint64] ## Global epoch counter.
     activeThreadMask* {.align: CacheLineBytes.}: Atomic[uint64]
       ## Bitmask of registered threads.
@@ -73,10 +83,14 @@ type
       ## thread, so adjacent slots sharing a cache line would cause
       ## false-sharing on every atomic write).
 
-  ThreadHandle*[MaxThreads: static int] = object
+  ThreadHandle*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object
     ## Handle for a registered thread. Required for pin/unpin.
+    ##
+    ## The `CC` parameter (introduced in 0.8.0) carries the consumer
+    ## cardinality of the pin scopes this handle will open. It defaults
+    ## to `ccSingle` so 0.7.x call shapes compile unchanged.
     idx*: int ## Index into the threads array.
-    manager*: ptr DebraManager[MaxThreads] ## Pointer to the manager.
+    manager*: ptr DebraManager[MaxThreads, CC] ## Pointer to the manager.
 
   DebraRegistrationError* = object of CatchableError
     ## Raised when thread registration fails (e.g., max threads reached).
@@ -108,6 +122,12 @@ static:
 proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
   ## Initialize a new DEBRA+ manager.
   ##
+  ## Returns `DebraManager[MaxThreads, ccSingle]` via the CC default; the
+  ## CC axis is not inferable from a zero-argument call. Callers that
+  ## want `ccMulti` must construct the manager explicitly (e.g. via
+  ## `initDebraManager[N, ccMulti]()` once Step 8 widens the surface, or
+  ## via direct zero-initialization of the object type).
+  ##
   ## The global epoch starts at 1 (not 0) so that epoch 0 can represent
   ## "never observed" in thread state.
   result.globalEpoch.store(1'u64, moRelaxed)
@@ -122,7 +142,9 @@ proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
     result.threads[i].limboBagTail = nil
     result.threads[i].advanceCounter = 0'u64
 
-proc `=destroy`*[MaxThreads: static int](manager: var DebraManager[MaxThreads]) =
+proc `=destroy`*[MaxThreads: static int, CC: static PinScopeCardinality](
+    manager: var DebraManager[MaxThreads, CC]
+) =
   ## Drain all per-thread limbo bags when the manager goes out of scope.
   ##
   ## Worker threads must have joined before the manager is destroyed (the
