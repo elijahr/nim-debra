@@ -44,7 +44,9 @@ proc step1*[N: static int](s: sink Start[N]): Middle[N] {.transition, raises: []
 proc step2*[N: static int](m: sink Middle[N]): Done[N] {.transition, raises: [].} =
   Done[N](MyFSM[N](m))
 
-proc good*[N: static int](m: sink Middle[N], flag: bool): Done[N] {.transition, raises: [].} =
+proc good*[N: static int](
+    m: sink Middle[N], flag: bool
+): Done[N] {.transition, raises: [].} =
   ## Every exit returns a Done value; the CFG analyzer accepts.
   if flag:
     result = step2(m)

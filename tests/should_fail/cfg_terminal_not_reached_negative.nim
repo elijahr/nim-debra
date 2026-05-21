@@ -44,9 +44,9 @@ proc step1*[N: static int](s: sink Start[N]): Middle[N] {.transition, raises: []
 proc step2*[N: static int](m: sink Middle[N]): Done[N] {.transition, raises: [].} =
   Done[N](MyFSM[N](m))
 
-proc badEarlyReturn*[N: static int](s: sink Start[N], flag: bool): Middle[N] {.
-  transition, raises: []
-.} =
+proc badEarlyReturn*[N: static int](
+    s: sink Start[N], flag: bool
+): Middle[N] {.transition, raises: [].} =
   ## The body-local `m: Middle[N]` is non-terminal at the early return
   ## on the `flag=true` branch — CFG-001 fires there.
   var m {.used.}: Middle[N]

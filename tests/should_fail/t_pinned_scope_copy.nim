@@ -10,7 +10,7 @@
 
 import debra
 
-proc main =
+proc main() =
   var manager = initDebraManager[4]()
   setGlobalManager(addr manager)
   let handle = registerThread(manager)

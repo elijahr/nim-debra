@@ -42,6 +42,7 @@ suite "PinnedScope happy path + lifecycle":
     proc earlyReturn(h: ThreadHandle[4]) =
       var scope {.used.} = pinScope(unpinned(h))
       return
+
     earlyReturn(handle)
     check manager.threads[handle.idx].pinned.load(moAcquire) == false
 
