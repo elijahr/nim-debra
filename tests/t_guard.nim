@@ -6,10 +6,10 @@ import debra/typestates/manager
 import debra/typestates/guard
 
 suite "EpochGuard typestate":
-  var mgr: DebraManager[4]
+  var mgr: DebraManager[4, ccSingle]
 
   setup:
-    mgr = DebraManager[4]()
+    mgr = DebraManager[4, ccSingle]()
     discard uninitializedManager(addr mgr).initialize()
 
   test "unpinned creates Unpinned state":

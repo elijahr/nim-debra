@@ -14,10 +14,10 @@ proc dtor(p: pointer) {.nimcall.} =
   dealloc(p)
 
 suite "Retire typestate":
-  var mgr: DebraManager[4]
+  var mgr: DebraManager[4, ccSingle]
 
   setup:
-    mgr = DebraManager[4]()
+    mgr = DebraManager[4, ccSingle]()
     discard uninitializedManager(addr mgr).initialize()
 
   test "retireReady from Pinned":

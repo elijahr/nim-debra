@@ -20,10 +20,10 @@ type
 
   Stack*[T] = object
     head: Atomic[ptr NodeObj[T]]
-    manager: ptr DebraManager[64]
+    manager: ptr DebraManager[64, ccSingle]
     handle: ThreadHandle[64, ccSingle]
 
-proc newStack*[T](manager: ptr DebraManager[64]): Stack[T] =
+proc newStack*[T](manager: ptr DebraManager[64, ccSingle]): Stack[T] =
   result.manager = manager
   result.handle = registerThread(manager[])
 

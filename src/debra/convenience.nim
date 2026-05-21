@@ -138,7 +138,7 @@ template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
   ## If another thread calls `neutralizeStalled` on this thread mid-body
   ## (because we stalled long enough that other threads' reclamation was
   ## blocked waiting on us), the SIGUSR1 handler force-unpins the slot
-  ## and `unpin` returns `Neutralized`. `withPin` honours the typestate
+  ## and `unpin` returns `Neutralized`. This template honours the typestate
   ## by acknowledging the neutralization in its `finally`, but it does
   ## **not** surface the fact to the caller. Code paths that need to
   ## know whether their critical section was interrupted (for example
@@ -168,7 +168,7 @@ template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
   block:
     let h = th
     doAssert not h.manager.threads[h.idx].pinned.load(moAcquire),
-      "withPin: thread is already pinned (handle slot " & $h.idx &
+      "deprecated pin helper: thread is already pinned (handle slot " & $h.idx &
         "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
     var it {.inject.} = retireReady(pinnedGuard)
@@ -192,10 +192,10 @@ template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
     deprecated:
       "use PinnedScope: var scope = pinScope(unpinned(handle)); see CHANGELOG.md#v0.8.0"
 .} =
-  ## `withPin` variant that injects a caller-supplied identifier `name`
-  ## (instead of the default `it`). Use to disambiguate nested handles
+  ## Deprecated pin helper variant that injects a caller-supplied identifier
+  ## `name` (instead of the default `it`). Use to disambiguate nested handles
   ## across multiple managers. The neutralization pitfall described on
-  ## the unnamed `withPin` template applies here too — see that
+  ## the unnamed deprecated template applies here too — see that
   ## docstring before relying on this form for code paths that may be
   ## interrupted by `neutralizeStalled`.
   runnableExamples:
@@ -214,7 +214,7 @@ template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
   block:
     let h = th
     doAssert not h.manager.threads[h.idx].pinned.load(moAcquire),
-      "withPin: thread is already pinned (handle slot " & $h.idx &
+      "deprecated pin helper: thread is already pinned (handle slot " & $h.idx &
         "). Nested pinning is forbidden."
     let pinnedGuard = unpinned(h).pin()
     var name {.inject.} = retireReady(pinnedGuard)
@@ -222,7 +222,7 @@ template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
       body
     finally:
       # Honour the `Pinned -> Unpinned | Neutralized` typestate. Same
-      # rationale as the unnamed `withPin` form above.
+      # rationale as the unnamed deprecated form above.
       var res = pinnedGuard.unpin()
       match res:
         Unpinned(_):

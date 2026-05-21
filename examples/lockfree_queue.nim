@@ -21,10 +21,10 @@ type
   Queue*[T] = object
     head: Atomic[ptr NodeObj[T]]
     tail: Atomic[ptr NodeObj[T]]
-    manager: ptr DebraManager[64]
+    manager: ptr DebraManager[64, ccSingle]
     handle: ThreadHandle[64, ccSingle]
 
-proc newQueue*[T](manager: ptr DebraManager[64]): Queue[T] =
+proc newQueue*[T](manager: ptr DebraManager[64, ccSingle]): Queue[T] =
   result.manager = manager
   result.handle = registerThread(manager[])
 

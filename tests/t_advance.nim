@@ -5,7 +5,7 @@ import debra/types
 import debra/typestates/advance
 
 suite "EpochAdvance typestate":
-  var mgr: DebraManager[4]
+  var mgr: DebraManager[4, ccSingle]
 
   setup:
     mgr = initDebraManager[4]()

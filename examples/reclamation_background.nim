@@ -46,7 +46,7 @@ else:
     Node = ref NodeObj
 
   var
-    manager: DebraManager[4]
+    manager: DebraManager[4, ccSingle]
     shouldStop: Atomic[bool]
     totalReclaimed: Atomic[int]
 

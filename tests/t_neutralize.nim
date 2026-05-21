@@ -46,10 +46,10 @@ proc helperThreadProcCrossSlot() {.thread.} =
   threadLocalIdx = 0
 
 suite "Neutralize typestate":
-  var mgr: DebraManager[4]
+  var mgr: DebraManager[4, ccSingle]
 
   setup:
-    mgr = DebraManager[4]()
+    mgr = DebraManager[4, ccSingle]()
     mgr.globalEpoch.store(1'u64, moRelaxed)
     mgr.activeThreadMask.store(0'u64, moRelaxed)
     for i in 0 ..< 4:
