@@ -22,6 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Retired`, `Registered`, `DebraManager`, `PinnedScope`. The default
   preserves source-compatibility for all single-cardinality call sites;
   multi-pin patterns must opt in with explicit `[N, ccMulti]`.
+- `bindClient`, `unbindClient`, `advance`, `currentEpoch`,
+  `clientCount`, and `initDebraManager` are now generic over
+  `CC: static PinScopeCardinality` (default `ccSingle` for the
+  ergonomic 0.7.x-style call shape). Completes the "Step 8" surface
+  widening flagged in `src/debra/types.nim` so callers can pass
+  `DebraManager[N, ccMulti]` to these procs without Nim's default-CC
+  rule triggering a `type mismatch`. The five wrappers infer `CC`
+  from the manager argument; `initDebraManager` keeps the default so
+  `initDebraManager[N]()` continues to return
+  `DebraManager[N, ccSingle]`, and `initDebraManager[N, ccMulti]()`
+  constructs the multi-cardinality variant directly.
 - `EpochGuardContext` typestate gained a `Closed` terminal state plus a
   `close` proc transitioning `Unpinned → Closed`. The full guard
   lifecycle is now `Pinned → Unpinned → Closed`. The new state is

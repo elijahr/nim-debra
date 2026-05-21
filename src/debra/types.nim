@@ -119,14 +119,18 @@ static:
         sizeof(ThreadState[DefaultMaxThreads].cacheLinePad)
       ) & " bytes); update ThreadStateLive to mirror ThreadState"
 
-proc initDebraManager*[MaxThreads: static int](): DebraManager[MaxThreads] =
+proc initDebraManager*[
+    MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
+](): DebraManager[MaxThreads, CC] =
   ## Initialize a new DEBRA+ manager.
   ##
-  ## Returns `DebraManager[MaxThreads, ccSingle]` via the CC default; the
-  ## CC axis is not inferable from a zero-argument call. Callers that
-  ## want `ccMulti` must construct the manager explicitly (e.g. via
-  ## `initDebraManager[N, ccMulti]()` once Step 8 widens the surface, or
-  ## via direct zero-initialization of the object type).
+  ## Returns `DebraManager[MaxThreads, CC]`. The `CC` axis is not
+  ## inferable from a zero-argument call, so it defaults to `ccSingle`
+  ## to keep the 0.7.x-style `initDebraManager[N]()` call shape working
+  ## unchanged. Callers that want `ccMulti` spell it explicitly:
+  ## `initDebraManager[N, ccMulti]()`. The 0.8.0 "Step 8" surface
+  ## widening is complete; direct zero-initialization of the object
+  ## type is no longer the workaround for ccMulti construction.
   ##
   ## The global epoch starts at 1 (not 0) so that epoch 0 can represent
   ## "never observed" in thread state.

@@ -76,20 +76,28 @@ proc neutralizeStalled*[MaxThreads: static int](
   let complete = scanning.scanAndSignal()
   complete.extractSignalCount()
 
-proc advance*[MaxThreads: static int](
-    manager: var DebraManager[MaxThreads]
+proc advance*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    manager: var DebraManager[MaxThreads, CC]
 ) {.inline.} =
   ## Advance the global epoch.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that
+  ## pass `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call
+  ## shape, while `DebraManager[N, ccMulti]` is also accepted.
   discard manager.globalEpoch.fetchAdd(1'u64, moRelease)
 
-proc currentEpoch*[MaxThreads: static int](
-    manager: var DebraManager[MaxThreads]
+proc currentEpoch*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    manager: var DebraManager[MaxThreads, CC]
 ): uint64 {.inline.} =
   ## Get current global epoch.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that
+  ## pass `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call
+  ## shape, while `DebraManager[N, ccMulti]` is also accepted.
   manager.globalEpoch.load(moAcquire)
 
-proc bindClient*[MaxThreads: static int](
-    manager: var DebraManager[MaxThreads]
+proc bindClient*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    manager: var DebraManager[MaxThreads, CC]
 ) {.inline.} =
   ## Register a client (e.g. a lock-free data structure) as bound to
   ## this manager. Increments `boundClients` by 1.
@@ -99,10 +107,14 @@ proc bindClient*[MaxThreads: static int](
   ## manager's destructor asserts the count is zero, so a non-zero
   ## count at teardown means a client outlived its manager: the client
   ## would continue calling into freed manager state.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that
+  ## pass `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call
+  ## shape, while `DebraManager[N, ccMulti]` is also accepted.
   discard manager.boundClients.fetchAdd(1, moAcquireRelease)
 
-proc unbindClient*[MaxThreads: static int](
-    manager: var DebraManager[MaxThreads]
+proc unbindClient*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    manager: var DebraManager[MaxThreads, CC]
 ) {.inline.} =
   ## Unregister a client previously bound via `bindClient`. Decrements
   ## `boundClients` by 1. See `bindClient` for usage.
@@ -111,15 +123,23 @@ proc unbindClient*[MaxThreads: static int](
   ## unbalanced unbind (e.g. double-destroy of a client) and is caught
   ## here with a precise stack trace, rather than later as a non-zero
   ## value seen by the manager destructor.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that
+  ## pass `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call
+  ## shape, while `DebraManager[N, ccMulti]` is also accepted.
   let prev = manager.boundClients.fetchSub(1, moAcquireRelease)
   doAssert prev > 0,
     "unbindClient: boundClients underflow (was " & $prev &
       ", expected > 0); unbalanced bindClient/unbindClient"
 
-proc clientCount*[MaxThreads: static int](
-    manager: var DebraManager[MaxThreads]
+proc clientCount*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    manager: var DebraManager[MaxThreads, CC]
 ): int {.inline.} =
   ## Number of clients currently bound to this manager. Relaxed load,
   ## suitable for inspection and tests; not synchronized against
   ## concurrent `bindClient` / `unbindClient`.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that
+  ## pass `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call
+  ## shape, while `DebraManager[N, ccMulti]` is also accepted.
   manager.boundClients.load(moRelaxed)
