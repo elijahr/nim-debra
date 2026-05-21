@@ -59,8 +59,8 @@ import ./typestates/reclaim
 # Batched retire/reclaim API (see docs/design/2026-04-25-batched-retire-reclaim.md)
 # ---------------------------------------------------------------------------
 
-proc retire*[MT: static int](
-    pin: var RetireReady[MT], p: pointer, destructor: Destructor
+proc retire*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    pin: var RetireReady[MT, CC], p: pointer, destructor: Destructor
 ) =
   ## Retire `p` inside an existing pinned epoch held by `pin`.
   ##
@@ -75,19 +75,21 @@ proc retire*[MT: static int](
     var manager = initDebraManager[4]()
     setGlobalManager(addr manager)
     let handle = registerThread(manager)
-    withPin(handle):
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
       let p = alloc0(8)
-      it.retire(p, dtor)
+      discard ready.retire(p, dtor)
   let retired = retire(move(pin), p, destructor)
   pin = retireReadyFromRetired(retired)
 
-proc retireBatch*[MT: static int](
-    pin: var RetireReady[MT], items: openArray[(pointer, Destructor)]
+proc retireBatch*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    pin: var RetireReady[MT, CC], items: openArray[(pointer, Destructor)]
 ) =
   ## Retire each `(p, dtor)` in `items` inside an existing pinned epoch.
   ##
   ## Must be called from within `withPin` body (or any other holder of a
-  ## `var RetireReady[MT]`). No pinning, no reclamation. Avoids one
+  ## `var RetireReady[MT, CC]`). No pinning, no reclamation. Avoids one
   ## pin/unpin per object when freeing chains.
   runnableExamples:
     import debra
@@ -99,15 +101,22 @@ proc retireBatch*[MT: static int](
     let handle = registerThread(manager)
     let a = alloc0(8)
     let b = alloc0(8)
-    withPin(handle):
-      it.retireBatch([(a, dtor), (b, dtor)])
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      ready.retireBatch([(a, dtor), (b, dtor)])
   for item in items:
     pin.retire(item[0], item[1])
 
-template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
+template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    th: ThreadHandle[MT, CC], body: untyped
+) {.
+    deprecated:
+      "use PinnedScope: var scope = pinScope(unpinned(handle)); see CHANGELOG.md#v0.8.0"
+.} =
   ## Pin the calling thread, run `body`, unpin on exit (including raises).
   ##
-  ## Injects `it` as a `var RetireReady[MT]` (matches the Nim convention
+  ## Injects `it` as a `var RetireReady[MT, CC]` (matches the Nim convention
   ## used by `filterIt`/`mapIt`). Body may call `it.retire(p, dtor)` zero
   ## or more times. Using `it` avoids collisions with the exported `pin`
   ## proc from `debra/typestates/guard`.
@@ -138,6 +147,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
   ## See also: `debra/typestates/guard.pin`_ (explicit transition), `retire`_,
   ## `retireBatch`_, `debra/typestates/neutralize.neutralizeStalled`_.
   runnableExamples:
+    {.push warning[Deprecated]: off.}
     import debra
     proc dtor(p: pointer) {.nimcall.} =
       dealloc(p)
@@ -148,6 +158,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
     withPin(handle):
       let p = alloc0(8)
       it.retire(p, dtor)
+    {.pop.}
   block:
     let h = th
     doAssert not h.manager.threads[h.idx].pinned.load(moAcquire),
@@ -169,7 +180,12 @@ template withPin*[MT: static int](th: ThreadHandle[MT], body: untyped) =
         Neutralized(nval):
           discard nval.acknowledge()
 
-template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
+template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    th: ThreadHandle[MT, CC], name, body: untyped
+) {.
+    deprecated:
+      "use PinnedScope: var scope = pinScope(unpinned(handle)); see CHANGELOG.md#v0.8.0"
+.} =
   ## `withPin` variant that injects a caller-supplied identifier `name`
   ## (instead of the default `it`). Use to disambiguate nested handles
   ## across multiple managers. The neutralization pitfall described on
@@ -177,6 +193,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
   ## docstring before relying on this form for code paths that may be
   ## interrupted by `neutralizeStalled`.
   runnableExamples:
+    {.push warning[Deprecated]: off.}
     import debra
     proc dtor(p: pointer) {.nimcall.} =
       dealloc(p)
@@ -187,6 +204,7 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
     withPin(handle, slot):
       let p = alloc0(8)
       slot.retire(p, dtor)
+    {.pop.}
   block:
     let h = th
     doAssert not h.manager.threads[h.idx].pinned.load(moAcquire),
@@ -206,8 +224,8 @@ template withPin*[MT: static int](th: ThreadHandle[MT], name, body: untyped) =
         Neutralized(nval):
           discard nval.acknowledge()
 
-proc advanceEvery*[MT: static int](
-    handle: ThreadHandle[MT], n: static int
+proc advanceEvery*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    handle: ThreadHandle[MT, CC], n: static int
 ): bool {.discardable.} =
   ## Increment a per-handle counter; advance the global epoch once every
   ## `n` calls. Returns `true` on the calls that actually advanced.
@@ -244,8 +262,10 @@ proc advanceEvery*[MT: static int](
     let handle = registerThread(manager)
     # Hot loop: retire and amortize the global-epoch atomic store.
     for i in 0 ..< 100:
-      withPin(handle):
-        it.retire(alloc0(8), dtor)
+      block:
+        var scope = pinScope(unpinned(handle))
+        var ready = retireReady(scope.state)
+        discard ready.retire(alloc0(8), dtor)
       handle.advanceEvery(32)
     discard reclaimNow(manager)
   static:
@@ -257,7 +277,9 @@ proc advanceEvery*[MT: static int](
     return true
   return false
 
-proc reclaimNow*[MT: static int](handle: ThreadHandle[MT]): int =
+proc reclaimNow*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    handle: ThreadHandle[MT, CC]
+): int =
   ## Run one reclamation pass over the calling thread's own retired objects.
   ## Returns the number of objects reclaimed, or 0 if no epoch is currently
   ## safe to reclaim.
@@ -279,8 +301,10 @@ proc reclaimNow*[MT: static int](handle: ThreadHandle[MT]): int =
     # Brand-new manager: no retired objects, returns 0 (not an error).
     doAssert reclaimNow(handle) == 0
     # Retire something, advance the epoch a few times, then reclaim.
-    withPin(handle):
-      it.retire(alloc0(8), dtor)
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      discard ready.retire(alloc0(8), dtor)
     manager.advance()
     manager.advance()
     discard reclaimNow(handle)
@@ -302,8 +326,8 @@ proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
   else:
     0
 
-proc retireAndReclaim*[MT: static int](
-    handle: ThreadHandle[MT], p: pointer, destructor: Destructor, eager: bool = true
+proc retireAndReclaim*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    handle: ThreadHandle[MT, CC], p: pointer, destructor: Destructor, eager: bool = true
 ) =
   ## Retire a pointer and optionally attempt immediate reclamation.
   ##
@@ -334,9 +358,9 @@ proc retireAndReclaim*[MT: static int](
   let retired = ready.retire(p, destructor)
 
   # Convert Retired back to Pinned for unpinning
-  let ctx = RetireContext[MT](retired)
+  let ctx = RetireContext[MT, CC](retired)
   let pinnedAgain =
-    Pinned[MT](EpochGuardContext[MT](handle: ctx.handle, epoch: ctx.epoch))
+    Pinned[MT, CC](EpochGuardContext[MT, CC](handle: ctx.handle, epoch: ctx.epoch))
   discard pinnedAgain.unpin()
 
   # Optional eager reclamation (per-thread, scoped to this handle's slot).
