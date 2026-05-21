@@ -55,35 +55,45 @@ import ../limbo
 import ../signal
 
 type
-  ReclaimContext*[MaxThreads: static int] = object of RootObj
-    manager*: ptr DebraManager[MaxThreads]
+  ReclaimContext*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object of RootObj
+    manager*: ptr DebraManager[MaxThreads, CC]
     idx*: int ## Slot index of the calling thread; bag walk targets this slot only.
     globalEpoch*: uint64
     safeEpoch*: uint64
 
-  ReclaimStart*[MaxThreads: static int] = distinct ReclaimContext[MaxThreads]
-  EpochsLoaded*[MaxThreads: static int] = distinct ReclaimContext[MaxThreads]
-  ReclaimReady*[MaxThreads: static int] = distinct ReclaimContext[MaxThreads]
-  ReclaimBlocked*[MaxThreads: static int] = distinct ReclaimContext[MaxThreads]
+  ReclaimStart*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct ReclaimContext[MaxThreads, CC]
+  EpochsLoaded*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct ReclaimContext[MaxThreads, CC]
+  ReclaimReady*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct ReclaimContext[MaxThreads, CC]
+  ReclaimBlocked*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct ReclaimContext[MaxThreads, CC]
 
-typestate ReclaimContext[MaxThreads: static int]:
+typestate ReclaimContext[MaxThreads: static int, CC: static PinScopeCardinality]:
   inheritsFromRootObj = true
   opaqueStates = true
-  states ReclaimStart[MaxThreads],
-    EpochsLoaded[MaxThreads], ReclaimReady[MaxThreads], ReclaimBlocked[MaxThreads]
+  defaults:
+    CC:
+      ccSingle
+  states ReclaimStart[MaxThreads, CC],
+    EpochsLoaded[MaxThreads, CC],
+    ReclaimReady[MaxThreads, CC],
+    ReclaimBlocked[MaxThreads, CC]
   initial:
-    ReclaimStart[MaxThreads]
+    ReclaimStart[MaxThreads, CC]
   terminal:
-    ReclaimReady[MaxThreads]
-    ReclaimBlocked[MaxThreads]
+    ReclaimReady[MaxThreads, CC]
+    ReclaimBlocked[MaxThreads, CC]
   transitions:
-    ReclaimStart[MaxThreads] -> EpochsLoaded[MaxThreads]
-    EpochsLoaded[MaxThreads] ->
-      ReclaimReady[MaxThreads] | ReclaimBlocked[MaxThreads] as ReclaimCheck[MaxThreads]
+    ReclaimStart[MaxThreads, CC] -> EpochsLoaded[MaxThreads, CC]
+    EpochsLoaded[MaxThreads, CC] ->
+      ReclaimReady[MaxThreads, CC] | ReclaimBlocked[MaxThreads, CC] as
+      ReclaimCheck[MaxThreads, CC]
 
 proc reclaimStart*[MaxThreads: static int, CC: static PinScopeCardinality](
     handle: ThreadHandle[MaxThreads, CC]
-): ReclaimStart[MaxThreads] =
+): ReclaimStart[MaxThreads, CC] =
   ## Begin reclamation attempt for the calling thread's own retired objects.
   ##
   ## `handle` identifies the slot whose limbo bag list will be walked. Pass the
@@ -92,15 +102,15 @@ proc reclaimStart*[MaxThreads: static int, CC: static PinScopeCardinality](
   ## without per-list synchronization.
   ##
   ## See also: `debra/convenience.reclaimNow`_ for the one-shot wrapper.
-  ReclaimStart[MaxThreads](
-    ReclaimContext[MaxThreads](
+  ReclaimStart[MaxThreads, CC](
+    ReclaimContext[MaxThreads, CC](
       manager: handle.manager, idx: handle.idx, globalEpoch: 0, safeEpoch: 0
     )
   )
 
-proc reclaimStart*[MaxThreads: static int](
-    mgr: ptr DebraManager[MaxThreads]
-): ReclaimStart[MaxThreads] =
+proc reclaimStart*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    mgr: ptr DebraManager[MaxThreads, CC]
+): ReclaimStart[MaxThreads, CC] =
   ## Legacy entry point that infers the calling thread's slot from the
   ## thread-local `threadLocalIdx` set by `registerThread`. Prefer the
   ## `reclaimStart(handle)` overload.
@@ -127,13 +137,13 @@ proc reclaimStart*[MaxThreads: static int](
       threadLocalIdx
     else:
       -1
-  ReclaimStart[MaxThreads](
-    ReclaimContext[MaxThreads](manager: mgr, idx: idx, globalEpoch: 0, safeEpoch: 0)
+  ReclaimStart[MaxThreads, CC](
+    ReclaimContext[MaxThreads, CC](manager: mgr, idx: idx, globalEpoch: 0, safeEpoch: 0)
   )
 
-proc loadEpochs*[MaxThreads: static int](
-    s: ReclaimStart[MaxThreads]
-): EpochsLoaded[MaxThreads] {.transition.} =
+proc loadEpochs*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: ReclaimStart[MaxThreads, CC]
+): EpochsLoaded[MaxThreads, CC] {.transition.} =
   ## Load global epoch and compute minimum epoch across pinned threads.
   ##
   ## Subscription read: an SC load of `globalEpoch` participates in the C11
@@ -183,7 +193,7 @@ proc loadEpochs*[MaxThreads: static int](
   # atomic" on the SC RMW below.
   subscribeBarrier.store(0'u64, moRelaxed)
   discard subscribeBarrier.fetchAdd(0'u64, moSequentiallyConsistent)
-  var ctx = ReclaimContext[MaxThreads](s)
+  var ctx = ReclaimContext[MaxThreads, CC](s)
   # `globalEpoch` is now just a value read; reading a slightly stale
   # epoch only makes `safeEpoch` conservatively lower, which is safe.
   # The acquire ordering is enough to pair with the release-stamping in
@@ -208,25 +218,25 @@ proc loadEpochs*[MaxThreads: static int](
       if threadEpoch < ctx.safeEpoch:
         ctx.safeEpoch = threadEpoch
 
-  result = EpochsLoaded[MaxThreads](ctx)
+  result = EpochsLoaded[MaxThreads, CC](ctx)
 
-func safeEpoch*[MaxThreads: static int](
-    e: EpochsLoaded[MaxThreads]
+func safeEpoch*[MaxThreads: static int, CC: static PinScopeCardinality](
+    e: EpochsLoaded[MaxThreads, CC]
 ): uint64 {.notATransition.} =
-  ReclaimContext[MaxThreads](e).safeEpoch
+  ReclaimContext[MaxThreads, CC](e).safeEpoch
 
-proc checkSafe*[MaxThreads: static int](
-    e: EpochsLoaded[MaxThreads]
-): ReclaimCheck[MaxThreads] {.transition.} =
+proc checkSafe*[MaxThreads: static int, CC: static PinScopeCardinality](
+    e: EpochsLoaded[MaxThreads, CC]
+): ReclaimCheck[MaxThreads, CC] {.transition.} =
   ## Check if any epochs are safe to reclaim.
-  let ctx = ReclaimContext[MaxThreads](e)
+  let ctx = ReclaimContext[MaxThreads, CC](e)
   if ctx.safeEpoch > 1:
-    ReclaimCheck[MaxThreads] -> ReclaimReady[MaxThreads](ctx)
+    ReclaimCheck[MaxThreads, CC] -> ReclaimReady[MaxThreads, CC](ctx)
   else:
-    ReclaimCheck[MaxThreads] -> ReclaimBlocked[MaxThreads](ctx)
+    ReclaimCheck[MaxThreads, CC] -> ReclaimBlocked[MaxThreads, CC](ctx)
 
-proc tryReclaim*[MaxThreads: static int](
-    r: ReclaimReady[MaxThreads]
+proc tryReclaim*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: ReclaimReady[MaxThreads, CC]
 ): int {.notATransition.} =
   ## Reclaim eligible objects from the calling thread's own limbo bag list.
   ##
@@ -249,7 +259,7 @@ proc tryReclaim*[MaxThreads: static int](
       ReclaimBlocked(_):
         # Brand-new manager: epoch hasn't advanced; this branch is normal.
         discard
-  let ctx = ReclaimContext[MaxThreads](r)
+  let ctx = ReclaimContext[MaxThreads, CC](r)
   if ctx.idx < 0 or ctx.idx >= MaxThreads:
     # Caller is not a registered thread; nothing to reclaim from their slot.
     return 0

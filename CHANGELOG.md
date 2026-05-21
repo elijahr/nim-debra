@@ -59,12 +59,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 60+ DR-T6 explicit-annotation sites widened across tests and examples
   to spell the new `CC` second parameter explicitly where the cardinality
   matters.
-- `AdvanceContext` remains intentionally CC-agnostic. The advance
-  protocol is pure atomic epoch arithmetic with no cardinality-dependent
-  branching; the operation is uniform across single- and multi-pin
-  scopes. Adding `CC` would be cargo-cult parameterization with zero
-  call-site benefit and a maintenance tax. Documented here so future
-  readers don't re-litigate the decision.
+- Five typestate context object types (`ReclaimContext`, `AdvanceContext`,
+  `ManagerContext`, `NeutralizeContext`, `SlotContext`) and their distinct
+  sub-states, typestate declarations, and builder procs gained
+  `CC: static PinScopeCardinality = ccSingle`, mirroring
+  `EpochGuardContext` / `RetireContext` / `PinnedScopeContext`. The
+  default `ccSingle` preserves the 0.7.x-style call shape; the parameter
+  enables ccMulti managers built by `initDebraManager[N, ccMulti]()` to
+  flow through the typestate context surface end-to-end, unblocking
+  multi-consumer reclamation paths in downstream lock-free clients
+  (e.g. `lockfreequeues` v5.0.0 multi-consumer pop body's `reclaimNow`
+  tail). This completes the Step 8 widening on the typestate context
+  layer that was missed in the manager-surface pass.
+  The `AdvanceContext` widening implements (rather than reverses) the
+  prior "intentionally CC-agnostic" intent: the advance ALGORITHM remains
+  uniform across cardinalities (pure atomic epoch arithmetic, no
+  CC-dependent branching), but the type system has to carry `CC` to accept
+  a `ptr DebraManager[MT, CC]` field for both cardinalities. The earlier
+  CHANGELOG entry asserting "no `CC` param on AdvanceContext" was based on
+  the algorithmic argument; the field type still defaulted to ccSingle and
+  rejected ccMulti managers at compile time. The ccSingle default preserves
+  the "no migration needed" contract for existing 0.7.x-style call shapes.
 - `typestates` dependency pinned at `>= 0.9.1` (downstream bracket-asymmetry
   fix exercised by the new `PinnedScope` and `EpochGuardContext` typestates;
   validated against 0.9.2).

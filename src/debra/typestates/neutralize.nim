@@ -13,44 +13,51 @@ import ../constants
 import ../thread_id
 
 type
-  NeutralizeContext*[MaxThreads: static int] = object of RootObj
-    manager*: ptr DebraManager[MaxThreads]
+  NeutralizeContext*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object of RootObj
+    manager*: ptr DebraManager[MaxThreads, CC]
     globalEpoch*: uint64
     threshold*: uint64
     signalsSent*: int
 
-  ScanStart*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
-  Scanning*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
-  ScanComplete*[MaxThreads: static int] = distinct NeutralizeContext[MaxThreads]
+  ScanStart*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct NeutralizeContext[MaxThreads, CC]
+  Scanning*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct NeutralizeContext[MaxThreads, CC]
+  ScanComplete*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct NeutralizeContext[MaxThreads, CC]
 
-typestate NeutralizeContext[MaxThreads: static int]:
+typestate NeutralizeContext[MaxThreads: static int, CC: static PinScopeCardinality]:
   inheritsFromRootObj = true
   opaqueStates = true
-  states ScanStart[MaxThreads], Scanning[MaxThreads], ScanComplete[MaxThreads]
+  defaults:
+    CC:
+      ccSingle
+  states ScanStart[MaxThreads, CC],
+    Scanning[MaxThreads, CC], ScanComplete[MaxThreads, CC]
   initial:
-    ScanStart[MaxThreads]
+    ScanStart[MaxThreads, CC]
   terminal:
-    ScanComplete[MaxThreads]
+    ScanComplete[MaxThreads, CC]
   transitions:
-    ScanStart[MaxThreads] -> Scanning[MaxThreads]
-    Scanning[MaxThreads] -> ScanComplete[MaxThreads]
+    ScanStart[MaxThreads, CC] -> Scanning[MaxThreads, CC]
+    Scanning[MaxThreads, CC] -> ScanComplete[MaxThreads, CC]
 
-proc scanStart*[MaxThreads: static int](
-    mgr: ptr DebraManager[MaxThreads]
-): ScanStart[MaxThreads] =
+proc scanStart*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    mgr: ptr DebraManager[MaxThreads, CC]
+): ScanStart[MaxThreads, CC] =
   ## Begin neutralization scan.
-  ScanStart[MaxThreads](
-    NeutralizeContext[MaxThreads](
+  ScanStart[MaxThreads, CC](
+    NeutralizeContext[MaxThreads, CC](
       manager: mgr, globalEpoch: 0, threshold: 0, signalsSent: 0
     )
   )
 
-proc loadEpoch*[MaxThreads: static int](
-    s: ScanStart[MaxThreads], epochsBeforeNeutralize: uint64 = 2
-): Scanning[MaxThreads] {.transition.} =
+proc loadEpoch*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: ScanStart[MaxThreads, CC], epochsBeforeNeutralize: uint64 = 2
+): Scanning[MaxThreads, CC] {.transition.} =
   ## Load global epoch and compute threshold for stalled threads.
   ## Threads with epoch < (globalEpoch - epochsBeforeNeutralize) get signaled.
-  var ctx = NeutralizeContext[MaxThreads](s)
+  var ctx = NeutralizeContext[MaxThreads, CC](s)
   ctx.globalEpoch = ctx.manager.globalEpoch.load(moAcquire)
 
   ctx.threshold =
@@ -59,26 +66,26 @@ proc loadEpoch*[MaxThreads: static int](
     else:
       0'u64
 
-  result = Scanning[MaxThreads](ctx)
+  result = Scanning[MaxThreads, CC](ctx)
 
-func globalEpoch*[MaxThreads: static int](
-    s: Scanning[MaxThreads]
+func globalEpoch*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Scanning[MaxThreads, CC]
 ): uint64 {.notATransition.} =
   ## Get the global epoch loaded during scan start.
-  NeutralizeContext[MaxThreads](s).globalEpoch
+  NeutralizeContext[MaxThreads, CC](s).globalEpoch
 
-func threshold*[MaxThreads: static int](
-    s: Scanning[MaxThreads]
+func threshold*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Scanning[MaxThreads, CC]
 ): uint64 {.notATransition.} =
   ## Get the epoch threshold for neutralization.
-  NeutralizeContext[MaxThreads](s).threshold
+  NeutralizeContext[MaxThreads, CC](s).threshold
 
-proc scanAndSignal*[MaxThreads: static int](
-    s: Scanning[MaxThreads]
-): ScanComplete[MaxThreads] {.transition.} =
+proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Scanning[MaxThreads, CC]
+): ScanComplete[MaxThreads, CC] {.transition.} =
   ## Scan all registered threads and send SIGUSR1 to stalled pinned threads.
   ## Returns count of signals sent.
-  var ctx = NeutralizeContext[MaxThreads](s)
+  var ctx = NeutralizeContext[MaxThreads, CC](s)
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
   let currentTid = currentThreadId()
 
@@ -96,16 +103,16 @@ proc scanAndSignal*[MaxThreads: static int](
             discard tid.sendSignal(QuiescentSignal)
             inc ctx.signalsSent
 
-  result = ScanComplete[MaxThreads](ctx)
+  result = ScanComplete[MaxThreads, CC](ctx)
 
-func signalsSent*[MaxThreads: static int](
-    c: ScanComplete[MaxThreads]
+func signalsSent*[MaxThreads: static int, CC: static PinScopeCardinality](
+    c: ScanComplete[MaxThreads, CC]
 ): int {.notATransition.} =
   ## Get number of signals sent during scan.
-  NeutralizeContext[MaxThreads](c).signalsSent
+  NeutralizeContext[MaxThreads, CC](c).signalsSent
 
-func extractSignalCount*[MaxThreads: static int](
-    c: ScanComplete[MaxThreads]
+func extractSignalCount*[MaxThreads: static int, CC: static PinScopeCardinality](
+    c: ScanComplete[MaxThreads, CC]
 ): int {.notATransition.} =
   ## Extract the count of signals sent. Terminal operation.
-  NeutralizeContext[MaxThreads](c).signalsSent
+  NeutralizeContext[MaxThreads, CC](c).signalsSent

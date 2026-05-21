@@ -320,10 +320,16 @@ proc reclaimNow*[MT: static int, CC: static PinScopeCardinality = ccSingle](
   else:
     0
 
-proc reclaimNow*[MT: static int](manager: var DebraManager[MT]): int =
+proc reclaimNow*[MT: static int, CC: static PinScopeCardinality = ccSingle](
+    manager: var DebraManager[MT, CC]
+): int =
   ## Legacy wrapper: infers the calling thread's slot from `threadLocalIdx`
   ## (set by `registerThread`). Prefer `reclaimNow(handle)` for clarity and
   ## for safety from unregistered threads.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that pass
+  ## `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call shape,
+  ## while `DebraManager[N, ccMulti]` is also accepted.
   ##
   ## See also: `debra/typestates/reclaim.tryReclaim`_, `advance`_.
   let op = reclaimStart(addr manager).loadEpochs().checkSafe()

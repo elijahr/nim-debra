@@ -12,74 +12,85 @@ import typestates
 import ../types
 
 type
-  SlotContext*[MaxThreads: static int] = object of RootObj
+  SlotContext*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object of RootObj
     idx*: int
-    manager*: ptr DebraManager[MaxThreads]
+    manager*: ptr DebraManager[MaxThreads, CC]
 
-  Free*[MaxThreads: static int] = distinct SlotContext[MaxThreads]
-  Claiming*[MaxThreads: static int] = distinct SlotContext[MaxThreads]
-  Active*[MaxThreads: static int] = distinct SlotContext[MaxThreads]
-  Draining*[MaxThreads: static int] = distinct SlotContext[MaxThreads]
+  Free*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct SlotContext[MaxThreads, CC]
+  Claiming*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct SlotContext[MaxThreads, CC]
+  Active*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct SlotContext[MaxThreads, CC]
+  Draining*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct SlotContext[MaxThreads, CC]
 
-typestate SlotContext[MaxThreads: static int]:
+typestate SlotContext[MaxThreads: static int, CC: static PinScopeCardinality]:
   inheritsFromRootObj = true
-  states Free[MaxThreads],
-    Claiming[MaxThreads], Active[MaxThreads], Draining[MaxThreads]
+  defaults:
+    CC:
+      ccSingle
+  states Free[MaxThreads, CC],
+    Claiming[MaxThreads, CC], Active[MaxThreads, CC], Draining[MaxThreads, CC]
   transitions:
-    Free[MaxThreads] -> Claiming[MaxThreads]
-    Claiming[MaxThreads] -> Active[MaxThreads]
-    Active[MaxThreads] -> Draining[MaxThreads]
-    Draining[MaxThreads] -> Free[MaxThreads]
+    Free[MaxThreads, CC] -> Claiming[MaxThreads, CC]
+    Claiming[MaxThreads, CC] -> Active[MaxThreads, CC]
+    Active[MaxThreads, CC] -> Draining[MaxThreads, CC]
+    Draining[MaxThreads, CC] -> Free[MaxThreads, CC]
 
-proc freeSlot*[MaxThreads: static int](
-    idx: int, mgr: ptr DebraManager[MaxThreads]
-): Free[MaxThreads] =
+proc freeSlot*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle](
+    idx: int, mgr: ptr DebraManager[MaxThreads, CC]
+): Free[MaxThreads, CC] =
   ## Create a free slot context.
-  Free[MaxThreads](SlotContext[MaxThreads](idx: idx, manager: mgr))
+  Free[MaxThreads, CC](SlotContext[MaxThreads, CC](idx: idx, manager: mgr))
 
-proc claim*[MaxThreads: static int](
-    f: sink Free[MaxThreads]
-): Claiming[MaxThreads] {.transition.} =
+proc claim*[MaxThreads: static int, CC: static PinScopeCardinality](
+    f: sink Free[MaxThreads, CC]
+): Claiming[MaxThreads, CC] {.transition.} =
   ## Begin claiming this slot. Transition to Claiming state.
-  Claiming[MaxThreads](SlotContext[MaxThreads](f))
+  Claiming[MaxThreads, CC](SlotContext[MaxThreads, CC](f))
 
-proc activate*[MaxThreads: static int](
-    c: sink Claiming[MaxThreads]
-): Active[MaxThreads] {.transition.} =
+proc activate*[MaxThreads: static int, CC: static PinScopeCardinality](
+    c: sink Claiming[MaxThreads, CC]
+): Active[MaxThreads, CC] {.transition.} =
   ## Complete slot claim. Transition to Active state.
   ## This is where the slot becomes fully owned by a thread.
-  Active[MaxThreads](SlotContext[MaxThreads](c))
+  Active[MaxThreads, CC](SlotContext[MaxThreads, CC](c))
 
-proc drain*[MaxThreads: static int](
-    a: sink Active[MaxThreads]
-): Draining[MaxThreads] {.transition.} =
+proc drain*[MaxThreads: static int, CC: static PinScopeCardinality](
+    a: sink Active[MaxThreads, CC]
+): Draining[MaxThreads, CC] {.transition.} =
   ## Begin unregistration. Transition to Draining state.
   ## Thread will drain its limbo bags before releasing the slot.
-  Draining[MaxThreads](SlotContext[MaxThreads](a))
+  Draining[MaxThreads, CC](SlotContext[MaxThreads, CC](a))
 
-proc release*[MaxThreads: static int](
-    d: sink Draining[MaxThreads]
-): Free[MaxThreads] {.transition.} =
+proc release*[MaxThreads: static int, CC: static PinScopeCardinality](
+    d: sink Draining[MaxThreads, CC]
+): Free[MaxThreads, CC] {.transition.} =
   ## Release slot back to free pool. Transition back to Free state.
   ## This completes the lifecycle, making the slot available for reuse.
-  Free[MaxThreads](SlotContext[MaxThreads](d))
+  Free[MaxThreads, CC](SlotContext[MaxThreads, CC](d))
 
-func idx*[MaxThreads: static int](s: Active[MaxThreads]): int {.notATransition.} =
+func idx*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Active[MaxThreads, CC]
+): int {.notATransition.} =
   ## Get the slot index from Active state.
-  SlotContext[MaxThreads](s).idx
+  SlotContext[MaxThreads, CC](s).idx
 
-func idx*[MaxThreads: static int](s: Draining[MaxThreads]): int {.notATransition.} =
+func idx*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Draining[MaxThreads, CC]
+): int {.notATransition.} =
   ## Get the slot index from Draining state.
-  SlotContext[MaxThreads](s).idx
+  SlotContext[MaxThreads, CC](s).idx
 
-func manager*[MaxThreads: static int](
-    s: Active[MaxThreads]
-): ptr DebraManager[MaxThreads] =
+func manager*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Active[MaxThreads, CC]
+): ptr DebraManager[MaxThreads, CC] =
   ## Get the manager pointer from Active state.
-  SlotContext[MaxThreads](s).manager
+  SlotContext[MaxThreads, CC](s).manager
 
-func manager*[MaxThreads: static int](
-    s: Draining[MaxThreads]
-): ptr DebraManager[MaxThreads] =
+func manager*[MaxThreads: static int, CC: static PinScopeCardinality](
+    s: Draining[MaxThreads, CC]
+): ptr DebraManager[MaxThreads, CC] =
   ## Get the manager pointer from Draining state.
-  SlotContext[MaxThreads](s).manager
+  SlotContext[MaxThreads, CC](s).manager
