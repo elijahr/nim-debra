@@ -17,6 +17,7 @@ import ./debra/typestates/manager
 import ./debra/typestates/registration
 import ./debra/typestates/guard
 import ./debra/typestates/retire
+import ./debra/typestates/pinned_scope
 import ./debra/typestates/reclaim
 import ./debra/typestates/neutralize
 import ./debra/typestates/advance
@@ -34,6 +35,7 @@ export manager
 export registration
 export guard
 export retire
+export pinned_scope
 export reclaim
 export neutralize
 export advance
