@@ -16,6 +16,10 @@ tests/test
 !tests/test.nim
 ## Nested test binaries
 tests/**/[a-z_]*
+# `tests/**/[a-z_]*` also matches subdirectories themselves; git's
+# negation can't re-include files inside a directory excluded by an
+# earlier rule. Re-include directories first, then re-include .nim files.
+!tests/**/
 !tests/**/*.nim
 ## Debug binaries and symbols
 tests/debug_*

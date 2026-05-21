@@ -8,6 +8,8 @@ import ./t_manager_typestate
 import ./t_registration
 import ./t_guard
 import ./t_retire
+import ./t_pinned_scope
+import ./t_retire_on_cas
 import ./t_reclaim
 import ./t_neutralize
 import ./t_advance

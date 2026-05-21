@@ -31,6 +31,9 @@ task test, "Run tests with all memory managers":
   echo "[nim check] verifying tests/t_atomics_dsl_negative.nim - DSL must NOT leak into debra/atomics core"
   exec "nim check --threads:on --hints:off --warnings:off --path:src tests/t_atomics_dsl_negative.nim"
   echo "[nim check] passed: DSL boundary intact"
+  echo "[should_fail] verifying compile-fail tests for PinnedScope + CFG analyzer"
+  exec "nim r --hints:off --warnings:off --path:src tests/should_fail/runner.nim"
+  echo "[should_fail] passed: PinnedScope =copy + CFG-terminal substrings pinned"
   echo "All backends passed!"
 
 task testExamples, "Compile and run all example files":
