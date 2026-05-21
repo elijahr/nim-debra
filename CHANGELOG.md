@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - YYYY-MM-DD
+
+### Changed (breaking)
+
+- `withPin(handle): body` is deprecated. Replace with the `PinnedScope`
+  RAII type: `var scope = pinScope(unpinned(handle))`. The new form runs
+  unpin + close automatically at scope exit via `=destroy`. Removal is
+  targeted for 0.9.0; the deprecated `withPin` template still compiles
+  in 0.8.0 with a deprecation warning.
+- Nine typestate-axis types gained a second generic parameter
+  `CC: static PinScopeCardinality` (default `ccSingle`):
+  `ThreadHandle`, `Pinned`, `RetireReady`, `Unpinned`, `Neutralized`,
+  `Retired`, `Registered`, `DebraManager`, `PinnedScope`. The default
+  preserves source-compatibility for all single-cardinality call sites;
+  multi-pin patterns must opt in with explicit `[N, ccMulti]`.
+- `EpochGuardContext` typestate gained a `Closed` terminal state plus a
+  `close` proc transitioning `Unpinned → Closed`. The full guard
+  lifecycle is now `Pinned → Unpinned → Closed`. The new state is
+  exercised by `PinnedScope.=destroy`.
+
+### Added
+
+- `PinnedScope[MT, CC]` RAII type. `=destroy` automatically runs unpin
+  and close on scope exit, including on early-return / exception paths.
+- `pinScope(unpinned(handle))` constructor (verb-noun form, chosen to
+  avoid name collision with `guard.pin`).
+- `retireReady(scope.state)` retire chain, allowing `discard ready.retire(ptr, dtor)`
+  inside a `PinnedScope` without leaving the pinned axis.
+- `PinScopeCardinality` enum (`ccSingle`, `ccMulti`). `ccSingle` is the
+  safe default and matches single-PinnedScope-per-thread-per-lifetime
+  usage. `ccMulti` is an explicit opt-in for multi-pin patterns; see
+  the migration guide for the foot-gun callout (pin ordering and limbo
+  bag advancement become caller responsibilities).
+
+### Internal
+
+- 17 internal `withPin` call sites migrated to `PinnedScope` across
+  `src/debra/` and the test/example tree.
+- 60+ DR-T6 explicit-annotation sites widened across tests and examples
+  to spell the new `CC` second parameter explicitly where the cardinality
+  matters.
+- `AdvanceContext` remains intentionally CC-agnostic. The advance
+  protocol is pure atomic epoch arithmetic with no cardinality-dependent
+  branching; the operation is uniform across single- and multi-pin
+  scopes. Adding `CC` would be cargo-cult parameterization with zero
+  call-site benefit and a maintenance tax. Documented here so future
+  readers don't re-litigate the decision.
+- `typestates` dependency pinned at `>= 0.9.1` (downstream bracket-asymmetry
+  fix exercised by the new `PinnedScope` and `EpochGuardContext` typestates;
+  validated against 0.9.2).
+- Test count: 210 → 229 (+19: 10 in `t_pinned_scope`, 9 in `t_retire_on_cas`).
+
 ## [0.7.3] - 2026-05-08
 
 ### Fixed
@@ -348,7 +400,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/elijahr/nim-debra/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/elijahr/nim-debra/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/elijahr/nim-debra/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/elijahr/nim-debra/compare/v0.7.0...v0.7.1
