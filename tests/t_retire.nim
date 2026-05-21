@@ -21,13 +21,13 @@ suite "Retire typestate":
     discard uninitializedManager(addr mgr).initialize()
 
   test "retireReady from Pinned":
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     let ready = retireReady(p)
-    check ready is RetireReady[4]
+    check ready is RetireReady[4, ccSingle]
 
   test "retire accepts pointer + destructor":
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     let ready = retireReady(p)
 
@@ -35,12 +35,12 @@ suite "Retire typestate":
     raw.value = 42
     let retired = ready.retire(cast[pointer](raw), dtor)
 
-    check retired is Retired[4]
+    check retired is Retired[4, ccSingle]
     check mgr.threads[0].currentBag != nil
     check mgr.threads[0].currentBag.count == 1
 
   test "retire multiple pointers fills bag":
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
 
@@ -53,7 +53,7 @@ suite "Retire typestate":
     check mgr.threads[0].currentBag.count == LimboBagSize
 
   test "retireReadyFromRetired allows chaining":
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
 
@@ -66,7 +66,7 @@ suite "Retire typestate":
     check mgr.threads[0].currentBag.count == 3
 
   test "pinnedFromRetired round-trips Pinned -> Retired -> Pinned -> unpin":
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let pinned = unpinned(handle).pin()
     let originalEpoch = pinned.epoch
     let ready = retireReady(pinned)

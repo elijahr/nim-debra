@@ -30,7 +30,7 @@ type
   StackBase[T] = object
     top: Atomic[ptr NodeObj[T]]
     manager: ptr DebraManager[64]
-    handle: ThreadHandle[64]
+    handle: ThreadHandle[64, ccSingle]
 
   Empty*[T] = distinct StackBase[T] ## Stack with no elements.
 

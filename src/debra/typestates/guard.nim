@@ -22,19 +22,18 @@
 ## * `Neutralized` — was Pinned, then signaled; must `acknowledge`
 ##   before re-pinning.
 ## * `Closed` — terminal state reached only by the destructor path of
-##   `PinnedScope` (or the deprecated `withPin` finalizer). User code
-##   SHOULD NOT call `close` directly; rely on `PinnedScope` to drive
-##   the lifecycle. `close` performs no atomic operations — the slot's
-##   `pinned` / `neutralized` flags were already cleared by the
-##   preceding `unpin` (or `unpin + acknowledge`) call.
+##   `PinnedScope`. User code SHOULD NOT call `close` directly; rely on
+##   `PinnedScope` to drive the lifecycle. `close` performs no atomic
+##   operations — the slot's `pinned` / `neutralized` flags were already
+##   cleared by the preceding `unpin` (or `unpin + acknowledge`) call.
 ##
 ## ## Pitfalls
 ##
 ## * The `Unpinned` -> `Pinned` -> `Unpinned`/`Neutralized` typestate sequence
 ##   must be respected. Calling `pin` on a handle that is already pinned at
 ##   the slot level (the manager's `threads[idx].pinned` flag is true) leaves
-##   the slot inconsistent. Use `withPin` (in `debra/convenience`) for the
-##   common path; reach for the typestate API only when you need finer control.
+##   the slot inconsistent. Use `PinnedScope` (in `debra/typestates/pinned_scope`)
+##   for the common path; reach for the typestate API only when you need finer control.
 ## * If `unpin` returns `Neutralized`, the thread was signaled while inside
 ##   the critical section. Call `acknowledge` before re-pinning. Skipping
 ##   `acknowledge` will leave the slot's `neutralized` flag set, and the
@@ -46,7 +45,7 @@
 ##
 ## ## See also
 ##
-## * `debra/convenience.withPin`_ - the recommended high-level wrapper.
+## * `debra/typestates/pinned_scope.PinnedScope`_ - the recommended high-level RAII guard.
 ## * `debra/typestates/retire`_ - `RetireReady` constructed from `Pinned`.
 
 import ../atomics
@@ -188,8 +187,8 @@ proc close*[MaxThreads: static int, CC: static PinScopeCardinality](
   ## One-way exit transition for `PinnedScope`'s destructor path.
   ##
   ## `close` is reserved for the `PinnedScope.=destroy` path; user code
-  ## should rely on `PinnedScope` (or the deprecated `withPin`) to drive
-  ## the lifecycle and should not call `close` directly. `close` performs
+  ## should rely on `PinnedScope` to drive the lifecycle and should not
+  ## call `close` directly. `close` performs
   ## no atomic operations; the slot's `pinned` and `neutralized` flags
   ## were already cleared by the preceding `unpin` (or `unpin +
   ## acknowledge`) call.

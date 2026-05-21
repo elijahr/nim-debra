@@ -39,7 +39,7 @@ suite "PinnedScope happy path + lifecycle":
     check manager.threads[handle.idx].pinned.load(moAcquire) == false
 
   test "=destroy fires on early return":
-    proc earlyReturn(h: ThreadHandle[4]) =
+    proc earlyReturn(h: ThreadHandle[4, ccSingle]) =
       var scope {.used.} = pinScope(unpinned(h))
       return
 

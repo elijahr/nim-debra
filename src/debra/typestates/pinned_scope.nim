@@ -1,7 +1,7 @@
 ## PinnedScope RAII guard for pin-scoped retire.
 ##
 ## `PinnedScope[MT, CC]` is the recommended high-level entry point for the
-## pin/retire/unpin cycle, replacing the deprecated `withPin` template.
+## pin/retire/unpin cycle, replacing the now-deprecated block-form sugar.
 ## Construct via `pinScope(unpinned(handle))`; destruction (block exit, scope
 ## end, explicit `=destroy`) drives the underlying `EpochGuardContext`
 ## through `unpin` (and, if signaled, `acknowledge`) and finally `close`,
@@ -48,7 +48,6 @@
 ##
 ## ## See also
 ##
-## * `debra/convenience.withPin`_ (deprecated) — the predecessor template.
 ## * `debra/typestates/guard.pin`_ / `unpin`_ / `acknowledge`_ / `close`_ —
 ##   the underlying `EpochGuardContext` transitions driven internally.
 ## * `debra/typestates/retire`_ — `RetireReady` / `Retired` rotation used

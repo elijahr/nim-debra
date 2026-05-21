@@ -18,7 +18,9 @@
 ##
 ## ## See also
 ##
-## * `debra/convenience.withPin`_ + `it.retire(...)` - the recommended path.
+## * `debra/typestates/pinned_scope.PinnedScope`_ +
+##   `scope.retireOnCAS` / `scope.retireOnPublish` (or
+##   `retireReady(scope.state).retire(...)`) - the recommended path.
 ## * `debra/typestates/reclaim`_ - eventual reclamation after epoch safety.
 
 import typestates

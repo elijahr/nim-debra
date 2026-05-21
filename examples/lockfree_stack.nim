@@ -21,7 +21,7 @@ type
   Stack*[T] = object
     head: Atomic[ptr NodeObj[T]]
     manager: ptr DebraManager[64]
-    handle: ThreadHandle[64]
+    handle: ThreadHandle[64, ccSingle]
 
 proc newStack*[T](manager: ptr DebraManager[64]): Stack[T] =
   result.manager = manager
@@ -30,7 +30,8 @@ proc newStack*[T](manager: ptr DebraManager[64]): Stack[T] =
 proc push*[T](stack: var Stack[T], value: T) =
   let newNode = retain Node[T](value: value)
 
-  stack.handle.withPin:
+  block:
+    var scope {.used.} = pinScope(unpinned(stack.handle))
     while true:
       let oldHead = stack.head.load(moAcquire)
       newNode.next.store(oldHead, moRelaxed)
@@ -41,7 +42,9 @@ proc push*[T](stack: var Stack[T], value: T) =
 proc pop*[T](stack: var Stack[T]): Option[T] =
   result = none(T)
 
-  stack.handle.withPin:
+  block:
+    var scope = pinScope(unpinned(stack.handle))
+    var ready = retireReady(scope.state)
     block popLoop:
       while true:
         let oldHead = stack.head.load(moAcquire)
@@ -54,7 +57,7 @@ proc pop*[T](stack: var Stack[T]): Option[T] =
           result = some(oldHead.value)
           # Retire the popped node. The destructor balances the `retain`
           # done by `push` once the epoch is safe.
-          it.retire(cast[pointer](oldHead), releaseDestructor[NodeObj[T]]())
+          ready.retire(cast[pointer](oldHead), releaseDestructor[NodeObj[T]]())
           break popLoop
 
 proc main() =

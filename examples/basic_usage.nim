@@ -11,7 +11,7 @@ type
   Node = ref NodeObj
 
 # One pin/retire/unpin cycle.
-proc doCycle(handle: ThreadHandle[4], value: int) =
+proc doCycle(handle: ThreadHandle[4, ccSingle], value: int) =
   let u = unpinned(handle)
   let pinned = u.pin()
 

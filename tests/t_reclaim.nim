@@ -27,27 +27,27 @@ suite "Reclaim typestate":
     discard uninitializedManager(addr mgr).initialize()
 
   test "reclaimStart creates ReclaimStart":
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let s = reclaimStart(handle)
     check s is ReclaimStart[4]
 
   test "loadEpochs computes safe epoch":
     mgr.globalEpoch.store(10'u64, moRelaxed)
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let loaded = reclaimStart(handle).loadEpochs()
     check loaded is EpochsLoaded[4]
     check loaded.safeEpoch == 10'u64
 
   test "checkSafe returns ReclaimReady when epoch > 1":
     mgr.globalEpoch.store(5'u64, moRelaxed)
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let check = reclaimStart(handle).loadEpochs().checkSafe()
     check check.kind == rReclaimReady
 
   test "tryReclaim reclaims eligible bags":
     # Setup: retire objects at epoch 1
     mgr.globalEpoch.store(1'u64, moRelaxed)
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
     for i in 0 ..< 5:
@@ -75,7 +75,7 @@ suite "Reclaim typestate":
     mgr.globalEpoch.store(1'u64, moRelaxed)
 
     # Thread 0: Retire 3 objects at epoch 1
-    let h0 = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let h0 = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p0 = unpinned(h0).pin()
     check p0.epoch == 1
     var ready0 = retireReady(p0)
@@ -88,7 +88,7 @@ suite "Reclaim typestate":
     mgr.globalEpoch.store(2'u64, moRelaxed)
 
     # Thread 1: Retire 4 objects at epoch 2
-    let h1 = ThreadHandle[4](idx: 1, manager: addr mgr)
+    let h1 = ThreadHandle[4, ccSingle](idx: 1, manager: addr mgr)
     let p1 = unpinned(h1).pin()
     check p1.epoch == 2
     var ready1 = retireReady(p1)
@@ -101,7 +101,7 @@ suite "Reclaim typestate":
     mgr.globalEpoch.store(3'u64, moRelaxed)
 
     # Thread 2: Retire 5 objects at epoch 3
-    let h2 = ThreadHandle[4](idx: 2, manager: addr mgr)
+    let h2 = ThreadHandle[4, ccSingle](idx: 2, manager: addr mgr)
     let p2 = unpinned(h2).pin()
     check p2.epoch == 3
     var ready2 = retireReady(p2)
@@ -163,8 +163,8 @@ suite "Reclaim typestate":
     # reclaims; thread 0's bags are untouched.
     mgr.globalEpoch.store(1'u64, moRelaxed)
 
-    let h0 = ThreadHandle[4](idx: 0, manager: addr mgr)
-    let h1 = ThreadHandle[4](idx: 1, manager: addr mgr)
+    let h0 = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
+    let h1 = ThreadHandle[4, ccSingle](idx: 1, manager: addr mgr)
 
     # Thread 0 retires 3 objects at epoch 1
     let p0 = unpinned(h0).pin()
@@ -197,7 +197,7 @@ suite "Reclaim typestate":
     # Retire enough objects to fill 2+ bags, then reclaim. Verifies the new
     # tail-to-current FIFO list management correctly walks all eligible bags.
     mgr.globalEpoch.store(1'u64, moRelaxed)
-    let handle = ThreadHandle[4](idx: 0, manager: addr mgr)
+    let handle = ThreadHandle[4, ccSingle](idx: 0, manager: addr mgr)
     let p = unpinned(handle).pin()
     var ready = retireReady(p)
     let totalObjects = LimboBagSize * 2 + 5 # 133 objects -> 3 bags

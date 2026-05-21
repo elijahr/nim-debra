@@ -5,19 +5,22 @@
 ##
 ## ## Pitfalls
 ##
-## * `withPin` does not allow re-pinning the same handle inside its body.
-##   A `doAssert` catches direct nesting and fires in release builds too,
-##   because a second `pin` would silently corrupt the pinned-flag on the
-##   thread's slot — this is a safety guard, not just a debug aid.
-##   Different handles (multi-manager) are independent.
+## * `PinnedScope` (in `debra/typestates/pinned_scope`) does not allow
+##   re-pinning the same handle inside its scope. A `doAssert` inside
+##   `pinScope(unpinned(handle))` catches direct nesting and fires in
+##   release builds too, because a second `pin` would silently corrupt
+##   the pinned-flag on the thread's slot — this is a safety guard, not
+##   just a debug aid. Different handles (multi-manager) are independent.
 ## * Do not invoke explicit typestate transitions
-##   (`unpinned`/`pin`/`unpin`/`acknowledge`) inside a `withPin` body. The
-##   `try`/`finally` already manages the lifecycle; manual transitions on the
-##   same handle desync the slot's `pinned` flag.
-## * `it` injected by `withPin` is a `var RetireReady[MT]`; it is only valid
-##   inside the body. Items retired via `it.retire(...)` and `it.retireBatch(...)`
-##   are added to the thread's limbo bag at the pinned epoch and are not
-##   reclaimed until a later reclamation pass observes a safe epoch.
+##   (`unpinned`/`pin`/`unpin`/`acknowledge`) inside a live `PinnedScope`.
+##   The scope's `=destroy` already manages the lifecycle; manual
+##   transitions on the same handle desync the slot's `pinned` flag.
+## * `retireReady(scope.state)` projects the inner `Pinned[MT, CC]` to a
+##   `var RetireReady[MT, CC]` that retires through the convenience
+##   `retire(var RetireReady, ...)` / `retireBatch(var RetireReady, ...)`
+##   procs below. Items retired via `ready.retire(...)` are added to the
+##   thread's limbo bag at the pinned epoch and are not reclaimed until a
+##   later reclamation pass observes a safe epoch.
 ## * `reclaimNow` returns 0 when no epoch is safe to reclaim yet. That is
 ##   normal at startup or when no thread has advanced the epoch since the
 ##   last retire. It is not an error; reclamation is best-effort.
@@ -28,7 +31,8 @@
 ## ## Naming convention
 ##
 ## This module is the **manager-level** layer: `retire`, `retireBatch`,
-## `reclaimNow`, `retireAndReclaim`, `withPin`, and `advanceEvery` coordinate
+## `reclaimNow`, `retireAndReclaim`, and `advanceEvery` (alongside
+## `PinnedScope` in `debra/typestates/pinned_scope`) coordinate
 ## the epoch-based reclamation pipeline (deferred destruction until no thread
 ## can observe an object). They take a `(pointer, Destructor)` pair and
 ## decide *when* the destructor runs.
@@ -65,8 +69,9 @@ proc retire*[MT: static int, CC: static PinScopeCardinality = ccSingle](
   ## Retire `p` inside an existing pinned epoch held by `pin`.
   ##
   ## Wraps the sink-form `retire` from typestates/retire.nim so the caller
-  ## can chain `it.retire(...)` repeatedly inside a `withPin` body without
-  ## manually rebuilding `RetireReady` from `Retired`.
+  ## can chain `ready.retire(...)` repeatedly (e.g. on a `RetireReady`
+  ## projected from a `PinnedScope` via `retireReady(scope.state)`)
+  ## without manually rebuilding `RetireReady` from `Retired`.
   runnableExamples:
     import debra
     proc dtor(p: pointer) {.nimcall.} =
@@ -88,8 +93,9 @@ proc retireBatch*[MT: static int, CC: static PinScopeCardinality = ccSingle](
 ) =
   ## Retire each `(p, dtor)` in `items` inside an existing pinned epoch.
   ##
-  ## Must be called from within `withPin` body (or any other holder of a
-  ## `var RetireReady[MT, CC]`). No pinning, no reclamation. Avoids one
+  ## Must be called by a holder of a `var RetireReady[MT, CC]` (typically
+  ## projected from a `PinnedScope` via `retireReady(scope.state)`).
+  ## No pinning, no reclamation. Avoids one
   ## pin/unpin per object when freeing chains.
   runnableExamples:
     import debra

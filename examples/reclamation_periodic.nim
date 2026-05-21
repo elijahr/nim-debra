@@ -11,10 +11,12 @@ type
 
 const ReclaimInterval = 10
 
-proc doOperation(handle: ThreadHandle[64], dtor: Destructor, i: int) =
-  handle.withPin:
+proc doOperation(handle: ThreadHandle[64, ccSingle], dtor: Destructor, i: int) =
+  block:
+    var scope = pinScope(unpinned(handle))
+    var ready = retireReady(scope.state)
     let node = retain Node(value: i)
-    it.retire(cast[pointer](node), dtor)
+    ready.retire(cast[pointer](node), dtor)
 
 proc periodicReclaimDemo() =
   var manager = initDebraManager[64]()
