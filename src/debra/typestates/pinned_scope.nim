@@ -136,7 +136,7 @@ proc pinScope*[MT: static int, CC: static PinScopeCardinality](
   )
   PinnedScope[MT, CC](state: u.pin(), consumed: false)
 
-proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
+proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T: ptr | pointer](
     scope: var PinnedScope[MT, CC],
     atomic: var Atomic[T],
     expected: var T,
@@ -155,13 +155,12 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
   ## value actually observed (as in stdlib `compareExchange`), so a retry
   ## loop need not re-load before the next attempt.
   ##
-  ## **`T` contract:** `T` must be a raw pointer type (`ptr X` or
-  ## `pointer`). The displaced value is `cast[pointer]` and reclaimed via
-  ## `dtor`. Do NOT instantiate over a `ref` type: refs are GC-managed, so
-  ## retiring one and reclaiming it manually double-frees. The generic is
-  ## intentionally left unconstrained so downstream wrappers can forward
-  ## their own pointer-shaped element type; the constraint is a documented
-  ## caller contract, not a static bound.
+  ## **`T` contract:** `T` is constrained to `ptr | pointer` (a raw pointer
+  ## type, `ptr X` or `pointer`). The displaced value is `cast[pointer]` and
+  ## reclaimed via `dtor`, so instantiating over a `ref` is rejected at
+  ## compile time — refs are GC-managed and would double-free on manual
+  ## reclamation. Generic wrappers forwarding their own element type must
+  ## likewise admit only pointer-shaped types.
   # `expected` is an in/out param (matches stdlib `compareExchange`): on CAS
   # failure `compareExchange` writes the observed value back into it so a
   # caller retry loop need not re-load. On success it is unchanged and still
@@ -179,7 +178,7 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
     return true
   return false
 
-proc retireOnPublish*[MT: static int, CC: static PinScopeCardinality, T](
+proc retireOnPublish*[MT: static int, CC: static PinScopeCardinality, T: ptr | pointer](
     scope: var PinnedScope[MT, CC], atomic: var Atomic[T], desired: T, dtor: Destructor
 ) {.raises: [].} =
   ## **FOOT-GUN — single-writer required (DR-S4).**
@@ -191,13 +190,12 @@ proc retireOnPublish*[MT: static int, CC: static PinScopeCardinality, T](
   ##
   ## Use `retireOnCAS`_ for the multi-writer-safe form.
   ##
-  ## **`T` contract:** `T` must be a raw pointer type (`ptr X` or
-  ## `pointer`). The displaced value is `cast[pointer]` and reclaimed via
-  ## `dtor`. Do NOT instantiate over a `ref` type: refs are GC-managed, so
-  ## retiring one and reclaiming it manually double-frees. The generic is
-  ## intentionally left unconstrained so downstream wrappers can forward
-  ## their own pointer-shaped element type; the constraint is a documented
-  ## caller contract, not a static bound.
+  ## **`T` contract:** `T` is constrained to `ptr | pointer` (a raw pointer
+  ## type, `ptr X` or `pointer`). The displaced value is `cast[pointer]` and
+  ## reclaimed via `dtor`, so instantiating over a `ref` is rejected at
+  ## compile time — refs are GC-managed and would double-free on manual
+  ## reclamation. Generic wrappers forwarding their own element type must
+  ## likewise admit only pointer-shaped types.
   # Single-writer fast path (DR-S4): the plain acquire-load + release-store is
   # deliberate and cheaper than an `exchange` RMW. Under the documented
   # single-writer contract no other thread writes `atomic`, so the loaded

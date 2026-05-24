@@ -52,6 +52,12 @@ const cases = @[
     outcome: eoCompileFails,
     substring: "'=copy' is not available for type",
   ),
+  Case(
+    name: "retireOnCAS non-pointer T rejected (must fail-with-substring)",
+    file: "tests/should_fail/t_retire_nonptr_rejected.nim",
+    outcome: eoCompileFails,
+    substring: "T: ptr | pointer",
+  ),
 ]
 
 proc runCase(c: Case): bool =
