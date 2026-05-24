@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The fix landed in the 0.9.2 dev cycle and shipped in released 0.9.3, which
   consolidates the never-released 0.9.2 — so 0.9.3 is the lowest release that
   carries it.
-- Test count: 210 → 229 (+19: 10 in `t_pinned_scope`, 9 in `t_retire_on_cas`).
+- Test count: 210 → 242 (per backend, across orc/arc/atomicArc/refc/cpp).
 
 ## [0.7.3] - 2026-05-08
 
