@@ -113,8 +113,7 @@ proc retireBatch*[MT: static int, CC: static PinScopeCardinality = ccSingle](
       var ready = retireReady(scope.state)
       ready.retireBatch([(a, dtor), (b, dtor)])
   for item in items:
-    if item[0] != nil:
-      pin.retire(item[0], item[1])
+    pin.retire(item[0], item[1])
 
 template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
     th: ThreadHandle[MT, CC], body: untyped
