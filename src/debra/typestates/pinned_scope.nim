@@ -169,6 +169,13 @@ proc retireOnPublish*[MT: static int, CC: static PinScopeCardinality, T](
   ## concurrently and double-freed on reclamation.
   ##
   ## Use `retireOnCAS`_ for the multi-writer-safe form.
+  # Single-writer fast path (DR-S4): the plain acquire-load + release-store is
+  # deliberate and cheaper than an `exchange` RMW. Under the documented
+  # single-writer contract no other thread writes `atomic`, so the loaded
+  # pointer is exactly the value the store displaces — an `exchange` would add
+  # a StoreLoad/RMW cost on this hot path for no benefit. Callers needing
+  # multi-writer safety must use `retireOnCAS` (the CAS form above), not a
+  # "hardened" variant of this foot-gun.
   let displaced = atomic.load(moAcquire)
   atomic.store(desired, moRelease)
   var ready = retireReady(scope.state)
