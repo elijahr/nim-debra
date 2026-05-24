@@ -105,7 +105,7 @@ suite "retireOnCAS + retireOnPublish":
     var loops = 0
     while true:
       inc loops
-      let exp = slot.load(moAcquire)
+      var exp = slot.load(moAcquire)
       if scope.retireOnCAS(slot, exp, successor, dtor):
         break
       check loops < 16 # guard against runaway retries
