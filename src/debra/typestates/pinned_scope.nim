@@ -123,6 +123,11 @@ proc pinScope*[MT: static int, CC: static PinScopeCardinality](
   # outer constructor produces a value in PinnedScopeLifecycle's initial
   # state PinnedScopeAlive via the
   # {.PinnedScopeLifecycle: PinnedScopeAlive.} attachment pragma.
+  # `u` (a sink param) is READ, not consumed, here: converting to
+  # EpochGuardContext is a non-destructive field read, and Nim's move
+  # analysis keeps `u` live because `u.pin()` below is its sole consumer. The
+  # handle must be read BEFORE pin(), since pin() sets the slot `pinned` flag
+  # that the re-entrancy doAssert checks.
   let handleVal = EpochGuardContext[MT, CC](u).handle
   let idx = handleVal.idx
   doAssert(
@@ -134,7 +139,8 @@ proc pinScope*[MT: static int, CC: static PinScopeCardinality](
 proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
     scope: var PinnedScope[MT, CC],
     atomic: var Atomic[T],
-    expected, desired: T,
+    expected: var T,
+    desired: T,
     dtor: Destructor,
 ): bool {.discardable, raises: [].} =
   ## Atomically swap a published pointer and retire the displaced value.
@@ -145,6 +151,10 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
   ##
   ## Callable under any `CC` (DR-S3).
   ##
+  ## `expected` is an in/out parameter: on CAS failure it is updated to the
+  ## value actually observed (as in stdlib `compareExchange`), so a retry
+  ## loop need not re-load before the next attempt.
+  ##
   ## **`T` contract:** `T` must be a raw pointer type (`ptr X` or
   ## `pointer`). The displaced value is `cast[pointer]` and reclaimed via
   ## `dtor`. Do NOT instantiate over a `ref` type: refs are GC-managed, so
@@ -152,8 +162,11 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
   ## intentionally left unconstrained so downstream wrappers can forward
   ## their own pointer-shaped element type; the constraint is a documented
   ## caller contract, not a static bound.
-  var exp = expected
-  if atomic.compareExchange(exp, desired, moAcquireRelease, moAcquire):
+  # `expected` is an in/out param (matches stdlib `compareExchange`): on CAS
+  # failure `compareExchange` writes the observed value back into it so a
+  # caller retry loop need not re-load. On success it is unchanged and still
+  # holds the displaced value we retire below.
+  if atomic.compareExchange(expected, desired, moAcquireRelease, moAcquire):
     # Rotate: Pinned -> RetireReady (BY-VALUE per DR-P3) -> Retired -> Pinned.
     # retireReady is by-value over Pinned (does not consume scope.state in
     # the typestate sense); the resulting RetireReady is the sink param for
@@ -161,7 +174,7 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
     # Pinned in the same epoch so the scope remains usable for further
     # retires inside the same pinned section.
     var ready = retireReady(scope.state)
-    let retired = ready.retire(cast[pointer](exp), dtor)
+    let retired = ready.retire(cast[pointer](expected), dtor)
     scope.state = pinnedFromRetired(retired)
     return true
   return false
