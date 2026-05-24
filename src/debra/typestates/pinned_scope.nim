@@ -144,6 +144,14 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T](
   ## failure, leaving `scope.state` unchanged.
   ##
   ## Callable under any `CC` (DR-S3).
+  ##
+  ## **`T` contract:** `T` must be a raw pointer type (`ptr X` or
+  ## `pointer`). The displaced value is `cast[pointer]` and reclaimed via
+  ## `dtor`. Do NOT instantiate over a `ref` type: refs are GC-managed, so
+  ## retiring one and reclaiming it manually double-frees. The generic is
+  ## intentionally left unconstrained so downstream wrappers can forward
+  ## their own pointer-shaped element type; the constraint is a documented
+  ## caller contract, not a static bound.
   var exp = expected
   if atomic.compareExchange(exp, desired, moAcquireRelease, moAcquire):
     # Rotate: Pinned -> RetireReady (BY-VALUE per DR-P3) -> Retired -> Pinned.
@@ -169,6 +177,14 @@ proc retireOnPublish*[MT: static int, CC: static PinScopeCardinality, T](
   ## concurrently and double-freed on reclamation.
   ##
   ## Use `retireOnCAS`_ for the multi-writer-safe form.
+  ##
+  ## **`T` contract:** `T` must be a raw pointer type (`ptr X` or
+  ## `pointer`). The displaced value is `cast[pointer]` and reclaimed via
+  ## `dtor`. Do NOT instantiate over a `ref` type: refs are GC-managed, so
+  ## retiring one and reclaiming it manually double-frees. The generic is
+  ## intentionally left unconstrained so downstream wrappers can forward
+  ## their own pointer-shaped element type; the constraint is a documented
+  ## caller contract, not a static bound.
   # Single-writer fast path (DR-S4): the plain acquire-load + release-store is
   # deliberate and cheaper than an `exchange` RMW. Under the documented
   # single-writer contract no other thread writes `atomic`, so the loaded
