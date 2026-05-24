@@ -85,8 +85,9 @@ proc retire*[MT: static int, CC: static PinScopeCardinality = ccSingle](
       var ready = retireReady(scope.state)
       let p = alloc0(8)
       discard ready.retire(p, dtor)
-  let retired = retire(move(pin), p, destructor)
-  pin = retireReadyFromRetired(retired)
+  if p != nil:
+    let retired = retire(move(pin), p, destructor)
+    pin = retireReadyFromRetired(retired)
 
 proc retireBatch*[MT: static int, CC: static PinScopeCardinality = ccSingle](
     pin: var RetireReady[MT, CC], items: openArray[(pointer, Destructor)]
@@ -112,7 +113,8 @@ proc retireBatch*[MT: static int, CC: static PinScopeCardinality = ccSingle](
       var ready = retireReady(scope.state)
       ready.retireBatch([(a, dtor), (b, dtor)])
   for item in items:
-    pin.retire(item[0], item[1])
+    if item[0] != nil:
+      pin.retire(item[0], item[1])
 
 template withPin*[MT: static int, CC: static PinScopeCardinality = ccSingle](
     th: ThreadHandle[MT, CC], body: untyped

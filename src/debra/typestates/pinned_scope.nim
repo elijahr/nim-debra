@@ -172,9 +172,11 @@ proc retireOnCAS*[MT: static int, CC: static PinScopeCardinality, T: ptr | point
     # retire, which produces a fresh Retired. pinnedFromRetired rebuilds a
     # Pinned in the same epoch so the scope remains usable for further
     # retires inside the same pinned section.
-    var ready = retireReady(scope.state)
-    let retired = ready.retire(cast[pointer](expected), dtor)
-    scope.state = pinnedFromRetired(retired)
+    let p = cast[pointer](expected)
+    if p != nil:
+      var ready = retireReady(scope.state)
+      let retired = ready.retire(p, dtor)
+      scope.state = pinnedFromRetired(retired)
     return true
   return false
 
@@ -205,9 +207,11 @@ proc retireOnPublish*[MT: static int, CC: static PinScopeCardinality, T: ptr | p
   # "hardened" variant of this foot-gun.
   let displaced = atomic.load(moAcquire)
   atomic.store(desired, moRelease)
-  var ready = retireReady(scope.state)
-  let retired = ready.retire(cast[pointer](displaced), dtor)
-  scope.state = pinnedFromRetired(retired)
+  let p = cast[pointer](displaced)
+  if p != nil:
+    var ready = retireReady(scope.state)
+    let retired = ready.retire(p, dtor)
+    scope.state = pinnedFromRetired(retired)
 
 proc `=destroy`*[MT: static int, CC: static PinScopeCardinality](
     scope: var PinnedScope[MT, CC]
