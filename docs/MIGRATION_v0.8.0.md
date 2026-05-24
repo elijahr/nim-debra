@@ -92,12 +92,13 @@ ordering and advance interaction.
 
 ## AdvanceContext
 
-**No migration needed.** `AdvanceContext` remains CC-agnostic. The
-epoch advancement protocol is cardinality-uniform — pure atomic
-arithmetic with no cardinality-dependent branching — so widening
-`AdvanceContext` with the `CC` parameter would be cargo-cult and add
-zero call-site benefit. Annotations on `AdvanceContext` values do not
-need to be updated.
+**No migration needed.** `AdvanceContext` gained the `CC` parameter — its
+field must accept a `ptr DebraManager[MT, CC]` for both cardinalities — but
+the epoch advancement protocol itself is cardinality-uniform: pure atomic
+arithmetic with no cardinality-dependent branching. Because `CC` defaults to
+`ccSingle`, existing annotations on `AdvanceContext` values do not need to be
+updated; `ccMulti` managers flow through automatically when constructed via
+`initDebraManager[N, ccMulti]()`.
 
 ## Deprecation timeline
 
@@ -116,5 +117,5 @@ nim-debra 0.8.0 itself migrated 17 internal `withPin` call sites to
 `PinnedScope` across the source tree, plus 60+ DR-T6 explicit-annotation
 sites widened to spell the `CC` second parameter. This is the same
 translation the migration guide prescribes — proof the pattern works
-end-to-end and is exercised by the 229-test suite across all five
+end-to-end and is exercised by the 242-test suite across all five
 backends (orc, arc, atomicArc, refc, cpp).

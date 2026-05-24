@@ -370,9 +370,7 @@ proc retireAndReclaim*[MT: static int, CC: static PinScopeCardinality = ccSingle
   let retired = ready.retire(p, destructor)
 
   # Convert Retired back to Pinned for unpinning
-  let ctx = RetireContext[MT, CC](retired)
-  let pinnedAgain =
-    Pinned[MT, CC](EpochGuardContext[MT, CC](handle: ctx.handle, epoch: ctx.epoch))
+  let pinnedAgain = pinnedFromRetired(retired)
   discard pinnedAgain.unpin()
 
   # Optional eager reclamation (per-thread, scoped to this handle's slot).
