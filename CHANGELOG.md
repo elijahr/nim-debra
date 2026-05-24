@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.0] - YYYY-MM-DD
+## [0.8.0] - 2026-05-24
 
 ### Changed (breaking)
 
@@ -80,9 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the algorithmic argument; the field type still defaulted to ccSingle and
   rejected ccMulti managers at compile time. The ccSingle default preserves
   the "no migration needed" contract for existing 0.7.x-style call shapes.
-- `typestates` dependency pinned at `>= 0.9.1` (downstream bracket-asymmetry
-  fix exercised by the new `PinnedScope` and `EpochGuardContext` typestates;
-  validated against 0.9.2).
+- `typestates` dependency pinned at `>= 0.9.3` (downstream bracket-asymmetry
+  fix exercised by the new `PinnedScope` and `EpochGuardContext` typestates).
+  The fix landed in the 0.9.2 dev cycle and shipped in released 0.9.3, which
+  consolidates the never-released 0.9.2 — so 0.9.3 is the lowest release that
+  carries it.
 - Test count: 210 → 229 (+19: 10 in `t_pinned_scope`, 9 in `t_retire_on_cas`).
 
 ## [0.7.3] - 2026-05-08
