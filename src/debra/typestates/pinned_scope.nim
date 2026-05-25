@@ -131,7 +131,7 @@ proc pinScope*[MT: static int, CC: static PinScopeCardinality](
   let handleVal = EpochGuardContext[MT, CC](u).handle
   let idx = handleVal.idx
   doAssert(
-    not handleVal.manager.threads[idx].pinned.load(moAcquire),
+    not handleVal.manager.threads[idx].pinned.load(moSequentiallyConsistent),
     "pinScope: thread already pinned (re-entrant pin?)",
   )
   PinnedScope[MT, CC](state: u.pin(), consumed: false)
