@@ -80,11 +80,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the algorithmic argument; the field type still defaulted to ccSingle and
   rejected ccMulti managers at compile time. The ccSingle default preserves
   the "no migration needed" contract for existing 0.7.x-style call shapes.
-- `typestates` dependency pinned at `>= 0.9.3` (downstream bracket-asymmetry
-  fix exercised by the new `PinnedScope` and `EpochGuardContext` typestates).
-  The fix landed in the 0.9.2 dev cycle and shipped in released 0.9.3, which
-  consolidates the never-released 0.9.2 — so 0.9.3 is the lowest release that
-  carries it.
+- `typestates` dependency floor bumped to `>= 0.10.0`. 0.10.0 rewrote
+  `typestates verify` Pass 2 from a substring scanner to an AST classifier,
+  which correctly flags non-transition procs the old scanner silently
+  skipped. (Supersedes the prior `>= 0.9.3` pin for the bracket-asymmetry
+  fix exercised by `PinnedScope` / `EpochGuardContext`; 0.10.0 carries that
+  fix as well.)
+- 7 procs marked `{.notATransition.}` to satisfy the 0.10.0 AST verifier:
+  `retire` / `retireBatch` (`src/debra/convenience.nim`),
+  `retireReadyFromRetired` / `pinnedFromRetired`
+  (`src/debra/typestates/retire.nim`), `manager` accessors on the `Active`
+  and `Draining` states (`src/debra/typestates/slot.nim`), and `getManager`
+  (`src/debra/typestates/manager.nim`). An audit corrected an earlier
+  4-proc bot guess: `retireOnCAS` / `retireOnPublish` take a base context
+  type rather than a declared-state type and are correctly excluded.
 - Test count: 210 → 242 (per backend, across orc/arc/atomicArc/refc/cpp).
 
 ## [0.7.3] - 2026-05-08

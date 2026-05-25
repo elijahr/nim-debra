@@ -83,6 +83,6 @@ proc shutdown*[MaxThreads: static int, CC: static PinScopeCardinality](
 
 func getManager*[MaxThreads: static int, CC: static PinScopeCardinality](
     m: ManagerReady[MaxThreads, CC]
-): ptr DebraManager[MaxThreads, CC] =
+): ptr DebraManager[MaxThreads, CC] {.notATransition.} =
   ## Get the underlying manager pointer.
   ManagerContext[MaxThreads, CC](m).manager

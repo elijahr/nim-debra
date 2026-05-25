@@ -12,7 +12,7 @@ installExt = @["nim"]
 # Dependencies
 
 requires "nim >= 2.2.10"
-requires "typestates >= 0.9.3"
+requires "typestates >= 0.10.0"
 requires "unittest2 >= 0.2.0"
 
 # Tasks

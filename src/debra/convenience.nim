@@ -52,6 +52,7 @@
 ## * `debra/typestates/retire`_ - typestate `retire` (sink form).
 ## * `debra/typestates/reclaim`_ - typestate `reclaimStart` / `tryReclaim`.
 
+import typestates # for the `{.notATransition.}` pragma
 import ./atomics
 import ./types
 import ./limbo
@@ -65,7 +66,7 @@ import ./typestates/reclaim
 
 proc retire*[MT: static int, CC: static PinScopeCardinality = ccSingle](
     pin: var RetireReady[MT, CC], p: pointer, destructor: Destructor
-) =
+) {.notATransition.} =
   ## Retire `p` inside an existing pinned epoch held by `pin`.
   ##
   ## Wraps the sink-form `retire` from typestates/retire.nim so the caller
@@ -91,7 +92,7 @@ proc retire*[MT: static int, CC: static PinScopeCardinality = ccSingle](
 
 proc retireBatch*[MT: static int, CC: static PinScopeCardinality = ccSingle](
     pin: var RetireReady[MT, CC], items: openArray[(pointer, Destructor)]
-) =
+) {.notATransition.} =
   ## Retire each `(p, dtor)` in `items` inside an existing pinned epoch.
   ##
   ## Must be called by a holder of a `var RetireReady[MT, CC]` (typically

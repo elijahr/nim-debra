@@ -85,12 +85,12 @@ func idx*[MaxThreads: static int, CC: static PinScopeCardinality](
 
 func manager*[MaxThreads: static int, CC: static PinScopeCardinality](
     s: Active[MaxThreads, CC]
-): ptr DebraManager[MaxThreads, CC] =
+): ptr DebraManager[MaxThreads, CC] {.notATransition.} =
   ## Get the manager pointer from Active state.
   SlotContext[MaxThreads, CC](s).manager
 
 func manager*[MaxThreads: static int, CC: static PinScopeCardinality](
     s: Draining[MaxThreads, CC]
-): ptr DebraManager[MaxThreads, CC] =
+): ptr DebraManager[MaxThreads, CC] {.notATransition.} =
   ## Get the manager pointer from Draining state.
   SlotContext[MaxThreads, CC](s).manager

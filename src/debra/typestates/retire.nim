@@ -65,13 +65,13 @@ proc retireReady*[MaxThreads: static int, CC: static PinScopeCardinality](
 
 proc retireReadyFromRetired*[MaxThreads: static int, CC: static PinScopeCardinality](
     r: sink Retired[MaxThreads, CC]
-): RetireReady[MaxThreads, CC] =
+): RetireReady[MaxThreads, CC] {.notATransition.} =
   ## Get back to RetireReady after retiring (for multiple retires).
   RetireReady[MaxThreads, CC](RetireContext[MaxThreads, CC](r))
 
 proc pinnedFromRetired*[MaxThreads: static int, CC: static PinScopeCardinality](
     r: sink Retired[MaxThreads, CC]
-): Pinned[MaxThreads, CC] =
+): Pinned[MaxThreads, CC] {.notATransition.} =
   ## Return a `Pinned[MaxThreads, CC]` reconstructed from a
   ## `Retired[MaxThreads, CC]` value, allowing the caller to keep working
   ## in the same pinned epoch (e.g. interleaving reads with further
