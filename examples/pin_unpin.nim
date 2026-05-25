@@ -30,18 +30,22 @@ proc main() =
       echo "Was neutralized - acknowledging"
       discard unpinResult.neutralized.acknowledge()
 
-  # Multiple pin/retire/unpin cycles using the high-level `withPin` sugar.
-  # `withPin` injects `it: var RetireReady[MT]` and unpins on scope exit
-  # (including raises). `retain` GC-pins the ref; `releaseDestructor` is
-  # the matching destructor that runs at reclamation time.
+  # Multiple pin/retire/unpin cycles using the PinnedScope RAII guard.
+  # `pinScope(unpinned(handle))` opens a scope whose `=destroy` unpins on
+  # block exit (including raises). `retireReady(scope.state)` projects the
+  # inner `Pinned` to a `RetireReady` we can retire through; `retain`
+  # GC-pins the ref; `releaseDestructor` is the matching destructor that
+  # runs at reclamation time.
   echo ""
-  echo "=== Multiple Cycles (withPin) ==="
+  echo "=== Multiple Cycles (PinnedScope) ==="
   let dtor = releaseDestructor[NodeObj]()
   for i in 1 .. 3:
-    handle.withPin:
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
       echo "Cycle ", i, ": pinned"
       let node = retain Node(value: i * 100)
-      it.retire(cast[pointer](node), dtor)
+      ready.retire(cast[pointer](node), dtor)
 
     # Advance epoch between cycles so reclamation can make progress.
     manager.advance()

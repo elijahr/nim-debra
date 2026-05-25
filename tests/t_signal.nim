@@ -38,7 +38,7 @@ suite "Signal Handler":
     ## flags untouched. This test asserts both halves.
 
     # Use 4 thread slots so we exercise a non-zero index.
-    var mgr: DebraManager[4]
+    var mgr: DebraManager[4, ccSingle]
     mgr.globalEpoch.store(1'u64, moRelaxed)
     mgr.activeThreadMask.store(0'u64, moRelaxed)
     for i in 0 ..< 4:

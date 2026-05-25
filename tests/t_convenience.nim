@@ -79,17 +79,19 @@ suite "DEBRA Batched Retire/Reclaim API":
     let handle = registerThread(manager)
     destroyedCount = 0
 
-  test "withPin injects it and retires multiple pointers":
+  test "pinScope injects scope.state and retires multiple pointers":
     let n1 = cast[Node](alloc0(sizeof(NodeObj)))
     let n2 = cast[Node](alloc0(sizeof(NodeObj)))
     let n3 = cast[Node](alloc0(sizeof(NodeObj)))
 
-    handle.withPin:
-      it.retire(n1, destroyNode)
-      it.retire(n2, destroyNode)
-      it.retire(n3, destroyNode)
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      ready.retire(n1, destroyNode)
+      ready.retire(n2, destroyNode)
+      ready.retire(n3, destroyNode)
 
-    # Thread is unpinned after the body
+    # Thread is unpinned after the scope's =destroy
     check not manager.threads[handle.idx].pinned.load(moAcquire)
 
     # Advance epoch and reclaim
@@ -99,10 +101,12 @@ suite "DEBRA Batched Retire/Reclaim API":
     discard reclaimNow(manager)
     check destroyedCount == 3
 
-  test "withPin accepts a custom identifier":
+  test "pinScope retires a single pointer via retireReady":
     let n = cast[Node](alloc0(sizeof(NodeObj)))
 
-    handle.withPin(myPin):
+    block:
+      var scope = pinScope(unpinned(handle))
+      var myPin = retireReady(scope.state)
       myPin.retire(n, destroyNode)
 
     check not manager.threads[handle.idx].pinned.load(moAcquire)
@@ -112,23 +116,25 @@ suite "DEBRA Batched Retire/Reclaim API":
     discard reclaimNow(manager)
     check destroyedCount == 1
 
-  test "withPin runs body to completion and unpins":
+  test "pinScope runs body to completion and unpins":
     var ran = false
-    handle.withPin:
+    block:
+      var scope {.used.} = pinScope(unpinned(handle))
       ran = true
       check manager.threads[handle.idx].pinned.load(moAcquire)
     check ran
     check not manager.threads[handle.idx].pinned.load(moAcquire)
 
-  test "withPin unpins on exception":
+  test "pinScope unpins on exception":
     let n = cast[Node](alloc0(sizeof(NodeObj)))
 
     expect(ValueError):
-      handle.withPin:
-        it.retire(n, destroyNode)
-        raise newException(ValueError, "boom")
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      ready.retire(n, destroyNode)
+      raise newException(ValueError, "boom")
 
-    # Thread is unpinned despite the raise
+    # Thread is unpinned despite the raise (scope's =destroy ran during unwind)
     check not manager.threads[handle.idx].pinned.load(moAcquire)
 
     # Reclamation can still proceed
@@ -138,16 +144,16 @@ suite "DEBRA Batched Retire/Reclaim API":
     discard reclaimNow(manager)
     check destroyedCount == 1
 
-  test "nested withPin on same handle raises AssertionDefect under debug":
+  test "nested pinScope on same handle raises AssertionDefect under debug":
     # `assert` is active unless built with -d:release / -d:danger.
     # Tests typically run with debug-friendly builds; only enforce when active.
     when compileOption("assertions"):
-      expect(AssertionDefect):
-        handle.withPin:
-          handle.withPin:
-            discard
-      # After the AssertionDefect, the outer withPin's finally still ran
-      # and unpinned the thread.
+      block:
+        var outer {.used.} = pinScope(unpinned(handle))
+        expect(AssertionDefect):
+          var inner {.used.} = pinScope(unpinned(handle))
+        # outer is still alive; its =destroy runs at block exit and
+        # unpins the slot.
       check not manager.threads[handle.idx].pinned.load(moAcquire)
 
   test "reclaimNow returns 0 when not safe yet":
@@ -159,9 +165,11 @@ suite "DEBRA Batched Retire/Reclaim API":
     let n1 = cast[Node](alloc0(sizeof(NodeObj)))
     let n2 = cast[Node](alloc0(sizeof(NodeObj)))
 
-    handle.withPin:
-      it.retire(n1, destroyNode)
-      it.retire(n2, destroyNode)
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      ready.retire(n1, destroyNode)
+      ready.retire(n2, destroyNode)
 
     advance(manager)
     advance(manager)
@@ -207,9 +215,11 @@ suite "DEBRA Batched Retire/Reclaim API":
     # End-to-end: retire, advance via cadence helper, reclaim observes safe.
     let n1 = cast[Node](alloc0(sizeof(NodeObj)))
     let n2 = cast[Node](alloc0(sizeof(NodeObj)))
-    handle.withPin:
-      it.retire(n1, destroyNode)
-      it.retire(n2, destroyNode)
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      ready.retire(n1, destroyNode)
+      ready.retire(n2, destroyNode)
     # Drive enough cadence ticks (n=2) to advance the epoch past safe.
     for i in 1 .. 6:
       handle.advanceEvery(2)
@@ -225,8 +235,10 @@ suite "DEBRA Batched Retire/Reclaim API":
       node.value = i
       items.add((cast[pointer](node), destroyNode))
 
-    handle.withPin:
-      it.retireBatch(items)
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
+      ready.retireBatch(items)
 
     check not manager.threads[handle.idx].pinned.load(moAcquire)
 

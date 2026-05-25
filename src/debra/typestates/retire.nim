@@ -18,7 +18,9 @@
 ##
 ## ## See also
 ##
-## * `debra/convenience.withPin`_ + `it.retire(...)` - the recommended path.
+## * `debra/typestates/pinned_scope.PinnedScope`_ +
+##   `scope.retireOnCAS` / `scope.retireOnPublish` (or
+##   `retireReady(scope.state).retire(...)`) - the recommended path.
 ## * `debra/typestates/reclaim`_ - eventual reclamation after epoch safety.
 
 import typestates
@@ -29,49 +31,57 @@ import ../limbo
 import ./guard
 
 type
-  RetireContext*[MaxThreads: static int] = object of RootObj
-    handle*: ThreadHandle[MaxThreads]
+  RetireContext*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object of RootObj
+    handle*: ThreadHandle[MaxThreads, CC]
     epoch*: uint64
 
-  RetireReady*[MaxThreads: static int] = distinct RetireContext[MaxThreads]
-  Retired*[MaxThreads: static int] = distinct RetireContext[MaxThreads]
+  RetireReady*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct RetireContext[MaxThreads, CC]
 
-typestate RetireContext[MaxThreads: static int]:
+  Retired*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct RetireContext[MaxThreads, CC]
+
+typestate RetireContext[MaxThreads: static int, CC: static PinScopeCardinality]:
   inheritsFromRootObj = true
   opaqueStates = true
-  states RetireReady[MaxThreads], Retired[MaxThreads]
+  defaults:
+    CC:
+      ccSingle
+  states RetireReady[MaxThreads, CC], Retired[MaxThreads, CC]
   initial:
-    RetireReady[MaxThreads]
+    RetireReady[MaxThreads, CC]
   terminal:
-    Retired[MaxThreads]
+    Retired[MaxThreads, CC]
   transitions:
-    RetireReady[MaxThreads] -> Retired[MaxThreads]
+    RetireReady[MaxThreads, CC] -> Retired[MaxThreads, CC]
 
-proc retireReady*[MaxThreads: static int](
-    p: Pinned[MaxThreads]
-): RetireReady[MaxThreads] =
+proc retireReady*[MaxThreads: static int, CC: static PinScopeCardinality](
+    p: Pinned[MaxThreads, CC]
+): RetireReady[MaxThreads, CC] =
   ## Create retire context from pinned state.
-  RetireReady[MaxThreads](RetireContext[MaxThreads](handle: p.handle, epoch: p.epoch))
+  RetireReady[MaxThreads, CC](
+    RetireContext[MaxThreads, CC](handle: p.handle, epoch: p.epoch)
+  )
 
-proc retireReadyFromRetired*[MaxThreads: static int](
-    r: sink Retired[MaxThreads]
-): RetireReady[MaxThreads] =
+proc retireReadyFromRetired*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: sink Retired[MaxThreads, CC]
+): RetireReady[MaxThreads, CC] {.notATransition.} =
   ## Get back to RetireReady after retiring (for multiple retires).
-  RetireReady[MaxThreads](RetireContext[MaxThreads](r))
+  RetireReady[MaxThreads, CC](RetireContext[MaxThreads, CC](r))
 
-proc pinnedFromRetired*[MaxThreads: static int](
-    r: sink Retired[MaxThreads]
-): Pinned[MaxThreads] =
-  ## Return a `Pinned[MaxThreads]` reconstructed from a `Retired[MaxThreads]`
-  ## value, allowing the caller to keep working in the same pinned epoch
-  ## (e.g. interleaving reads with further retires) instead of unpinning
-  ## immediately after a retire.
+proc pinnedFromRetired*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: sink Retired[MaxThreads, CC]
+): Pinned[MaxThreads, CC] {.notATransition.} =
+  ## Return a `Pinned[MaxThreads, CC]` reconstructed from a
+  ## `Retired[MaxThreads, CC]` value, allowing the caller to keep working
+  ## in the same pinned epoch (e.g. interleaving reads with further
+  ## retires) instead of unpinning immediately after a retire.
   ##
   ## Symmetric to `retireReadyFromRetired`: same underlying
-  ## `RetireContext[MaxThreads]`, projected to the `Pinned` typestate via
-  ## the `EpochGuardContext[MaxThreads]` shape (handle + epoch). The slot's
-  ## `pinned` flag is unchanged; this is a typestate rebrand, not a
-  ## re-pin.
+  ## `RetireContext[MaxThreads, CC]`, projected to the `Pinned` typestate
+  ## via the `EpochGuardContext[MaxThreads, CC]` shape (handle + epoch).
+  ## The slot's `pinned` flag is unchanged; this is a typestate rebrand,
+  ## not a re-pin.
   ##
   ## See also: `retireReadyFromRetired`_, `retire`_, `debra/typestates/guard.pin`_.
   runnableExamples:
@@ -91,14 +101,14 @@ proc pinnedFromRetired*[MaxThreads: static int](
     let pinnedAgain = pinnedFromRetired(retired)
     discard pinnedAgain.unpin()
 
-  let ctx = RetireContext[MaxThreads](r)
-  Pinned[MaxThreads](
-    EpochGuardContext[MaxThreads](handle: ctx.handle, epoch: ctx.epoch)
+  let ctx = RetireContext[MaxThreads, CC](r)
+  Pinned[MaxThreads, CC](
+    EpochGuardContext[MaxThreads, CC](handle: ctx.handle, epoch: ctx.epoch)
   )
 
-proc retire*[MaxThreads: static int](
-    r: sink RetireReady[MaxThreads], p: pointer, destructor: Destructor
-): Retired[MaxThreads] {.transition.} =
+proc retire*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: sink RetireReady[MaxThreads, CC], p: pointer, destructor: Destructor
+): Retired[MaxThreads, CC] {.transition.} =
   ## Retire a raw pointer for epoch-based reclamation.
   ##
   ## The destructor will be called when the epoch becomes safe.
@@ -118,7 +128,7 @@ proc retire*[MaxThreads: static int](
     discard pinnedAgain.unpin()
 
   # Extract values we need before consuming r
-  let handle = RetireContext[MaxThreads](r).handle
+  let handle = RetireContext[MaxThreads, CC](r).handle
   let state = addr handle.manager.threads[handle.idx]
 
   # Record the CURRENT global epoch as the bag's epoch, not the pin's
@@ -192,9 +202,9 @@ proc retire*[MaxThreads: static int](
   inc bag.count
 
   # Consume r to create result
-  Retired[MaxThreads](RetireContext[MaxThreads](r))
+  Retired[MaxThreads, CC](RetireContext[MaxThreads, CC](r))
 
-func handle*[MaxThreads: static int](
-    r: RetireReady[MaxThreads]
-): ThreadHandle[MaxThreads] =
-  RetireContext[MaxThreads](r).handle
+func handle*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: RetireReady[MaxThreads, CC]
+): ThreadHandle[MaxThreads, CC] {.notATransition.} =
+  RetireContext[MaxThreads, CC](r).handle

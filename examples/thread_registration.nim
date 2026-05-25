@@ -4,7 +4,7 @@
 import debra
 import debra/atomics
 
-var manager: DebraManager[4]
+var manager: DebraManager[4, ccSingle]
 
 proc workerThread() {.thread.} =
   # Register this thread with the manager

@@ -2,6 +2,18 @@
 ##
 ## Handles thread registration with the DEBRA manager, ensuring threads
 ## properly claim slots in the thread array using lock-free CAS operations.
+##
+## The typestate carries two static generic-param axes:
+##
+## - `MaxThreads: static int` — capacity of the manager's thread array.
+## - `CC: static PinScopeCardinality = ccSingle` — consumer-cardinality
+##   phantom mirroring `DebraManager` / `ThreadHandle`. Default `ccSingle`
+##   matches the 0.7.x call shape, so existing call sites that spell only
+##   `MaxThreads` continue to bind cleanly.
+##
+## Codegen-emitted helpers (variant type `RegisterResult`, `=copy` hooks,
+## `state()` procs, `$` overloads, `match` macros) inherit `CC = ccSingle`
+## via the typestate macro's `defaults:` body section (typestates 0.9.2+).
 
 import ../atomics
 import typestates
@@ -10,42 +22,59 @@ import ../types
 import ../signal
 import ../thread_id
 
+# `PinScopeCardinality` reaches this module via `../types` (re-exported
+# from `./cardinality`).
+
 type
-  RegistrationContext*[MaxThreads: static int] = object of RootObj
-    manager*: ptr DebraManager[MaxThreads]
+  RegistrationContext*[
+    MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
+  ] = object of RootObj
+    manager*: ptr DebraManager[MaxThreads, CC]
     idx*: int
 
-  Unregistered*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
-  Registered*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
-  RegistrationFull*[MaxThreads: static int] = distinct RegistrationContext[MaxThreads]
+  Unregistered*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct RegistrationContext[MaxThreads, CC]
 
-typestate RegistrationContext[MaxThreads: static int]:
+  Registered*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct RegistrationContext[MaxThreads, CC]
+
+  RegistrationFull*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] =
+    distinct RegistrationContext[MaxThreads, CC]
+
+typestate RegistrationContext[MaxThreads: static int, CC: static PinScopeCardinality]:
   inheritsFromRootObj = true
   opaqueStates = true
-  states Unregistered[MaxThreads], Registered[MaxThreads], RegistrationFull[MaxThreads]
+  defaults:
+    CC:
+      ccSingle
+  states:
+    Unregistered[MaxThreads, CC]
+    Registered[MaxThreads, CC]
+    RegistrationFull[MaxThreads, CC]
   initial:
-    Unregistered[MaxThreads]
+    Unregistered[MaxThreads, CC]
   terminal:
-    Registered[MaxThreads]
-    RegistrationFull[MaxThreads]
+    Registered[MaxThreads, CC]
+    RegistrationFull[MaxThreads, CC]
   transitions:
-    Unregistered[MaxThreads] ->
-      Registered[MaxThreads] | RegistrationFull[MaxThreads] as RegisterResult[
-        MaxThreads
-      ]
+    Unregistered[MaxThreads, CC] ->
+      Registered[MaxThreads, CC] | RegistrationFull[MaxThreads, CC] as
+      RegisterResult[MaxThreads, CC]
 
-proc unregistered*[MaxThreads: static int](
-    mgr: ptr DebraManager[MaxThreads]
-): Unregistered[MaxThreads] =
+proc unregistered*[MaxThreads: static int, CC: static PinScopeCardinality](
+    mgr: ptr DebraManager[MaxThreads, CC]
+): Unregistered[MaxThreads, CC] =
   ## Create unregistered context for a thread.
-  Unregistered[MaxThreads](RegistrationContext[MaxThreads](manager: mgr, idx: -1))
+  Unregistered[MaxThreads, CC](
+    RegistrationContext[MaxThreads, CC](manager: mgr, idx: -1)
+  )
 
-proc register*[MaxThreads: static int](
-    u: sink Unregistered[MaxThreads]
-): RegisterResult[MaxThreads] {.transition.} =
+proc register*[MaxThreads: static int, CC: static PinScopeCardinality](
+    u: sink Unregistered[MaxThreads, CC]
+): RegisterResult[MaxThreads, CC] {.transition.} =
   ## Try to register thread by claiming a slot. Returns Registered if successful,
   ## RegistrationFull if all slots are taken.
-  let ctx = RegistrationContext[MaxThreads](u)
+  let ctx = RegistrationContext[MaxThreads, CC](u)
   let mgr = ctx.manager
 
   # Try each slot in order
@@ -70,21 +99,27 @@ proc register*[MaxThreads: static int](
         threadLocalRegistered = true
         threadLocalManager = cast[pointer](mgr)
         return
-          RegisterResult[MaxThreads] ->
-          Registered[MaxThreads](RegistrationContext[MaxThreads](manager: mgr, idx: i))
+          RegisterResult[MaxThreads, CC] ->
+          Registered[MaxThreads, CC](
+            RegistrationContext[MaxThreads, CC](manager: mgr, idx: i)
+          )
       # CAS failed, expected was updated, retry with new value
 
   # All slots taken
-  RegisterResult[MaxThreads] ->
-    RegistrationFull[MaxThreads](RegistrationContext[MaxThreads](manager: mgr, idx: -1))
+  RegisterResult[MaxThreads, CC] ->
+    RegistrationFull[MaxThreads, CC](
+      RegistrationContext[MaxThreads, CC](manager: mgr, idx: -1)
+    )
 
-func idx*[MaxThreads: static int](r: Registered[MaxThreads]): int {.notATransition.} =
+func idx*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: Registered[MaxThreads, CC]
+): int {.notATransition.} =
   ## Get the thread slot index.
-  RegistrationContext[MaxThreads](r).idx
+  RegistrationContext[MaxThreads, CC](r).idx
 
-func getHandle*[MaxThreads: static int](
-    r: Registered[MaxThreads]
-): ThreadHandle[MaxThreads] =
+func getHandle*[MaxThreads: static int, CC: static PinScopeCardinality](
+    r: Registered[MaxThreads, CC]
+): ThreadHandle[MaxThreads, CC] =
   ## Extract ThreadHandle for use in pin/unpin operations.
-  let ctx = RegistrationContext[MaxThreads](r)
-  ThreadHandle[MaxThreads](idx: ctx.idx, manager: ctx.manager)
+  let ctx = RegistrationContext[MaxThreads, CC](r)
+  ThreadHandle[MaxThreads, CC](idx: ctx.idx, manager: ctx.manager)

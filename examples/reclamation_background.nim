@@ -46,7 +46,7 @@ else:
     Node = ref NodeObj
 
   var
-    manager: DebraManager[4]
+    manager: DebraManager[4, ccSingle]
     shouldStop: Atomic[bool]
     totalReclaimed: Atomic[int]
 
@@ -68,9 +68,11 @@ else:
       let dtor = releaseDestructor[NodeObj]()
 
       for i in 0 ..< 100:
-        withPin(handle):
+        block:
+          var scope = pinScope(unpinned(handle))
+          var ready = retireReady(scope.state)
           let node = retain Node(value: i)
-          it.retire(cast[pointer](node), dtor)
+          ready.retire(cast[pointer](node), dtor)
 
         # Reclaim our own bag occasionally. The background thread keeps the
         # global epoch advancing, so most of these passes find work.

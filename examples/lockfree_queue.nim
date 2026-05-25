@@ -21,10 +21,10 @@ type
   Queue*[T] = object
     head: Atomic[ptr NodeObj[T]]
     tail: Atomic[ptr NodeObj[T]]
-    manager: ptr DebraManager[64]
-    handle: ThreadHandle[64]
+    manager: ptr DebraManager[64, ccSingle]
+    handle: ThreadHandle[64, ccSingle]
 
-proc newQueue*[T](manager: ptr DebraManager[64]): Queue[T] =
+proc newQueue*[T](manager: ptr DebraManager[64, ccSingle]): Queue[T] =
   result.manager = manager
   result.handle = registerThread(manager[])
 
@@ -38,7 +38,8 @@ proc newQueue*[T](manager: ptr DebraManager[64]): Queue[T] =
 proc enqueue*[T](queue: var Queue[T], value: T) =
   let newNode = retain Node[T](value: value)
 
-  queue.handle.withPin:
+  block:
+    var scope {.used.} = pinScope(unpinned(queue.handle))
     while true:
       let tail = queue.tail.load(moAcquire)
       let next = tail.next.load(moAcquire)
@@ -64,7 +65,9 @@ proc enqueue*[T](queue: var Queue[T], value: T) =
 proc dequeue*[T](queue: var Queue[T]): Option[T] =
   result = none(T)
 
-  queue.handle.withPin:
+  block:
+    var scope = pinScope(unpinned(queue.handle))
+    var ready = retireReady(scope.state)
     block dequeueLoop:
       while true:
         let head = queue.head.load(moAcquire)
@@ -86,7 +89,7 @@ proc dequeue*[T](queue: var Queue[T]): Option[T] =
             # Retire old head (sentinel). The destructor will GC_unref it
             # once the epoch is safe, balancing the `retain` from newQueue
             # or the previous enqueue.
-            it.retire(cast[pointer](head), releaseDestructor[NodeObj[T]]())
+            ready.retire(cast[pointer](head), releaseDestructor[NodeObj[T]]())
             result = some(value)
             break dequeueLoop
 

@@ -6,7 +6,7 @@ import debra/typestates/registration
 import debra/typestates/manager
 
 type ConcurrentRegTestData* = object
-  manager: ptr DebraManager[4]
+  manager: ptr DebraManager[4, ccSingle]
   registrationResult: RegisterResult[4]
 
 var
@@ -31,11 +31,11 @@ proc concurrentRegisterProc() {.thread.} =
   globalThreadData[myId].registrationResult = u.register()
 
 suite "Registration typestate":
-  var mgr: DebraManager[4]
+  var mgr: DebraManager[4, ccSingle]
   var ready: ManagerReady[4]
 
   setup:
-    mgr = DebraManager[4]()
+    mgr = DebraManager[4, ccSingle]()
     ready = uninitializedManager(addr mgr).initialize()
 
   test "unregistered creates Unregistered state":

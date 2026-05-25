@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-24
+
+### Changed (breaking)
+
+- `withPin(handle): body` is deprecated. Replace with the `PinnedScope`
+  RAII type: `var scope = pinScope(unpinned(handle))`. The new form runs
+  unpin + close automatically at scope exit via `=destroy`. Removal is
+  targeted for 0.9.0; the deprecated `withPin` template still compiles
+  in 0.8.0 with a deprecation warning.
+- Nine typestate-axis types gained a second generic parameter
+  `CC: static PinScopeCardinality` (default `ccSingle`):
+  `ThreadHandle`, `Pinned`, `RetireReady`, `Unpinned`, `Neutralized`,
+  `Retired`, `Registered`, `DebraManager`, `PinnedScope`. The default
+  preserves source-compatibility for all single-cardinality call sites;
+  multi-pin patterns must opt in with explicit `[N, ccMulti]`.
+- `bindClient`, `unbindClient`, `advance`, `currentEpoch`,
+  `clientCount`, and `initDebraManager` are now generic over
+  `CC: static PinScopeCardinality` (default `ccSingle` for the
+  ergonomic 0.7.x-style call shape). Completes the "Step 8" surface
+  widening flagged in `src/debra/types.nim` so callers can pass
+  `DebraManager[N, ccMulti]` to these procs without Nim's default-CC
+  rule triggering a `type mismatch`. The five wrappers infer `CC`
+  from the manager argument; `initDebraManager` keeps the default so
+  `initDebraManager[N]()` continues to return
+  `DebraManager[N, ccSingle]`, and `initDebraManager[N, ccMulti]()`
+  constructs the multi-cardinality variant directly.
+- `EpochGuardContext` typestate gained a `Closed` terminal state plus a
+  `close` proc transitioning `Unpinned → Closed`. The full guard
+  lifecycle is now `Pinned → Unpinned → Closed`. The new state is
+  exercised by `PinnedScope.=destroy`.
+
+### Added
+
+- `PinnedScope[MT, CC]` RAII type. `=destroy` automatically runs unpin
+  and close on scope exit, including on early-return / exception paths.
+- `pinScope(unpinned(handle))` constructor (verb-noun form, chosen to
+  avoid name collision with `guard.pin`).
+- `retireReady(scope.state)` retire chain, allowing `discard ready.retire(ptr, dtor)`
+  inside a `PinnedScope` without leaving the pinned axis.
+- `PinScopeCardinality` enum (`ccSingle`, `ccMulti`). `ccSingle` is the
+  safe default and matches single-PinnedScope-per-thread-per-lifetime
+  usage. `ccMulti` is an explicit opt-in for multi-pin patterns; see
+  the migration guide for the foot-gun callout (pin ordering and limbo
+  bag advancement become caller responsibilities).
+
+### Internal
+
+- 17 internal `withPin` call sites migrated to `PinnedScope` across
+  `src/debra/` and the test/example tree.
+- 60+ DR-T6 explicit-annotation sites widened across tests and examples
+  to spell the new `CC` second parameter explicitly where the cardinality
+  matters.
+- Five typestate context object types (`ReclaimContext`, `AdvanceContext`,
+  `ManagerContext`, `NeutralizeContext`, `SlotContext`) and their distinct
+  sub-states, typestate declarations, and builder procs gained
+  `CC: static PinScopeCardinality = ccSingle`, mirroring
+  `EpochGuardContext` / `RetireContext` / `PinnedScopeContext`. The
+  default `ccSingle` preserves the 0.7.x-style call shape; the parameter
+  enables ccMulti managers built by `initDebraManager[N, ccMulti]()` to
+  flow through the typestate context surface end-to-end, unblocking
+  multi-consumer reclamation paths in downstream lock-free clients
+  (e.g. `lockfreequeues` v5.0.0 multi-consumer pop body's `reclaimNow`
+  tail). This completes the Step 8 widening on the typestate context
+  layer that was missed in the manager-surface pass.
+  The `AdvanceContext` widening implements (rather than reverses) the
+  prior "intentionally CC-agnostic" intent: the advance ALGORITHM remains
+  uniform across cardinalities (pure atomic epoch arithmetic, no
+  CC-dependent branching), but the type system has to carry `CC` to accept
+  a `ptr DebraManager[MT, CC]` field for both cardinalities. The earlier
+  CHANGELOG entry asserting "no `CC` param on AdvanceContext" was based on
+  the algorithmic argument; the field type still defaulted to ccSingle and
+  rejected ccMulti managers at compile time. The ccSingle default preserves
+  the "no migration needed" contract for existing 0.7.x-style call shapes.
+- `typestates` dependency floor bumped to `>= 0.10.0`. 0.10.0 rewrote
+  `typestates verify` Pass 2 from a substring scanner to an AST classifier,
+  which correctly flags non-transition procs the old scanner silently
+  skipped. (Supersedes the prior `>= 0.9.3` pin for the bracket-asymmetry
+  fix exercised by `PinnedScope` / `EpochGuardContext`; 0.10.0 carries that
+  fix as well.)
+- 7 procs marked `{.notATransition.}` to satisfy the 0.10.0 AST verifier:
+  `retire` / `retireBatch` (`src/debra/convenience.nim`),
+  `retireReadyFromRetired` / `pinnedFromRetired`
+  (`src/debra/typestates/retire.nim`), `manager` accessors on the `Active`
+  and `Draining` states (`src/debra/typestates/slot.nim`), and `getManager`
+  (`src/debra/typestates/manager.nim`). An audit corrected an earlier
+  4-proc bot guess: `retireOnCAS` / `retireOnPublish` take a base context
+  type rather than a declared-state type and are correctly excluded.
+- Test count: 210 → 242 (per backend, across orc/arc/atomicArc/refc/cpp).
+
 ## [0.7.3] - 2026-05-08
 
 ### Fixed
@@ -348,7 +437,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/elijahr/nim-debra/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/elijahr/nim-debra/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/elijahr/nim-debra/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/elijahr/nim-debra/compare/v0.7.0...v0.7.1

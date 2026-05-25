@@ -152,7 +152,9 @@ proc releaseDestructor*[T](): Destructor {.inline.} =
     # Object-type spelling — canonical, matches what `retain` returns.
     # `releaseDestructor[T]()` returns the same proc address each call;
     # passing it inline costs no allocation.
-    withPin(handle):
+    block:
+      var scope = pinScope(unpinned(handle))
+      var ready = retireReady(scope.state)
       let raw = retain(Node(value: 1))
-      it.retire(raw, releaseDestructor[NodeObj]())
+      ready.retire(raw, releaseDestructor[NodeObj]())
   releaseDestructorImpl[T]

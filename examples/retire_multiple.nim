@@ -3,7 +3,8 @@
 ##
 ## Demonstrates chaining retires by threading `RetireReady` through
 ## `retireReadyFromRetired`, which is the lower-level form behind the
-## `var RetireReady` overload used by `withPin` bodies.
+## `var RetireReady` overload typically consumed inside a `PinnedScope`
+## via `retireReady(scope.state)`.
 
 import debra
 
@@ -38,9 +39,10 @@ proc main() =
   echo "Retired 5 nodes"
 
   # Rebuild the Pinned context from the last RetireReady so we can unpin.
-  let ctx = RetireContext[4](ready)
-  let pinnedAgain =
-    Pinned[4](EpochGuardContext[4](handle: ctx.handle, epoch: ctx.epoch))
+  let ctx = RetireContext[4, ccSingle](ready)
+  let pinnedAgain = Pinned[4, ccSingle](
+    EpochGuardContext[4, ccSingle](handle: ctx.handle, epoch: ctx.epoch)
+  )
   discard pinnedAgain.unpin()
 
   echo "Multiple retirement example completed"
