@@ -26,3 +26,4 @@ import ./t_backoff
 import ./t_bind_client
 import ./t_manager_cc_surface
 import ./t_unregister_thread
+import ./t_unregister_thread_stress
