@@ -472,7 +472,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/elijahr/nim-debra/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/elijahr/nim-debra/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/elijahr/nim-debra/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/elijahr/nim-debra/compare/v0.7.1...v0.7.2
