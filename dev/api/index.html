@@ -712,6 +712,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#unregisterThread" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unregisterThread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#neutralizeStalled" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2503,6 +2514,17 @@
     <span class="md-ellipsis">
       
         registerThread
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unregisterThread" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unregisterThread
       
     </span>
   </a>
@@ -4341,6 +4363,112 @@ receive <code>ThreadHandle[N, ccSingle]</code> unchanged from 0.7.x.</p>
   
 
   
+    <h4 id="unregisterThread" class="doc doc-heading">
+      
+      <span class="doc doc-object-name doc-proc-name">unregisterThread</span>
+      
+        
+          <span class="doc-label" data-label="raises">raises</span>
+        
+      
+    <a href="#unregisterThread" class="headerlink" title="Permanent link">¶</a></h4>
+  
+
+  
+    <div class="doc-signature highlight">
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">unregisterThread</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">,</span><span class="w"> </span><span class="n">CC</span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="n">handle</span><span class="p">:</span><span class="w"> </span><span class="n">ThreadHandle</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">,</span><span class="w"> </span><span class="n">CC</span><span class="o">]</span><span class="p">)</span>
+</code></pre>
+    </div>
+  
+
+  <div class="doc doc-contents first">
+    
+      <div class="doc-description">
+        <p>Unregister the current thread from the DEBRA manager, releasing the</p>
+<p>slot it claimed via <code>registerThread</code>. Idempotent under no concurrent
+re-claim: a second call with the same <code>handle</code> is a no-op IF no other
+thread has reclaimed the slot in between. If the slot has been
+concurrently re-claimed, the runtime <code>doAssert</code> below detects
+stale-handle aliasing and raises an <code>AssertionDefect</code>.</p>
+<p><strong>Caller obligations</strong> (documented misuse):</p>
+<ul>
+<li><strong>Thread-affine</strong>: must be called from the same OS thread that
+  called <code>registerThread</code> to obtain <code>handle</code>. The per-thread bookkeeping
+  (<code>threadLocalIdx</code>, <code>threadLocalRegistered</code>, <code>threadLocalManager</code>) is
+  per-thread, so a cross-thread call leaves the owning thread's
+  threadvars stale and will misroute future signal delivery.</li>
+<li><strong>No in-flight pin</strong>: any <code>PinnedScope</code> opened against <code>handle</code> must
+  have been closed before this call. <code>unregisterThread</code> does not
+  un-pin; releasing a slot with an active pin is a use-after-free.</li>
+<li><strong>Stale-handle aliasing is detected at runtime (Gemini round-2 HIGH)</strong>:
+  a <code>doAssert</code> after the idempotency early-return checks that the
+  per-thread <code>threadLocalRegistered</code> / <code>threadLocalIdx</code> /
+  <code>threadLocalManager</code> match the <code>handle</code> + <code>manager</code> arguments.
+  Cross-thread call or stale-handle reuse on a live (re-claimed) slot
+  raises <code>AssertionDefect</code>. This is a runtime defense; the contract
+  remains "don't do this" and the per-thread bookkeeping is the
+  source of truth.</li>
+</ul>
+<p><strong>Clear order</strong> (matters for concurrent signal delivery):</p>
+<ol>
+<li>Reset <code>threads[idx].threadId</code> to <code>InvalidThreadId</code> (release) — closes
+   the signal-delivery hint before the mask bit advertises the slot as
+   free.</li>
+<li>Clear the mask bit via CAS-with-retry, mirroring <code>register</code>'s
+   claim-side pattern.</li>
+<li>Clear the three thread-locals last.</li>
+</ol>
+<p>The <code>CC</code> parameter binds via the <code>manager</code> argument; callers that pass
+<code>DebraManager[N]</code> (CC default <code>ccSingle</code>) keep the 0.7.x call shape,
+while <code>DebraManager[N, ccMulti]</code> is also accepted.</p>
+      </div>
+    
+
+    
+      <div class="doc-section doc-section-parameters">
+        <h5>Parameters</h5>
+        <ul>
+          
+            <li>
+              <code>manager</code>
+              (<code>var DebraManager[MaxThreads, CC]</code>)
+              
+            </li>
+          
+            <li>
+              <code>handle</code>
+              (<code>ThreadHandle[MaxThreads, CC]</code>)
+              
+            </li>
+          
+        </ul>
+      </div>
+    
+
+    
+
+    
+
+    
+      <div class="doc-source">
+        <span class="doc-source-label">Source:</span>
+        
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L70" target="_blank" rel="noopener">
+            src/debra.nim:70
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+    
+      
+      
+        <div class="doc doc-object doc-proc">
+  
+
+  
     <h4 id="neutralizeStalled" class="doc doc-heading">
       
       <span class="doc doc-object-name doc-proc-name">neutralizeStalled</span>
@@ -4396,8 +4524,8 @@ receive <code>ThreadHandle[N, ccSingle]</code> unchanged from 0.7.x.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L70" target="_blank" rel="noopener">
-            src/debra.nim:70
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L163" target="_blank" rel="noopener">
+            src/debra.nim:163
           </a>
         
       </div>
@@ -4463,8 +4591,8 @@ shape, while <code>DebraManager[N, ccMulti]</code> is also accepted.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L79" target="_blank" rel="noopener">
-            src/debra.nim:79
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L172" target="_blank" rel="noopener">
+            src/debra.nim:172
           </a>
         
       </div>
@@ -4535,8 +4663,8 @@ shape, while <code>DebraManager[N, ccMulti]</code> is also accepted.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L89" target="_blank" rel="noopener">
-            src/debra.nim:89
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L182" target="_blank" rel="noopener">
+            src/debra.nim:182
           </a>
         
       </div>
@@ -4608,8 +4736,8 @@ shape, while <code>DebraManager[N, ccMulti]</code> is also accepted.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L99" target="_blank" rel="noopener">
-            src/debra.nim:99
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L192" target="_blank" rel="noopener">
+            src/debra.nim:192
           </a>
         
       </div>
@@ -4680,8 +4808,8 @@ shape, while <code>DebraManager[N, ccMulti]</code> is also accepted.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L116" target="_blank" rel="noopener">
-            src/debra.nim:116
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L209" target="_blank" rel="noopener">
+            src/debra.nim:209
           </a>
         
       </div>
@@ -4754,8 +4882,8 @@ shape, while <code>DebraManager[N, ccMulti]</code> is also accepted.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L135" target="_blank" rel="noopener">
-            src/debra.nim:135
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra.nim#L228" target="_blank" rel="noopener">
+            src/debra.nim:228
           </a>
         
       </div>
@@ -6061,7 +6189,7 @@ library's public surface for normal use; prefer
 
   
     <div class="doc-signature highlight">
-      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">setGlobalManager</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="o">]</span><span class="p">)</span>
+      <pre><code class="language-nim highlight"><span class="k">proc</span><span class="w"> </span><span class="nf">setGlobalManager</span><span class="p">(</span><span class="n">manager</span><span class="p">:</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">DebraManager</span><span class="o">[</span><span class="n">MaxThreads</span><span class="p">,</span><span class="w"> </span><span class="n">CC</span><span class="o">]</span><span class="p">)</span>
 </code></pre>
     </div>
   
@@ -6101,7 +6229,7 @@ stride that was just overwritten.</p>
           
             <li>
               <code>manager</code>
-              (<code>ptr DebraManager[MaxThreads]</code>)
+              (<code>ptr DebraManager[MaxThreads, CC]</code>)
               
             </li>
           
@@ -6184,8 +6312,8 @@ clearing the manager.</p>
       <div class="doc-source">
         <span class="doc-source-label">Source:</span>
         
-          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L255" target="_blank" rel="noopener">
-            src/debra/signal.nim:255
+          <a href="https://github.com/elijahr/nim-debra/blob/main/src/debra/signal.nim#L257" target="_blank" rel="noopener">
+            src/debra/signal.nim:257
           </a>
         
       </div>
