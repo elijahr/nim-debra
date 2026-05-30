@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-30
+
+### Added
+
+- `unregisterThread*[MaxThreads, CC]` runtime API in `src/debra.nim`.
+  Releases the per-thread slot previously claimed via `registerThread`,
+  making the slot available for reuse by a subsequent registration on
+  the same or another thread. `{.raises: [].}`; idempotent on double
+  call and stale/out-of-range `handle.idx`. Thread-affine and
+  no-in-flight-pin contracts are caller obligations, documented in the
+  proc's doc comment. Clear order is (1) `threads[idx].threadId`
+  release-store to `InvalidThreadId`, (2) CAS-with-retry clear of the
+  `activeThreadMask` bit, (3) clear thread-locals — mirrors the
+  claim-side order in `registerThread`. Track B of the
+  static-thread-affinity wave.
+- `$` for `ThreadId` in `src/debra/thread_id.nim`. Custom stringifier
+  rendering the opaque `Pthread` handle as `ThreadId(0xHEX)` (collateral
+  fix: clang's auto-stringifier could not synthesise a `$` for the
+  underlying struct, blocking equality-assertion diagnostics in the new
+  unregister tests).
+
+### Changed
+
+- `setGlobalManager` in `src/debra/signal.nim` widened to be CC-generic
+  (`CC: static PinScopeCardinality = ccSingle` default). Closes a
+  v0.8.0 surface-widening gap exposed by `unregisterThread`'s
+  `ccMulti` test coverage. Backward-compatible: the default keeps the
+  existing single-cardinality call shape; `ccMulti` managers no longer
+  hit a `type mismatch` when publishing to the signal handler.
+
+### Other
+
+- Pin bumped: `typestates >= 0.12.0` (was `>= 0.10.0`) for the implicit
+  `TypestateOp` effect tag.
+
 ## [0.8.0] - 2026-05-24
 
 ### Changed (breaking)
