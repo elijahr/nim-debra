@@ -67,6 +67,84 @@ proc registerThread*[MaxThreads: static int, CC: static PinScopeCardinality](
         "Maximum threads (" & $MaxThreads & ") already registered",
       )
 
+proc unregisterThread*[
+    MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
+](
+    manager: var DebraManager[MaxThreads, CC],
+    handle: ThreadHandle[MaxThreads, CC],
+) {.raises: [].} =
+  ## Unregister the current thread from the DEBRA manager, releasing the
+  ## slot it claimed via `registerThread`. Idempotent: a second call with
+  ## the same `handle` is a no-op.
+  ##
+  ## **Caller obligations** (documented misuse; not enforced at runtime):
+  ##
+  ## - **Thread-affine**: must be called from the same OS thread that
+  ##   called `registerThread` to obtain `handle`. The per-thread bookkeeping
+  ##   (`threadLocalIdx`, `threadLocalRegistered`, `threadLocalManager`) is
+  ##   per-thread, so a cross-thread call leaves the owning thread's
+  ##   threadvars stale and will misroute future signal delivery.
+  ## - **No in-flight pin**: any `PinnedScope` opened against `handle` must
+  ##   have been closed before this call. `unregisterThread` does not
+  ##   un-pin; releasing a slot with an active pin is a use-after-free.
+  ## - **Stale-handle aliasing is undetected**: `ThreadHandle` carries no
+  ##   epoch/generation. If a slot has already been released and reclaimed
+  ##   by another thread, passing the original handle here may corrupt the
+  ##   new owner's slot. Do not retain handles past the matching
+  ##   `unregisterThread`.
+  ##
+  ## **Clear order** (matters for concurrent signal delivery):
+  ##
+  ## 1. Reset `threads[idx].threadId` to `InvalidThreadId` (release) — closes
+  ##    the signal-delivery hint before the mask bit advertises the slot as
+  ##    free.
+  ## 2. Clear the mask bit via CAS-with-retry, mirroring `register`'s
+  ##    claim-side pattern.
+  ## 3. Clear the three thread-locals last.
+  ##
+  ## The `CC` parameter binds via the `manager` argument; callers that pass
+  ## `DebraManager[N]` (CC default `ccSingle`) keep the 0.7.x call shape,
+  ## while `DebraManager[N, ccMulti]` is also accepted.
+
+  # Bounds check on a stale/corrupt handle. Out-of-range idx returns
+  # early (idempotent-style) rather than indexing garbage.
+  if handle.idx < 0 or handle.idx >= MaxThreads:
+    return
+
+  let bit = 1'u64 shl handle.idx
+
+  # Idempotency check: if the mask bit is already clear, this is a
+  # double-unregister or a stale handle to a slot already freed; either
+  # way, no-op.
+  if (manager.activeThreadMask.load(moAcquire) and bit) == 0'u64:
+    return
+
+  # Step 1: clear the signal-delivery hint BEFORE releasing the mask bit.
+  # Inverse order would expose a window where the mask says "free" but the
+  # threadId still points at the (now-departing) thread.
+  manager.threads[handle.idx].threadId.store(InvalidThreadId, moRelease)
+
+  # Step 2: clear the mask bit via CAS-with-retry, mirroring the
+  # claim-side pattern in `register` (registration.nim:82-90).
+  var expected = manager.activeThreadMask.load(moAcquire)
+  while (expected and bit) != 0'u64:
+    let desired = expected and not bit
+    if manager.activeThreadMask.compareExchangeWeak(
+      expected, desired, moAcquireRelease, moAcquire
+    ):
+      break
+    # CAS failed; `expected` is updated. If another writer cleared the
+    # bit in the meantime (shouldn't happen under thread-affine usage but
+    # is defensible), the loop guard exits.
+
+  # Step 3: clear thread-locals last. Only meaningful on the owning thread
+  # (per the thread-affine contract above); on a wrong thread these clears
+  # would scribble the caller's threadvars instead of the owner's, which
+  # is the caller's bug, not ours.
+  threadLocalIdx = 0
+  threadLocalRegistered = false
+  threadLocalManager = nil
+
 proc neutralizeStalled*[MaxThreads: static int](
     manager: var DebraManager[MaxThreads], epochsBeforeNeutralize: uint64 = 2
 ): int =
