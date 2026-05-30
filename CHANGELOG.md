@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `unregisterThread*[MaxThreads, CC]` runtime API in `src/debra.nim`.
   Releases the per-thread slot previously claimed via `registerThread`,
   making the slot available for reuse by a subsequent registration on
-  the same or another thread. `{.raises: [].}`; idempotent on double
-  call and stale/out-of-range `handle.idx`. Thread-affine and
+  the same or another thread. `{.raises: [].}`; idempotent under no
+  concurrent re-claim on double call and stale/out-of-range
+  `handle.idx`. Thread-affine and
   no-in-flight-pin contracts are caller obligations, documented in the
   proc's doc comment. Clear order is (1) `threads[idx].threadId`
   release-store to `InvalidThreadId`, (2) CAS-with-retry clear of the
@@ -41,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pin bumped: `typestates >= 0.12.0` (was `>= 0.10.0`) for the implicit
   `TypestateOp` effect tag.
+- Added defensive `doAssert` in `unregisterThread` enforcing the
+  thread-affinity + live-slot-handle contracts at runtime. Idempotent
+  double-unregister still short-circuits at the mask-bit check IF the
+  slot has not been concurrently re-claimed; under concurrent re-claim,
+  the assert detects stale-handle aliasing rather than silently
+  corrupting another thread's slot. Mirrors `unbindClient` / `withPin`
+  defensive style. (Gemini round-2 HIGH on PR #13.)
 
 ## [0.8.0] - 2026-05-24
 

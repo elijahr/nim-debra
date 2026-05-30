@@ -73,10 +73,13 @@ proc unregisterThread*[
     manager: var DebraManager[MaxThreads, CC], handle: ThreadHandle[MaxThreads, CC]
 ) {.raises: [].} =
   ## Unregister the current thread from the DEBRA manager, releasing the
-  ## slot it claimed via `registerThread`. Idempotent: a second call with
-  ## the same `handle` is a no-op.
+  ## slot it claimed via `registerThread`. Idempotent under no concurrent
+  ## re-claim: a second call with the same `handle` is a no-op IF no other
+  ## thread has reclaimed the slot in between. If the slot has been
+  ## concurrently re-claimed, the runtime `doAssert` below detects
+  ## stale-handle aliasing and raises an `AssertionDefect`.
   ##
-  ## **Caller obligations** (documented misuse; not enforced at runtime):
+  ## **Caller obligations** (documented misuse):
   ##
   ## - **Thread-affine**: must be called from the same OS thread that
   ##   called `registerThread` to obtain `handle`. The per-thread bookkeeping
@@ -86,11 +89,14 @@ proc unregisterThread*[
   ## - **No in-flight pin**: any `PinnedScope` opened against `handle` must
   ##   have been closed before this call. `unregisterThread` does not
   ##   un-pin; releasing a slot with an active pin is a use-after-free.
-  ## - **Stale-handle aliasing is undetected**: `ThreadHandle` carries no
-  ##   epoch/generation. If a slot has already been released and reclaimed
-  ##   by another thread, passing the original handle here may corrupt the
-  ##   new owner's slot. Do not retain handles past the matching
-  ##   `unregisterThread`.
+  ## - **Stale-handle aliasing is detected at runtime (Gemini round-2 HIGH)**:
+  ##   a `doAssert` after the idempotency early-return checks that the
+  ##   per-thread `threadLocalRegistered` / `threadLocalIdx` /
+  ##   `threadLocalManager` match the `handle` + `manager` arguments.
+  ##   Cross-thread call or stale-handle reuse on a live (re-claimed) slot
+  ##   raises `AssertionDefect`. This is a runtime defense; the contract
+  ##   remains "don't do this" and the per-thread bookkeeping is the
+  ##   source of truth.
   ##
   ## **Clear order** (matters for concurrent signal delivery):
   ##
@@ -117,6 +123,16 @@ proc unregisterThread*[
   # way, no-op.
   if (manager.activeThreadMask.load(moAcquire) and bit) == 0'u64:
     return
+
+  # Defensive runtime enforcement (Gemini round-2 PR #13 HIGH): the
+  # docstring contracts (thread-affine, no stale handle on a live slot)
+  # are caller obligations, but violating them silently corrupts state
+  # (cross-thread unregister; signal misroute). `unregisterThread` is
+  # off the hot path, so the cost is negligible. Mirrors the defensive
+  # style of `unbindClient` and `withPin`'s nested-pin check.
+  doAssert threadLocalRegistered and threadLocalIdx == handle.idx and
+    threadLocalManager == cast[pointer](addr manager),
+    "unregisterThread: thread-affinity violation or stale handle on a live slot"
 
   # Step 1: clear the signal-delivery hint BEFORE releasing the mask bit.
   # Inverse order would expose a window where the mask says "free" but the
