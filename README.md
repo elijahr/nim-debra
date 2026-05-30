@@ -151,8 +151,8 @@ shape; `DebraManager[N, ccMulti]` is also accepted. See
 [`examples/unregister_thread.nim`](examples/unregister_thread.nim) for a
 runnable register → work → unregister cycle that demonstrates slot reuse.
 
-**Caller obligations** (documented misuse; not enforced at runtime — see
-`src/debra.nim:80-94` for the full contract):
+**Caller obligations** (partially enforced at runtime via a defensive
+`doAssert` — see `src/debra.nim:80-129` for the full contract):
 
 - **Idempotent.** A second call with the same `handle` is a no-op. The
   routine bounds-checks `handle.idx` and short-circuits if the slot's

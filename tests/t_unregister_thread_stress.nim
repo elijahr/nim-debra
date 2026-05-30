@@ -84,7 +84,7 @@ proc s1Worker() {.thread.} =
   discard s1Ctx.barrier[].fetchAdd(1)
   while not s1Ctx.startGate[].load():
     cpuRelax()
-  setGlobalManager(s1Ctx.mgr)
+  # setGlobalManager already published by the main thread before spawn.
   for i in 0 ..< StressRepeatIters:
     try:
       let h = registerThread(s1Ctx.mgr[])
@@ -115,7 +115,7 @@ var s2Unregisters: Atomic[int]
 proc s2Worker() {.thread.} =
   while not s2Ctx.startGate[].load():
     cpuRelax()
-  setGlobalManager(s2Ctx.mgr)
+  # setGlobalManager already published by the main thread before spawn.
   for i in 0 ..< ContentionIters:
     try:
       let h = registerThread(s2Ctx.mgr[])
@@ -140,7 +140,7 @@ var s3RegisterFailures: Atomic[int]
 proc s3Worker() {.thread.} =
   while not s3Ctx.startGate[].load():
     cpuRelax()
-  setGlobalManager(s3Ctx.mgr)
+  # setGlobalManager already published by the main thread before spawn.
   for i in 0 ..< PinIters:
     try:
       let h = registerThread(s3Ctx.mgr[])
