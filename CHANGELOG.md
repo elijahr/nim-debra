@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-30
+
+### Added
+
+- `unregisterThread*[MaxThreads, CC]` runtime API in `src/debra.nim`.
+  Releases the per-thread slot previously claimed via `registerThread`,
+  making the slot available for reuse by a subsequent registration on
+  the same or another thread. `{.raises: [].}`; idempotent under no
+  concurrent re-claim on double call and stale/out-of-range
+  `handle.idx`. Thread-affine and
+  no-in-flight-pin contracts are caller obligations, documented in the
+  proc's doc comment. Clear order is (1) `threads[idx].threadId`
+  release-store to `InvalidThreadId`, (2) CAS-with-retry clear of the
+  `activeThreadMask` bit, (3) clear thread-locals — mirrors the
+  claim-side order in `registerThread`. Track B of the
+  static-thread-affinity wave.
+- `$` for `ThreadId` in `src/debra/thread_id.nim`. Custom stringifier
+  rendering the opaque `Pthread` handle as `ThreadId(0xHEX)` (collateral
+  fix: clang's auto-stringifier could not synthesise a `$` for the
+  underlying struct, blocking equality-assertion diagnostics in the new
+  unregister tests).
+
+### Changed
+
+- `setGlobalManager` in `src/debra/signal.nim` widened to be CC-generic
+  (`CC: static PinScopeCardinality = ccSingle` default). Closes a
+  v0.8.0 surface-widening gap exposed by `unregisterThread`'s
+  `ccMulti` test coverage. Backward-compatible: the default keeps the
+  existing single-cardinality call shape; `ccMulti` managers no longer
+  hit a `type mismatch` when publishing to the signal handler.
+
+### Other
+
+- Pin bumped: `typestates >= 0.12.0` (was `>= 0.10.0`) for the implicit
+  `TypestateOp` effect tag.
+- Added defensive `doAssert` in `unregisterThread` enforcing the
+  thread-affinity + live-slot-handle contracts at runtime. Idempotent
+  double-unregister still short-circuits at the mask-bit check IF the
+  slot has not been concurrently re-claimed; under concurrent re-claim,
+  the assert detects stale-handle aliasing rather than silently
+  corrupting another thread's slot. Mirrors `unbindClient` / `withPin`
+  defensive style. (Gemini round-2 HIGH on PR #13.)
+
 ## [0.8.0] - 2026-05-24
 
 ### Changed (breaking)
@@ -437,7 +480,8 @@ type
 - Docs deployment workflow for GitHub Pages
 - Integration tests
 
-[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/elijahr/nim-debra/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/elijahr/nim-debra/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/elijahr/nim-debra/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/elijahr/nim-debra/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/elijahr/nim-debra/compare/v0.7.1...v0.7.2

@@ -2,7 +2,7 @@
 
 # Package
 
-version = "0.8.0"
+version = "0.9.0"
 author = "elijahr <elijahr+debra@gmail.com>"
 description = "DEBRA+ safe memory reclamation for lock-free data structures"
 license = "MIT"
@@ -12,7 +12,7 @@ installExt = @["nim"]
 # Dependencies
 
 requires "nim >= 2.2.10"
-requires "typestates >= 0.10.0"
+requires "typestates >= 0.12.0"
 requires "unittest2 >= 0.2.0"
 
 # Tasks

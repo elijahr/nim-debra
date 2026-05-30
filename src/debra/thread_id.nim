@@ -9,6 +9,7 @@
 ## This module provides a unified ThreadId type that works correctly on all platforms.
 
 import std/posix
+import std/strutils
 
 type ThreadId* = object
   ## Platform-abstracted thread identifier for use with pthread_kill.
@@ -27,6 +28,14 @@ proc currentThreadId*(): ThreadId =
 proc `==`*(a, b: ThreadId): bool =
   ## Compare two ThreadIds for equality.
   a.handle == b.handle
+
+proc `$`*(tid: ThreadId): string =
+  ## Render a `ThreadId` for diagnostics. The auto-generated stringifier
+  ## tries to format the underlying `Pthread` (an opaque struct pointer on
+  ## some POSIX platforms) as an integer, which fails to compile; we
+  ## render the pointer bits as hex instead. Used by `unittest2.check`
+  ## when an equality assertion involving a `ThreadId` fails.
+  "ThreadId(0x" & cast[uint](tid.handle).toHex & ")"
 
 proc isValid*(tid: ThreadId): bool =
   ## Check if this ThreadId represents a valid thread.

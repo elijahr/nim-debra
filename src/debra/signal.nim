@@ -209,7 +209,9 @@ proc forceReinstallSignalHandler*() =
   if sigaction(QuiescentSignal, sa, nil) == 0:
     signalHandlerInstalled.store(true, moRelease)
 
-proc setGlobalManager*[MaxThreads: static int](manager: ptr DebraManager[MaxThreads]) =
+proc setGlobalManager*[
+    MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
+](manager: ptr DebraManager[MaxThreads, CC]) =
   ## Set the global manager pointer for the signal handler and capture
   ## the byte-stride information the handler needs to find each
   ## thread's slot.

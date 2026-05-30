@@ -127,8 +127,8 @@ suite "retireOnCAS + retireOnPublish":
       mgr.threads[i].threadId.store(InvalidThreadId, moRelaxed)
       mgr.threads[i].currentBag = nil
       mgr.threads[i].limboBagTail = nil
-    # NOTE: setGlobalManager not widened to ccMulti yet; ccMulti retire
-    # path does not require it.
+    # The ccMulti retire path does not require a published global
+    # manager, so this test does not call setGlobalManager.
 
     let u = unregistered[4, ccMulti](addr mgr)
     var regResult = u.register()

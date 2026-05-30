@@ -128,6 +128,49 @@ Each `retain` must be balanced by exactly one `release`.
 `releaseDestructor[T]()` is a captureless function pointer, so handing it
 to `retire` does not allocate.
 
+### Release a registration slot
+
+`registerThread` claims one slot in the manager's per-thread table; the
+fixed-size table is bounded by the `MaxThreads` static parameter. If a
+worker thread exits while its slot stays claimed, that capacity is lost
+for the lifetime of the manager. `unregisterThread` releases the slot
+for reuse:
+
+```nim
+proc unregisterThread*[
+    MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
+](
+    manager: var DebraManager[MaxThreads, CC],
+    handle: ThreadHandle[MaxThreads, CC],
+) {.raises: [].}
+```
+
+The `CC` parameter binds via the `manager` argument, so the default
+`DebraManager[N]` (which carries `CC = ccSingle`) keeps the same call
+shape; `DebraManager[N, ccMulti]` is also accepted. See
+[`examples/unregister_thread.nim`](examples/unregister_thread.nim) for a
+runnable register → work → unregister cycle that demonstrates slot reuse.
+
+**Caller obligations** (partially enforced at runtime via a defensive
+`doAssert` — see `src/debra.nim:80-129` for the full contract):
+
+- **Idempotent.** A second call with the same `handle` is a no-op. The
+  routine bounds-checks `handle.idx` and short-circuits if the slot's
+  mask bit is already clear, so double-unregister is safe.
+- **Thread-affine.** Must be called from the same OS thread that called
+  `registerThread` to obtain `handle`. The per-thread bookkeeping
+  (`threadLocalIdx`, `threadLocalRegistered`, `threadLocalManager`) is
+  cleared at the end of the call; a cross-thread call leaves the owning
+  thread's threadvars stale and will misroute future signal delivery.
+- **No in-flight pin.** Any `PinnedScope` opened against `handle` must
+  have been closed before this call. `unregisterThread` does not un-pin;
+  releasing a slot with an active pin is a use-after-free.
+- **Stale-handle aliasing is undetected.** `ThreadHandle` carries no
+  epoch/generation. If a slot has already been released and reclaimed by
+  another thread, passing the original handle here may corrupt the new
+  owner's slot. Do not retain handles past the matching
+  `unregisterThread`.
+
 ### Recover from a stalled thread
 
 If a registered thread has been parked inside a system call for too long,
