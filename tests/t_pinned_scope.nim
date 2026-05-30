@@ -151,10 +151,9 @@ suite "PinnedScope ccMulti cardinality":
       manager.threads[i].threadId.store(InvalidThreadId, moRelaxed)
       manager.threads[i].currentBag = nil
       manager.threads[i].limboBagTail = nil
-    # NOTE: setGlobalManager has not been widened to accept
-    # `ptr DebraManager[MaxThreads, ccMulti]` yet (step 8 territory).
-    # The ccMulti happy-path test exercises pin/unpin only — no signals,
-    # no neutralize — so a non-published global manager is acceptable.
+    # This ccMulti happy-path test exercises pin/unpin only — no signals,
+    # no neutralize — so the global manager does not need to be published
+    # for the assertions below to be meaningful.
 
     let u = unregistered[4, ccMulti](addr manager)
     var regResult = u.register()
