@@ -44,7 +44,7 @@
 ## - Assertions follow the FULL ASSERTION PRINCIPLE: every final assertion
 ##   compares against an exactly-computed expected value.
 
-import std/sysatomics  # for cpuRelax only
+import std/sysatomics # for cpuRelax only
 
 import unittest2
 
@@ -71,11 +71,10 @@ const
 # Scenario 1: N == MaxThreads workers, repeated register/unregister.
 # ---------------------------------------------------------------------------
 
-type
-  Scenario1Ctx = object
-    mgr: ptr DebraManager[StressMaxThreads, ccSingle]
-    barrier: ptr Atomic[int]
-    startGate: ptr Atomic[bool]
+type Scenario1Ctx = object
+  mgr: ptr DebraManager[StressMaxThreads, ccSingle]
+  barrier: ptr Atomic[int]
+  startGate: ptr Atomic[bool]
 
 var s1Ctx: Scenario1Ctx
 var s1Errors: Atomic[int]
@@ -83,7 +82,8 @@ var s1Errors: Atomic[int]
 proc s1Worker() {.thread.} =
   # Arrive at the barrier, then wait for the start gate.
   discard s1Ctx.barrier[].fetchAdd(1)
-  while not s1Ctx.startGate[].load(): cpuRelax()
+  while not s1Ctx.startGate[].load():
+    cpuRelax()
   setGlobalManager(s1Ctx.mgr)
   for i in 0 ..< StressRepeatIters:
     try:
@@ -104,17 +104,17 @@ proc s1Worker() {.thread.} =
 # Scenario 2: re-claim race, workers > MaxThreads.
 # ---------------------------------------------------------------------------
 
-type
-  Scenario2Ctx = object
-    mgr: ptr DebraManager[ContentionMaxThreads, ccSingle]
-    startGate: ptr Atomic[bool]
+type Scenario2Ctx = object
+  mgr: ptr DebraManager[ContentionMaxThreads, ccSingle]
+  startGate: ptr Atomic[bool]
 
 var s2Ctx: Scenario2Ctx
 var s2Registers: Atomic[int]
 var s2Unregisters: Atomic[int]
 
 proc s2Worker() {.thread.} =
-  while not s2Ctx.startGate[].load(): cpuRelax()
+  while not s2Ctx.startGate[].load():
+    cpuRelax()
   setGlobalManager(s2Ctx.mgr)
   for i in 0 ..< ContentionIters:
     try:
@@ -129,17 +129,17 @@ proc s2Worker() {.thread.} =
 # Scenario 3: pin/unpin between register and unregister.
 # ---------------------------------------------------------------------------
 
-type
-  Scenario3Ctx = object
-    mgr: ptr DebraManager[StressMaxThreads, ccSingle]
-    startGate: ptr Atomic[bool]
+type Scenario3Ctx = object
+  mgr: ptr DebraManager[StressMaxThreads, ccSingle]
+  startGate: ptr Atomic[bool]
 
 var s3Ctx: Scenario3Ctx
 var s3PinObserved: Atomic[int]
 var s3RegisterFailures: Atomic[int]
 
 proc s3Worker() {.thread.} =
-  while not s3Ctx.startGate[].load(): cpuRelax()
+  while not s3Ctx.startGate[].load():
+    cpuRelax()
   setGlobalManager(s3Ctx.mgr)
   for i in 0 ..< PinIters:
     try:
@@ -162,23 +162,23 @@ proc s3Worker() {.thread.} =
 # Scenario 4: idempotent double-unregister under contention.
 # ---------------------------------------------------------------------------
 
-type
-  Scenario4Ctx = object
-    mgr: ptr DebraManager[StressMaxThreads, ccSingle]
-    startGate: ptr Atomic[bool]
+type Scenario4Ctx = object
+  mgr: ptr DebraManager[StressMaxThreads, ccSingle]
+  startGate: ptr Atomic[bool]
 
 var s4Ctx: Scenario4Ctx
 var s4DoubleCalls: Atomic[int]
 var s4RegisterFailures: Atomic[int]
 
 proc s4Worker() {.thread.} =
-  while not s4Ctx.startGate[].load(): cpuRelax()
+  while not s4Ctx.startGate[].load():
+    cpuRelax()
   setGlobalManager(s4Ctx.mgr)
   for i in 0 ..< DoubleUnregIters:
     try:
       let h = registerThread(s4Ctx.mgr[])
       unregisterThread(s4Ctx.mgr[], h)
-      unregisterThread(s4Ctx.mgr[], h)  # idempotent no-op
+      unregisterThread(s4Ctx.mgr[], h) # idempotent no-op
       discard s4DoubleCalls.fetchAdd(1)
     except DebraRegistrationError:
       discard s4RegisterFailures.fetchAdd(1)
@@ -188,7 +188,6 @@ proc s4Worker() {.thread.} =
 # ---------------------------------------------------------------------------
 
 suite "unregisterThread concurrent stress (Task B4.5)":
-
   test "scenario 1: N=MaxThreads workers, repeated register/unregister, mask returns to zero":
     var mgr = initDebraManager[StressMaxThreads, ccSingle]()
     setGlobalManager(addr mgr)
@@ -198,18 +197,16 @@ suite "unregisterThread concurrent stress (Task B4.5)":
     barrier.store(0)
     startGate.store(false)
     s1Errors.store(0)
-    s1Ctx = Scenario1Ctx(
-      mgr: addr mgr,
-      barrier: addr barrier,
-      startGate: addr startGate,
-    )
+    s1Ctx =
+      Scenario1Ctx(mgr: addr mgr, barrier: addr barrier, startGate: addr startGate)
 
     var workers: array[StressMaxThreads, Thread[void]]
     for i in 0 ..< StressMaxThreads:
       createThread(workers[i], s1Worker)
 
     # Wait for all workers to arrive at the barrier, then release.
-    while barrier.load() < StressMaxThreads: cpuRelax()
+    while barrier.load() < StressMaxThreads:
+      cpuRelax()
     startGate.store(true)
 
     for i in 0 ..< StressMaxThreads:

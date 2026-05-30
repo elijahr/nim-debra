@@ -70,8 +70,7 @@ proc registerThread*[MaxThreads: static int, CC: static PinScopeCardinality](
 proc unregisterThread*[
     MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
 ](
-    manager: var DebraManager[MaxThreads, CC],
-    handle: ThreadHandle[MaxThreads, CC],
+    manager: var DebraManager[MaxThreads, CC], handle: ThreadHandle[MaxThreads, CC]
 ) {.raises: [].} =
   ## Unregister the current thread from the DEBRA manager, releasing the
   ## slot it claimed via `registerThread`. Idempotent: a second call with

@@ -26,8 +26,7 @@ unregisterThread(manager, h1)
 
 # Second registration on the same thread reuses the freed slot.
 let h2 = registerThread(manager)
-doAssert h2.idx == h1.idx,
-  "slot reuse: expected idx " & $h1.idx & ", got " & $h2.idx
+doAssert h2.idx == h1.idx, "slot reuse: expected idx " & $h1.idx & ", got " & $h2.idx
 
 # Release the second-cycle slot.
 unregisterThread(manager, h2)

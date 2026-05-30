@@ -101,9 +101,11 @@ suite "unregisterThread — runtime API on DebraManager (ccSingle)":
     ## A `compiles()` block asserting that `unregisterThread` typechecks
     ## inside a `{.raises: [].}` proc. If B4 introduces any raising
     ## effect, this test fails to compile.
-    proc raisesNothing(mgr: var DebraManager[4, ccSingle],
-                      h: ThreadHandle[4, ccSingle]) {.raises: [].} =
+    proc raisesNothing(
+        mgr: var DebraManager[4, ccSingle], h: ThreadHandle[4, ccSingle]
+    ) {.raises: [].} =
       unregisterThread(mgr, h)
+
     check compiles(raisesNothing)
 
 suite "unregisterThread — CC-generic (ccMulti)":
@@ -119,7 +121,9 @@ suite "unregisterThread — CC-generic (ccMulti)":
     check mgr.threads[h.idx].threadId.load(moAcquire) == InvalidThreadId
 
   test "compile-time contract: {.raises: [].} on ccMulti instantiation":
-    proc raisesNothingMulti(mgr: var DebraManager[4, ccMulti],
-                            h: ThreadHandle[4, ccMulti]) {.raises: [].} =
+    proc raisesNothingMulti(
+        mgr: var DebraManager[4, ccMulti], h: ThreadHandle[4, ccMulti]
+    ) {.raises: [].} =
       unregisterThread(mgr, h)
+
     check compiles(raisesNothingMulti)
