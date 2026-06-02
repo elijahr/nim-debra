@@ -1061,9 +1061,10 @@ when sizeof(pointer) == 8:
     ## Low-level 16-byte weak CAS emit. Backend-dispatched (see
     ## `dwcasLoad`). On gcc-amd64 `cmpxchg16b` is always-strong, so the
     ## weak/strong distinction is a no-op; on clang-amd64 maps to
-    ## `__atomic_compare_exchange_n` with weak=1; on arm64 LL/SC
-    ## (without LSE) `stlxp` may genuinely fail spuriously, while
-    ## arm64 LSE (`caspal`) is always-strong. Prefer
+    ## `__atomic_compare_exchange_n` with weak=1; on ARMv8.0 LL/SC
+    ## (no LSE) `stlxp` may genuinely fail spuriously, while arm64
+    ## FEAT_LSE / LSE2 (`caspal`, objdump-verified on Apple Silicon)
+    ## is always-strong. Prefer
     ## `compareExchangeWeak(Atomic[Pair[A, B]])` for the validated,
     ## warning-emitting surface.
     enforceDwcasConstraints(A, B)
@@ -1132,10 +1133,14 @@ when sizeof(pointer) == 8:
       success: static MemoryOrder,
       failure: static MemoryOrder,
   ): bool {.inline.} =
-    ## Weak 16-byte CAS via DWCAS. May fail spuriously on platforms with
-    ## LL/SC primitives (notably aarch64 without LSE) even when current
-    ## value equals `expected`. Cheaper inside a loop than `Strong`.
-    ## On gcc-amd64 (`cmpxchg16b`), weak and strong are equivalent.
+    ## Weak 16-byte CAS via DWCAS. May fail spuriously only on ARMv8.0
+    ## LL/SC cores (no LSE), where `stlxp` is permitted to fail without
+    ## contention. On all other supported targets weak and strong are
+    ## equivalent: x86_64 (`cmpxchg16b`) is always-strong; arm64 with
+    ## FEAT_LSE / LSE2 (Apple Silicon, modern server chips) emits
+    ## `caspal` for both procs (objdump-verified on Apple Silicon).
+    ## Default to `compareExchangeStrong`; reach for Weak only after
+    ## measuring a contention win on an ARMv8.0 target.
     ##
     ## ABA / aliasing note: `expected` and `desired` MUST be distinct
     ## memory locations. On CAS failure, `expected` is overwritten in-place

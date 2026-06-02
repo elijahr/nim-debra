@@ -93,7 +93,7 @@ load/store/exchange ops that go with it. The surface is:
 | `Atomic[Pair[A, B]]`                      | Atomic over a 16-byte pair. Requires a 64-bit target and arch-specific compile flags. |
 | `load` / `store` / `exchange`             | 16-byte ops on `Atomic[Pair[A, B]]`. Always seq_cst at the instruction level.        |
 | `compareExchangeStrong` (3 overloads)     | Strong 16-byte CAS. `(success, failure)`, single-order, and default-order forms.     |
-| `compareExchangeWeak` (2 overloads)       | Weak 16-byte CAS. May fail spuriously on LL/SC platforms (aarch64 without LSE).      |
+| `compareExchangeWeak` (2 overloads)       | Weak 16-byte CAS. May fail spuriously only on ARMv8.0 LL/SC; equivalent to Strong elsewhere. See §5.   |
 | `compareExchange` aliases (3 overloads)   | Unsuffixed-name aliases routing to `compareExchangeStrong`, for `std/atomics`-style spelling. |
 | `dwcasOrderRelaxedCAS:`                   | Template that wraps a single call site to suppress the seq_cst-upgrade warning.      |
 
@@ -175,6 +175,38 @@ dwcasOrderRelaxedCAS:
 The warning continues to fire at every unwrapped call site. The wrap is
 per-site, not per-module — you can't accidentally silence the warning
 globally.
+
+### When to use Strong vs Weak compareExchange
+
+The Strong/Weak distinction matters only on ARMv8.0 cores that use the
+LL/SC primitives `ldaxp` / `stlxp`. On all other supported targets the
+two are equivalent in both cost and behaviour:
+
+- **x86_64 (gcc and clang).** Both `compareExchangeStrong` and
+  `compareExchangeWeak` lower to `cmpxchg16b`, which is always-strong.
+  The `weak` flag is a no-op.
+- **arm64 with FEAT_LSE / LSE2 (Apple Silicon, modern server chips).**
+  Both lower to `caspal` (single-instruction CAS). The `weak` flag is a
+  no-op. Verified by `objdump` of a release-mode probe on Apple Silicon:
+  both procs emit identical `caspal` instructions, no `ldaxp` / `stlxp`
+  pairs are emitted on either path.
+- **arm64 ARMv8.0 (LL/SC fallback, e.g. Raspberry Pi 3, Cortex-A53).**
+  Weak uses `ldaxp` / `stlxp` and is permitted to fail spuriously;
+  Strong wraps the LL/SC pair in a retry loop.
+
+Practical guidance:
+
+- **Default to Strong** on all targets. It is the safer choice (no
+  spurious-failure branch to handle) and equivalent cost on every
+  target v0.10.0 explicitly supports (CI cells are x86_64 and
+  Apple-Silicon-equivalent ARMv8.1+).
+- **Use Weak only if** you have measured your specific workload and
+  chip and confirmed (a) Strong is showing CAS-loop overhead from
+  contention, AND (b) your target is ARMv8.0 LL/SC, AND (c) the
+  surrounding loop already reloads `expected` on the failure path.
+
+The unsuffixed-name aliases `compareExchange` route to Strong, matching
+the `std/atomics` default. Weak must be spelled out explicitly.
 
 ## 6. Compatibility matrix
 
@@ -264,11 +296,15 @@ Two things to note about this example:
   `expected` and `desired` is defined-but-confusing on the wider 16-byte
   surface and the doc-comments call it out explicitly.
 - **The consumer uses `compareExchangeWeak` inside the loop.** On
-  aarch64 without LSE, weak-CAS may fail spuriously (LL/SC `stlxp` is
-  permitted to fail without contention). The loop reloads `expected`
-  from the failure path and retries. On gcc-x86_64 (`cmpxchg16b`) and
-  on arm64 with LSE (`caspal`), weak is identical to strong — the
-  spurious-failure branch never fires.
+  ARMv8.0 LL/SC cores (no LSE), weak-CAS may fail spuriously (`stlxp`
+  is permitted to fail without contention). The loop reloads
+  `expected` from the failure path and retries. On x86_64
+  (`cmpxchg16b`) and on arm64 with FEAT_LSE / LSE2 (`caspal`, e.g.
+  Apple Silicon, modern server chips), weak is identical to strong —
+  both lower to the same single instruction and the spurious-failure
+  branch never fires. See §5 "When to use Strong vs Weak" for the
+  full guidance: default to Strong unless you have measured a Weak
+  win on a specific ARMv8.0 target.
 
 For the full LCRQ algorithm see the v0.10.0+ wave specs in the
 `lockfreequeues` project; the cell above is just the DWCAS substrate.

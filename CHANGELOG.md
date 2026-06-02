@@ -69,6 +69,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 16-byte `fetchAdd` / `fetchSub` / `fetchAnd` / `fetchOr` /
   `fetchXor` are OUT of scope for v0.10.0 (LCRQ does not require
   16-byte arithmetic RMW; deferred to a future revision).
+- `compareExchangeStrong` vs `compareExchangeWeak` distinction is a
+  no-op on every CI cell. x86_64 emits `cmpxchg16b` (always-strong)
+  for both; arm64 with FEAT_LSE / LSE2 emits `caspal` (always-strong)
+  for both. The Weak path can only fail spuriously on ARMv8.0 LL/SC
+  cores (no LSE), which are not in the v0.10.0 CI matrix.
+  Objdump-verified on Apple Silicon: both procs emit identical
+  `caspal` instructions, zero `ldaxp` / `stlxp` pairs. Default to
+  Strong; the user guide §5 "When to use Strong vs Weak" documents
+  the decision criteria.
 
 ### Attribution
 
