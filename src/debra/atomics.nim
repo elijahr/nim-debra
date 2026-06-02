@@ -686,6 +686,12 @@ when sizeof(pointer) == 8:
   template dwcasLoad*[A, B](
       loc: var Atomic[Pair[A, B]], order: static MemoryOrder
   ): Pair[A, B] =
+    ## Low-level 16-byte atomic load emit. Backend-dispatched between
+    ## gcc-amd64 `__sync_*`, clang-amd64 `__atomic_*`, and arm64
+    ## `__atomic_*`. Callers should prefer `load(Atomic[Pair[A, B]])`
+    ## which carries the per-callsite memory-order validation and
+    ## seq_cst-upgrade warning. Exposed for testing and for callers
+    ## that have already validated the order policy externally.
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: Pair[A, B]
@@ -762,6 +768,9 @@ when sizeof(pointer) == 8:
       desired: Pair[A, B],
       order: static MemoryOrder
   ) =
+    ## Low-level 16-byte atomic store emit. Backend-dispatched (see
+    ## `dwcasLoad`). Prefer `store(Atomic[Pair[A, B]])` for the
+    ## validated, warning-emitting surface.
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     when defined(gcc) and not defined(clang) and defined(amd64):
@@ -826,6 +835,9 @@ when sizeof(pointer) == 8:
       desired: Pair[A, B],
       order: static MemoryOrder
   ): Pair[A, B] =
+    ## Low-level 16-byte atomic exchange emit. Backend-dispatched
+    ## (see `dwcasLoad`). Prefer `exchange(Atomic[Pair[A, B]])` for
+    ## the validated, warning-emitting surface.
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: Pair[A, B]
@@ -903,6 +915,12 @@ when sizeof(pointer) == 8:
       success: static MemoryOrder,
       failure: static MemoryOrder,
   ): bool =
+    ## Low-level 16-byte strong CAS emit. Backend-dispatched (see
+    ## `dwcasLoad`). On gcc-amd64 maps to `__sync_val_compare_and_swap`
+    ## (always-strong); on clang-amd64 and arm64 maps to
+    ## `__atomic_compare_exchange_n` with the weak flag = 0. Prefer
+    ## `compareExchangeStrong(Atomic[Pair[A, B]])` for the validated,
+    ## warning-emitting surface.
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: bool
@@ -1040,6 +1058,14 @@ when sizeof(pointer) == 8:
       success: static MemoryOrder,
       failure: static MemoryOrder,
   ): bool =
+    ## Low-level 16-byte weak CAS emit. Backend-dispatched (see
+    ## `dwcasLoad`). On gcc-amd64 `cmpxchg16b` is always-strong, so the
+    ## weak/strong distinction is a no-op; on clang-amd64 maps to
+    ## `__atomic_compare_exchange_n` with weak=1; on arm64 LL/SC
+    ## (without LSE) `stlxp` may genuinely fail spuriously, while
+    ## arm64 LSE (`caspal`) is always-strong. Prefer
+    ## `compareExchangeWeak(Atomic[Pair[A, B]])` for the validated,
+    ## warning-emitting surface.
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: bool
