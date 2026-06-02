@@ -144,6 +144,29 @@ template assertLockFree(T: typedesc) =
     .}
 
 # ---------------------------------------------------------------------------
+# Pair[A, B]  (DWCAS substrate)
+# ---------------------------------------------------------------------------
+
+type Pair*[A, B] = object
+  ## 16-byte-aligned object wrapper for DWCAS. Both halves must satisfy
+  ## `supportsCopyMem`, each must be `<= 8` bytes, and `sizeof(A) + sizeof(B)`
+  ## must equal 16. Domain-neutral field names: `first` and `second`.
+  ##
+  ## Conventional LCRQ usage spells `Pair[uint64, T]` where `first` is a
+  ## monotonically-bumped sequence counter (ABA defense) and `second` is the
+  ## payload. Generation overflow is documented as impossible in practical
+  ## lifetimes (uint64 monotonicity).
+  ##
+  ## Field-level `{.align: 16.}` on `first*` elevates the whole object to
+  ## 16-byte alignment per Nim 2.2.10 align-pragma scope rules; the
+  ## object-level form (`type Pair {.align: 16.} = object ...`) is rejected.
+  ##
+  ## `ptr T` fields are explicitly opt-out of ARC: `Pair` makes no claim
+  ## on the lifetime of whatever a contained `ptr` points at.
+  first* {.align: 16.}: A
+  second*: B
+
+# ---------------------------------------------------------------------------
 # Atomic[T]
 # ---------------------------------------------------------------------------
 

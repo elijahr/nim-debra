@@ -776,3 +776,23 @@ when compileOption("threads"):
         joinThread(threads[i])
 
       check counter.load() == float64(NumThreads * Increments)
+
+# ---------------------------------------------------------------------------
+# DWCAS (v0.10.0): Pair[A, B] type shape
+# ---------------------------------------------------------------------------
+
+suite "Pair type shape":
+  test "Pair[uint64, uint64] is 16 bytes and 16-byte aligned":
+    static:
+      doAssert sizeof(Pair[uint64, uint64]) == 16
+      doAssert alignof(Pair[uint64, uint64]) == 16
+
+  test "Pair[uint64, ptr int] is 16 bytes and 16-byte aligned":
+    static:
+      doAssert sizeof(Pair[uint64, ptr int]) == 16
+      doAssert alignof(Pair[uint64, ptr int]) == 16
+
+  test "Pair stores and reads back first/second":
+    let p = Pair[uint64, uint64](first: 7'u64, second: 9'u64)
+    check p.first == 7'u64
+    check p.second == 9'u64
