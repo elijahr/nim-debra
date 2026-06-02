@@ -828,3 +828,14 @@ suite "DWCAS store/load round-trip":
     let r = a.load()
     check r.first == 11'u64
     check r.second == 13'u64
+
+suite "DWCAS exchange":
+  test "exchange returns old, installs new":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    let old = a.exchange(Pair[uint64, uint64](first: 3'u64, second: 4'u64))
+    check old.first == 1'u64
+    check old.second == 2'u64
+    let cur = a.load()
+    check cur.first == 3'u64
+    check cur.second == 4'u64

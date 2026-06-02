@@ -802,3 +802,78 @@ when sizeof(pointer) == 8:
     when not defined(release):
       doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
     dwcasStore(loc, desired, order)
+
+  template dwcasExchange*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      desired: Pair[A, B],
+      order: static MemoryOrder
+  ): Pair[A, B] =
+    enforceDwcasConstraints(A, B)
+    dwcasGate3Assert()
+    var result: Pair[A, B]
+    when defined(gcc) and not defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _new = *(__int128*)&",
+          desired,
+          "; __int128 _old, _prev;",
+          " do { _old = *(volatile __int128*)&",
+          loc,
+          "; _prev = __sync_val_compare_and_swap((__int128*)&",
+          loc,
+          ", _old, _new); } while (_prev != _old);",
+          " *(__int128*)&",
+          result,
+          " = _prev; }"
+        ]
+      .}
+    elif defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _d = *(__int128*)&",
+          desired,
+          "; __int128 _prev = __atomic_exchange_n((__int128*)&",
+          loc,
+          ", _d, __ATOMIC_SEQ_CST);",
+          " *(__int128*)&",
+          result,
+          " = _prev; }"
+        ]
+      .}
+    elif defined(arm64):
+      {.
+        emit: [
+          "{ __int128 _d = *(__int128*)&",
+          desired,
+          "; __int128 _prev = __atomic_exchange_n((__int128*)&",
+          loc,
+          ", _d, __ATOMIC_SEQ_CST);",
+          " *(__int128*)&",
+          result,
+          " = _prev; }"
+        ]
+      .}
+    else:
+      {.error: "DWCAS unsupported backend / arch combo".}
+    result
+
+  proc exchange*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      desired: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent
+  ): Pair[A, B] {.inline.} =
+    ## 16-byte atomic exchange via DWCAS substrate. Atomically replaces the
+    ## value at `loc` with `desired` and returns the prior value. Always
+    ## seq_cst at the instruction level; sub-seq_cst `order` values emit a
+    ## compile-time warning.
+    when order != moSequentiallyConsistent:
+      {.
+        warning:
+          "nim-debra DWCAS upgrades memory order to moSequentiallyConsistent " &
+          "at the instruction level. Pass moSequentiallyConsistent to silence " &
+          "this warning, or wrap the call site in `dwcasOrderRelaxedCAS:` if " &
+          "the relaxation is intentional."
+      .}
+    when not defined(release):
+      doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
+    dwcasExchange(loc, desired, order)
