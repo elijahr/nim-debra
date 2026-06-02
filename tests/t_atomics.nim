@@ -839,3 +839,61 @@ suite "DWCAS exchange":
     let cur = a.load()
     check cur.first == 3'u64
     check cur.second == 4'u64
+
+suite "DWCAS compareExchangeStrong":
+  test "success: expected matches, returns true, slot updated, expected unchanged":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchangeStrong(
+      expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+    )
+    check ok
+    check expected.first == 1'u64
+    check expected.second == 2'u64
+    let cur = a.load()
+    check cur.first == 5'u64
+    check cur.second == 6'u64
+
+  test "failure: expected mismatch, returns false, slot unchanged, expected updated":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 99'u64, second: 99'u64)
+    let ok = a.compareExchangeStrong(
+      expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+    )
+    check not ok
+    check expected.first == 1'u64
+    check expected.second == 2'u64
+    let cur = a.load()
+    check cur.first == 1'u64
+    check cur.second == 2'u64
+
+  test "single-order overload derives failure order from success":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 7'u64, second: 8'u64))
+    var expected = Pair[uint64, uint64](first: 7'u64, second: 8'u64)
+    let ok = a.compareExchangeStrong(
+      expected,
+      Pair[uint64, uint64](first: 9'u64, second: 10'u64),
+      moSequentiallyConsistent,
+    )
+    check ok
+    let cur = a.load()
+    check cur.first == 9'u64
+    check cur.second == 10'u64
+
+  test "five-arg overload with explicit success+failure orders":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 21'u64, second: 22'u64))
+    var expected = Pair[uint64, uint64](first: 21'u64, second: 22'u64)
+    let ok = a.compareExchangeStrong(
+      expected,
+      Pair[uint64, uint64](first: 23'u64, second: 24'u64),
+      moSequentiallyConsistent,
+      moSequentiallyConsistent,
+    )
+    check ok
+    let cur = a.load()
+    check cur.first == 23'u64
+    check cur.second == 24'u64

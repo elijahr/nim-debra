@@ -877,3 +877,140 @@ when sizeof(pointer) == 8:
     when not defined(release):
       doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
     dwcasExchange(loc, desired, order)
+
+  template dwcasCasStrong*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      expected: var Pair[A, B],
+      desired: Pair[A, B],
+      success: static MemoryOrder,
+      failure: static MemoryOrder,
+  ): bool =
+    enforceDwcasConstraints(A, B)
+    dwcasGate3Assert()
+    var result: bool
+    when defined(gcc) and not defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _e = *(__int128*)&",
+          expected,
+          "; __int128 _d = *(__int128*)&",
+          desired,
+          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&",
+          loc,
+          ", _e, _d);",
+          " *(__int128*)&",
+          expected,
+          " = _prev;",
+          " ",
+          result,
+          " = (_prev == _e); }"
+        ]
+      .}
+    elif defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _d = *(__int128*)&",
+          desired,
+          "; ",
+          result,
+          " = __atomic_compare_exchange_n((__int128*)&",
+          loc,
+          ", (__int128*)&",
+          expected,
+          ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }"
+        ]
+      .}
+    elif defined(arm64):
+      {.
+        emit: [
+          "{ __int128 _d = *(__int128*)&",
+          desired,
+          "; ",
+          result,
+          " = __atomic_compare_exchange_n((__int128*)&",
+          loc,
+          ", (__int128*)&",
+          expected,
+          ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }"
+        ]
+      .}
+    else:
+      {.error: "DWCAS unsupported backend / arch combo".}
+    result
+
+  proc compareExchangeStrong*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      expected: var Pair[A, B],
+      desired: Pair[A, B],
+      success: static MemoryOrder,
+      failure: static MemoryOrder,
+  ): bool {.inline.} =
+    ## Strong 16-byte CAS via DWCAS. On success, swaps `desired` into
+    ## `loc` and returns true; `expected` is unchanged. On failure,
+    ## overwrites `expected` with the current value of `loc` and returns
+    ## false. Always seq_cst at the instruction level; sub-seq_cst
+    ## `success`/`failure` values emit a compile-time warning.
+    ##
+    ## ABA / aliasing note: `expected` and `desired` MUST be distinct
+    ## memory locations. On CAS failure, `expected` is overwritten in-place
+    ## with the current value of `loc`; on success, `expected` is unchanged.
+    ## Passing the same `var` location for both `expected` and `desired` is
+    ## a defined-but-confusing pattern (the desired payload is read first,
+    ## then `expected` is overwritten — but if `expected` and `desired`
+    ## alias, the post-CAS `desired` is undefined). Callers MUST NOT alias
+    ## them. The 1/2/4/8-byte CAS surface has the same contract; the
+    ## 16-byte ops re-document it here because the wider value makes
+    ## accidental aliasing more tempting in LCRQ-style consumer code.
+    validCasFailureOrder(success, failure)
+    when success != moSequentiallyConsistent or failure != moSequentiallyConsistent:
+      {.
+        warning:
+          "nim-debra DWCAS upgrades memory order to moSequentiallyConsistent " &
+          "at the instruction level. Pass moSequentiallyConsistent to silence " &
+          "this warning, or wrap the call site in `dwcasOrderRelaxedCAS:` if " &
+          "the relaxation is intentional."
+      .}
+    when not defined(release):
+      doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
+    dwcasCasStrong(loc, expected, desired, success, failure)
+
+  proc compareExchangeStrong*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      expected: var Pair[A, B],
+      desired: Pair[A, B],
+      order: static MemoryOrder,
+  ): bool {.inline.} =
+    ## Strong 16-byte CAS, single-order form. Failure order is derived
+    ## from `order` per C11 (drop the release component).
+    ##
+    ## ABA / aliasing note: `expected` and `desired` MUST be distinct
+    ## memory locations. On CAS failure, `expected` is overwritten in-place
+    ## with the current value of `loc`; on success, `expected` is unchanged.
+    ## Passing the same `var` location for both `expected` and `desired` is
+    ## a defined-but-confusing pattern (the desired payload is read first,
+    ## then `expected` is overwritten — but if `expected` and `desired`
+    ## alias, the post-CAS `desired` is undefined). Callers MUST NOT alias
+    ## them. The 1/2/4/8-byte CAS surface has the same contract; the
+    ## 16-byte ops re-document it here because the wider value makes
+    ## accidental aliasing more tempting in LCRQ-style consumer code.
+    compareExchangeStrong(loc, expected, desired, order, casFailureFromSuccess(order))
+
+  proc compareExchangeStrong*[A, B](
+      loc: var Atomic[Pair[A, B]], expected: var Pair[A, B], desired: Pair[A, B]
+  ): bool {.inline.} =
+    ## Strong 16-byte CAS, default-order form. Equivalent to passing
+    ## `moSequentiallyConsistent` for both success and failure.
+    ##
+    ## ABA / aliasing note: `expected` and `desired` MUST be distinct
+    ## memory locations. On CAS failure, `expected` is overwritten in-place
+    ## with the current value of `loc`; on success, `expected` is unchanged.
+    ## Passing the same `var` location for both `expected` and `desired` is
+    ## a defined-but-confusing pattern (the desired payload is read first,
+    ## then `expected` is overwritten — but if `expected` and `desired`
+    ## alias, the post-CAS `desired` is undefined). Callers MUST NOT alias
+    ## them. The 1/2/4/8-byte CAS surface has the same contract; the
+    ## 16-byte ops re-document it here because the wider value makes
+    ## accidental aliasing more tempting in LCRQ-style consumer code.
+    compareExchangeStrong(
+      loc, expected, desired, moSequentiallyConsistent, moSequentiallyConsistent
+    )
