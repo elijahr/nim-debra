@@ -20,6 +20,14 @@
 ## bound by Nim's `std/sysatomics` module). MSVC fallback is a future
 ## item; this module currently requires gcc, clang, llvm_gcc, or the
 ## Nintendo Switch toolchain.
+##
+## DWCAS (16-byte) emit logic adapted from atomic128
+## (https://github.com/patternnoster/atomic128) by patternnoster,
+## MIT licensed. See atomic128_ref.hpp for the C++ reference
+## implementation that documents the GCC __sync vs __atomic
+## footgun this code works around. Pinned upstream commit:
+## d45ba3d348a9620a25552f9cf50dc7ccef05ef90.
+## See THIRD_PARTY_LICENSES.md for the verbatim MIT text.
 
 import std/sysatomics
 import std/typetraits
