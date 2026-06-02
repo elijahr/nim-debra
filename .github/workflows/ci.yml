@@ -69,6 +69,32 @@ jobs:
           path: ~/.nimble
           key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
 
+      - name: DWCAS macro probe (gates downstream cells)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dwcas-probe
+
+          # Pick compiler + flags per runner (design §5.2.5).
+          case "${{ matrix.runs-on }}" in
+            ubuntu-24.04)        CC=gcc;     CFLAGS="-mcx16";                                       SUFFIX="ubuntu-24.04.gcc" ;;
+            ubuntu-24.04-arm)    CC=gcc;     CFLAGS="-march=armv8.1-a+lse -mno-outline-atomics";    SUFFIX="ubuntu-24.04-arm" ;;
+            macos-15)            CC=clang;   CFLAGS="";                                             SUFFIX="macos-15" ;;
+            *)                   echo "::error::unknown runner ${{ matrix.runs-on }}"; exit 1 ;;
+          esac
+
+          # Compile + run the probe.
+          "$CC" $CFLAGS tests/probes/dwcas_macro_probe.c -o /tmp/dwcas-probe/probe
+          /tmp/dwcas-probe/probe | tee /tmp/dwcas-probe/actual.txt
+
+          # Compare against the golden file (per-runner expected output).
+          EXPECTED="tests/probes/dwcas_macro_probe.expected.${SUFFIX}"
+          if [[ ! -f "$EXPECTED" ]]; then
+            echo "::error::missing golden file $EXPECTED"
+            exit 1
+          fi
+          diff -u "$EXPECTED" /tmp/dwcas-probe/actual.txt
+
       - name: Install dependencies
         run: nimble install -y
 
@@ -97,6 +123,45 @@ jobs:
             fi
           }
           nimble_run nimble test --passNim:--mm:${{ matrix.mm }} --passNim:--backend:${{ matrix.backend }}
+
+      - name: objdump regex verification
+        # Only run once per runner (not per mm/backend axis) — the emit
+        # is fixed by the compiler + flags, not by --mm or --backend.
+        if: matrix.mm == 'arc' && matrix.backend == 'c'
+        shell: bash
+        run: |
+          set -euo pipefail
+          nim c -d:release --passC:-fno-lto -o:/tmp/fixture tests/probes/dwcas_objdump_fixture.nim
+          case "${{ matrix.runs-on }}" in
+            ubuntu-24.04)
+              objdump -d /tmp/fixture | grep -Eq '(^|\s)(lock\s+)?cmpxchg16b\s' \
+                || (echo "::error::expected cmpxchg16b mnemonic missing"; exit 1)
+              if objdump -d /tmp/fixture | grep -Eq 'bl\s+__aarch64_cas16_'; then
+                echo "::error::outline-atomics libcall detected on x86_64 (impossible — investigate)"
+                exit 1
+              fi
+              ;;
+            ubuntu-24.04-arm|macos-15)
+              if objdump -d /tmp/fixture | grep -Eq 'bl\s+__aarch64_cas16_'; then
+                echo "::error::outline-atomics libcall detected — -mno-outline-atomics not in effect"
+                exit 1
+              fi
+              objdump -d /tmp/fixture | grep -Eq '(^|\s)caspal?\s' \
+                || objdump -d /tmp/fixture | grep -Pzo '(?s)ldaxp.*\n.*stlxp' \
+                || (echo "::error::expected caspal or ldaxp/stlxp pair missing"; exit 1)
+              ;;
+          esac
+          # Counter-test: same fixture compiled with -mno-cx16 MUST fail compile
+          # (gate 3's _Static_assert fires under -mno-cx16). Only meaningful on
+          # x86_64 — -mno-cx16 is a noop on aarch64.
+          if [[ "${{ matrix.runs-on }}" == "ubuntu-24.04" ]]; then
+            if nim c -d:release --passC:-mno-cx16 --passC:-fno-lto -o:/tmp/fixture-neg \
+                 tests/probes/dwcas_objdump_fixture.nim 2>/dev/null; then
+              echo "::error::counter-test should have failed compile (gate 3 not firing under -mno-cx16)"
+              exit 1
+            fi
+            echo "counter-test PASSED: compile correctly failed under -mno-cx16"
+          fi
 
       - name: Test examples
         shell: bash
