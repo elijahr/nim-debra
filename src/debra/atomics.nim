@@ -1169,10 +1169,10 @@ when sizeof(pointer) == 8:
       loc: var Atomic[Pair[A, B]],
       expected: var Pair[A, B],
       desired: Pair[A, B],
-      order: static MemoryOrder = moSequentiallyConsistent,
+      order: static MemoryOrder,
   ): bool {.inline.} =
-    ## Weak 16-byte CAS, single-order/default form. Failure order is
-    ## derived from `order` per C11 (drop the release component).
+    ## Weak 16-byte CAS, single-order form. Failure order is derived
+    ## from `order` per C11 (drop the release component).
     ##
     ## ABA / aliasing note: `expected` and `desired` MUST be distinct
     ## memory locations. On CAS failure, `expected` is overwritten in-place
@@ -1185,6 +1185,30 @@ when sizeof(pointer) == 8:
     ## 16-byte ops re-document it here because the wider value makes
     ## accidental aliasing more tempting in LCRQ-style consumer code.
     compareExchangeWeak(loc, expected, desired, order, casFailureFromSuccess(order))
+
+  proc compareExchangeWeak*[A, B](
+      loc: var Atomic[Pair[A, B]], expected: var Pair[A, B], desired: Pair[A, B]
+  ): bool {.inline.} =
+    ## Weak 16-byte CAS, default-order form. Equivalent to passing
+    ## `moSequentiallyConsistent` for both success and failure. Mirrors
+    ## the `compareExchangeStrong` default-order overload so that the
+    ## two overload sets match shape-for-shape — relevant for callers
+    ## migrating from `std/atomics`, whose `compareExchange*` procs all
+    ## accept the no-order form.
+    ##
+    ## ABA / aliasing note: `expected` and `desired` MUST be distinct
+    ## memory locations. On CAS failure, `expected` is overwritten in-place
+    ## with the current value of `loc`; on success, `expected` is unchanged.
+    ## Passing the same `var` location for both `expected` and `desired` is
+    ## a defined-but-confusing pattern (the desired payload is read first,
+    ## then `expected` is overwritten — but if `expected` and `desired`
+    ## alias, the post-CAS `desired` is undefined). Callers MUST NOT alias
+    ## them. The 1/2/4/8-byte CAS surface has the same contract; the
+    ## 16-byte ops re-document it here because the wider value makes
+    ## accidental aliasing more tempting in LCRQ-style consumer code.
+    compareExchangeWeak(
+      loc, expected, desired, moSequentiallyConsistent, moSequentiallyConsistent
+    )
 
   # -------------------------------------------------------------------------
   # compareExchange aliases — route to Strong, std/atomics-compatible spelling.

@@ -93,7 +93,7 @@ load/store/exchange ops that go with it. The surface is:
 | `Atomic[Pair[A, B]]`                      | Atomic over a 16-byte pair. Requires a 64-bit target and arch-specific compile flags. |
 | `load` / `store` / `exchange`             | 16-byte ops on `Atomic[Pair[A, B]]`. Always seq_cst at the instruction level.        |
 | `compareExchangeStrong` (3 overloads)     | Strong 16-byte CAS. `(success, failure)`, single-order, and default-order forms.     |
-| `compareExchangeWeak` (2 overloads)       | Weak 16-byte CAS. May fail spuriously only on ARMv8.0 LL/SC; equivalent to Strong elsewhere. See §5.   |
+| `compareExchangeWeak` (3 overloads)       | Weak 16-byte CAS. `(success, failure)`, single-order, and default-order forms. May fail spuriously only on ARMv8.0 LL/SC; equivalent to Strong elsewhere. See §5.   |
 | `compareExchange` aliases (3 overloads)   | Unsuffixed-name aliases routing to `compareExchangeStrong`, for `std/atomics`-style spelling. |
 | `dwcasOrderRelaxedCAS:`                   | Template that wraps a single call site to suppress the seq_cst-upgrade warning.      |
 

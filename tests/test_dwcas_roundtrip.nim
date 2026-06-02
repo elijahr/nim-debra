@@ -5,8 +5,8 @@
 ## Exhaustively exercises every public DWCAS entry point on
 ## `Atomic[Pair[uint64, uint64]]`: load (default + explicit-order),
 ## store (default + explicit-order), exchange (default + explicit-order),
-## compareExchangeStrong (3 overloads), compareExchangeWeak (2 overloads),
-## compareExchange aliases (3 overloads). 13 entry points total.
+## compareExchangeStrong (3 overloads), compareExchangeWeak (3 overloads),
+## compareExchange aliases (3 overloads). 14 entry points total.
 ##
 ## Wired into `tests/test.nim` so it runs under arc / orc / atomicArc /
 ## refc via the `nimble test` task. Each test verifies return value and
@@ -182,6 +182,28 @@ suite "DWCAS round-trip: compareExchangeWeak overloads":
       moSequentiallyConsistent,
     ))
     check expected == mkP(1'u64, 2'u64)
+
+  test "3-arg default-order weak: eventual success":
+    # Default-order overload mirrors Strong's zero-extra-arg form.
+    # Equivalent to passing moSequentiallyConsistent for both orders.
+    var a: Atomic[P]
+    var ok = false
+    for _ in 0 ..< SpuriousRetries:
+      a.store(mkP(1'u64, 2'u64))
+      var expected = mkP(1'u64, 2'u64)
+      if a.compareExchangeWeak(expected, mkP(21'u64, 22'u64)):
+        ok = true
+        break
+    check ok
+    check a.load() == mkP(21'u64, 22'u64)
+
+  test "3-arg default-order weak: definitive failure on mismatch":
+    var a: Atomic[P]
+    a.store(mkP(1'u64, 2'u64))
+    var expected = mkP(99'u64, 99'u64)
+    check (not a.compareExchangeWeak(expected, mkP(21'u64, 22'u64)))
+    check expected == mkP(1'u64, 2'u64)
+    check a.load() == mkP(1'u64, 2'u64)
 
 suite "DWCAS round-trip: compareExchange aliases":
   test "3-arg default-order alias routes to Strong":

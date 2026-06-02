@@ -14,9 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DWCAS (16-byte / 128-bit atomics) support in `src/debra/atomics.nim`:
   `Atomic[Pair[A, B]]` with full op surface — `load`, `store`,
   `exchange`, `compareExchangeStrong` (3 overloads: (success,failure),
-  single-order, default-order), `compareExchangeWeak` (2 overloads),
-  and `compareExchange` unsuffixed-name aliases (3 overloads, route
-  to `compareExchangeStrong` for `std/atomics`-compatible spelling).
+  single-order, default-order), `compareExchangeWeak` (3 overloads:
+  (success,failure), single-order, default-order — shape-matched to
+  Strong for `std/atomics` migration ergonomics), and `compareExchange`
+  unsuffixed-name aliases (3 overloads, route to
+  `compareExchangeStrong` for `std/atomics`-compatible spelling).
 - `Pair[A, B]` type with field-level `{.align: 16.}` on `first` for
   16-byte cell layout (object-level align pragma is rejected by Nim
   2.2.10 scope rules; the field-level form elevates the whole object).
