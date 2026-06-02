@@ -72,14 +72,16 @@ suite "Pair[uint64, ptr int] DWCAS round-trip (no pointee corruption)":
     a.store(Pair[uint64, ptr int](first: 1'u64, second: addr x))
 
     var expected = Pair[uint64, ptr int](first: 99'u64, second: nil)
-    check (not a.compareExchangeStrong(
-      expected, Pair[uint64, ptr int](first: 2'u64, second: addr y)
-    ))
+    check (
+      not a.compareExchangeStrong(
+        expected, Pair[uint64, ptr int](first: 2'u64, second: addr y)
+      )
+    )
     # Failure path: slot unchanged; expected overwritten with current.
     check expected.first == 1'u64
     check expected.second == addr x
     check expected.second[] == 42
-    check x == 42  # original pointee intact
+    check x == 42 # original pointee intact
 
   test "compareExchangeStrong with nil second half":
     var a: Atomic[PP]

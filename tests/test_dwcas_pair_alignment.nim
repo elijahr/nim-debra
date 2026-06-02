@@ -33,6 +33,7 @@ suite "DWCAS Pair alignment (positive)":
   test "Pair embedded in outer object is 16-byte aligned":
     type Segment = object
       committed: array[16, Atomic[P]]
+
     var seg: Segment
     for i in 0 ..< seg.committed.len:
       check (cast[uint](addr seg.committed[i]) mod 16'u) == 0'u
@@ -53,9 +54,9 @@ suite "DWCAS Pair alignment (negative: 1-byte misalign trips debug assert)":
       # + 16 bytes payload.
       var buf {.align: 16.}: array[48, byte]
       let aligned = (cast[uint](addr buf[0]) + 15'u) and not 15'u
-      doAssert (aligned mod 16'u) == 0'u  # sanity: base is aligned
+      doAssert (aligned mod 16'u) == 0'u # sanity: base is aligned
       let misaligned = cast[ptr Atomic[P]](aligned + 1'u)
-      doAssert (cast[uint](misaligned) mod 16'u) == 1'u  # confirmed +1
+      doAssert (cast[uint](misaligned) mod 16'u) == 1'u # confirmed +1
 
       expect AssertionDefect:
         discard misaligned[].load()

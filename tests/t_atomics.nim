@@ -924,9 +924,8 @@ suite "DWCAS compareExchangeWeak":
     var a: Atomic[Pair[uint64, uint64]]
     a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
     var expected = Pair[uint64, uint64](first: 99'u64, second: 99'u64)
-    let ok = a.compareExchangeWeak(
-      expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
-    )
+    let ok =
+      a.compareExchangeWeak(expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64))
     check not ok
     check expected.first == 1'u64
     check expected.second == 2'u64
@@ -936,9 +935,8 @@ suite "DWCAS compareExchange aliases":
     var a: Atomic[Pair[uint64, uint64]]
     a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
     var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
-    let ok = a.compareExchange(
-      expected, Pair[uint64, uint64](first: 7'u64, second: 8'u64)
-    )
+    let ok =
+      a.compareExchange(expected, Pair[uint64, uint64](first: 7'u64, second: 8'u64))
     check ok
     let cur = a.load()
     check cur.first == 7'u64

@@ -12,8 +12,5 @@ a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
 var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
 dwcasOrderRelaxedCAS:
   discard a.compareExchangeStrong(
-    expected,
-    Pair[uint64, uint64](first: 3'u64, second: 4'u64),
-    moRelease,
-    moRelaxed,
+    expected, Pair[uint64, uint64](first: 3'u64, second: 4'u64), moRelease, moRelaxed
   )

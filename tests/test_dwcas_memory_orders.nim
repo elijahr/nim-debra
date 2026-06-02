@@ -26,15 +26,11 @@ import debra/atomics
 type P = Pair[uint64, uint64]
 
 const
-  ValidLoadOrders = [
-    moRelaxed, moConsume, moAcquire, moSequentiallyConsistent
-  ]
-  ValidStoreOrders = [
-    moRelaxed, moRelease, moSequentiallyConsistent
-  ]
+  ValidLoadOrders = [moRelaxed, moConsume, moAcquire, moSequentiallyConsistent]
+  ValidStoreOrders = [moRelaxed, moRelease, moSequentiallyConsistent]
   AllOrders = [
     moRelaxed, moConsume, moAcquire, moRelease, moAcquireRelease,
-    moSequentiallyConsistent
+    moSequentiallyConsistent,
   ]
 
 suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
@@ -70,9 +66,7 @@ suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
       var a: Atomic[P]
       a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
       dwcasOrderRelaxedCAS:
-        let prev = a.exchange(
-          Pair[uint64, uint64](first: 9'u64, second: 9'u64), ord
-        )
+        let prev = a.exchange(Pair[uint64, uint64](first: 9'u64, second: 9'u64), ord)
         check prev.first == 1'u64
       check a.load() == Pair[uint64, uint64](first: 9'u64, second: 9'u64)
 
@@ -88,16 +82,13 @@ suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
     # moRelease / moAcquireRelease as failure orders) AND
     # ord(failure) <= ord(success).
     template casBody(sOrd, fOrd: static MemoryOrder) =
-      when ord(fOrd) <= ord(sOrd) and
-          fOrd != moRelease and fOrd != moAcquireRelease:
+      when ord(fOrd) <= ord(sOrd) and fOrd != moRelease and fOrd != moAcquireRelease:
         var a: Atomic[P]
         a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
         var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
         dwcasOrderRelaxedCAS:
           check a.compareExchangeStrong(
-            expected,
-            Pair[uint64, uint64](first: 5'u64, second: 6'u64),
-            sOrd, fOrd,
+            expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64), sOrd, fOrd
           )
         check a.load() == Pair[uint64, uint64](first: 5'u64, second: 6'u64)
 
@@ -118,8 +109,7 @@ suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
 
   test "compareExchangeWeak accepts every (success, failure) order pair":
     template casBody(sOrd, fOrd: static MemoryOrder) =
-      when ord(fOrd) <= ord(sOrd) and
-          fOrd != moRelease and fOrd != moAcquireRelease:
+      when ord(fOrd) <= ord(sOrd) and fOrd != moRelease and fOrd != moAcquireRelease:
         var ok = false
         var a: Atomic[P]
         # Loop to absorb spurious weak failures on aarch64 LL/SC.
@@ -128,9 +118,7 @@ suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
           var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
           dwcasOrderRelaxedCAS:
             if a.compareExchangeWeak(
-              expected,
-              Pair[uint64, uint64](first: 5'u64, second: 6'u64),
-              sOrd, fOrd,
+              expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64), sOrd, fOrd
             ):
               ok = true
               break

@@ -29,8 +29,7 @@ suite "DWCAS generation rollover (uint64 wrap)":
     for i in 0 ..< 8:
       var expected = slot.load()
       let nextSeq = expected.first + 1'u64
-      let desired =
-        Pair[uint64, uint64](first: nextSeq, second: i.uint64)
+      let desired = Pair[uint64, uint64](first: nextSeq, second: i.uint64)
       check slot.compareExchangeStrong(expected, desired)
 
     let final = slot.load()
@@ -56,9 +55,11 @@ suite "DWCAS generation rollover (uint64 wrap)":
     slot.store(Pair[uint64, uint64](first: 0'u64, second: 42'u64))
 
     var stale = Pair[uint64, uint64](first: high(uint64), second: 42'u64)
-    check (not slot.compareExchangeStrong(
-      stale, Pair[uint64, uint64](first: 1'u64, second: 99'u64)
-    ))
+    check (
+      not slot.compareExchangeStrong(
+        stale, Pair[uint64, uint64](first: 1'u64, second: 99'u64)
+      )
+    )
     # Failure must overwrite expected with the post-wrap value.
     check stale == Pair[uint64, uint64](first: 0'u64, second: 42'u64)
 

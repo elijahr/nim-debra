@@ -194,11 +194,12 @@ template enforceDwcasConstraints*(A, B: typedesc) =
   static:
     assert sizeof(A) + sizeof(B) == 16,
       "Pair[" & $A & ", " & $B & "] must be exactly 16 bytes; got " &
-        $(sizeof(A) + sizeof(B)) & " (sizeof(" & $A & ")=" & $sizeof(A) &
-        ", sizeof(" & $B & ")=" & $sizeof(B) & ")"
+        $(sizeof(A) + sizeof(B)) & " (sizeof(" & $A & ")=" & $sizeof(A) & ", sizeof(" &
+        $B & ")=" & $sizeof(B) & ")"
     assert alignof(Pair[A, B]) == 16,
-      "Pair[" & $A & ", " & $B & "] must be 16-byte aligned; got " &
-        $alignof(Pair[A, B])
+      "Pair[" & $A & ", " & $B & "] must be 16-byte aligned; got " & $alignof(
+        Pair[A, B]
+      )
     assert supportsCopyMem(A),
       "Pair half-type must be supportsCopyMem; " & $A & " is not"
     assert supportsCopyMem(B),
@@ -230,8 +231,7 @@ else:
   {.
     error:
       "DWCAS requires a 64-bit target. nim-debra v0.10.0 does not " &
-      "support 32-bit or 16-bit pointers. sizeof(pointer) = " & $sizeof(pointer) &
-      "."
+      "support 32-bit or 16-bit pointers. sizeof(pointer) = " & $sizeof(pointer) & "."
   .}
 
 # ---------------------------------------------------------------------------
@@ -655,7 +655,6 @@ proc clear*(
 # `__ARM_FEATURE_ATOMICS` (aarch64) at C-compile time per design §5.1.
 
 when sizeof(pointer) == 8:
-
   template dwcasGate3Assert() =
     ## Gate 3: `_Static_assert` that the C compiler has DWCAS lock-free
     ## support at this target's effective ISA level. C/C++ keyword split
@@ -664,22 +663,18 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16\n",
-          "#if defined(__aarch64__)\n",
-          "  || __ARM_FEATURE_ATOMICS\n",
-          "#endif\n",
+          "#if defined(__aarch64__)\n", "  || __ARM_FEATURE_ATOMICS\n", "#endif\n",
           ", \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
-          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");"
+          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");",
         ]
       .}
     else:
       {.
         emit: [
           "_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16\n",
-          "#if defined(__aarch64__)\n",
-          "  || __ARM_FEATURE_ATOMICS\n",
-          "#endif\n",
+          "#if defined(__aarch64__)\n", "  || __ARM_FEATURE_ATOMICS\n", "#endif\n",
           ", \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
-          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");"
+          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");",
         ]
       .}
 
@@ -699,34 +694,22 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int128 _zero = 0;",
-          " __int128 _prev = __sync_val_compare_and_swap((__int128*)&",
-          loc,
-          ", _zero, _zero);",
-          " *(__int128*)&",
-          result,
-          " = _prev; }"
+          " __int128 _prev = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _zero, _zero);", " *(__int128*)&", result, " = _prev; }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _v = __atomic_load_n((__int128*)&",
-          loc,
-          ", __ATOMIC_SEQ_CST);",
-          " *(__int128*)&",
-          result,
-          " = _v; }"
+          "{ __int128 _v = __atomic_load_n((__int128*)&", loc, ", __ATOMIC_SEQ_CST);",
+          " *(__int128*)&", result, " = _v; }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _v = __atomic_load_n((__int128*)&",
-          loc,
-          ", __ATOMIC_SEQ_CST);",
-          " *(__int128*)&",
-          result,
-          " = _v; }"
+          "{ __int128 _v = __atomic_load_n((__int128*)&", loc, ", __ATOMIC_SEQ_CST);",
+          " *(__int128*)&", result, " = _v; }",
         ]
       .}
     else:
@@ -734,8 +717,7 @@ when sizeof(pointer) == 8:
     result
 
   proc load*[A, B](
-      loc: var Atomic[Pair[A, B]],
-      order: static MemoryOrder = moSequentiallyConsistent
+      loc: var Atomic[Pair[A, B]], order: static MemoryOrder = moSequentiallyConsistent
   ): Pair[A, B] {.inline.} =
     ## 16-byte atomic load via DWCAS substrate. Returns the current value
     ## of `loc` as a `Pair[A, B]`. Always seq_cst at the instruction level;
@@ -764,9 +746,7 @@ when sizeof(pointer) == 8:
     dwcasLoad(loc, order)
 
   template dwcasStore*[A, B](
-      loc: var Atomic[Pair[A, B]],
-      desired: Pair[A, B],
-      order: static MemoryOrder
+      loc: var Atomic[Pair[A, B]], desired: Pair[A, B], order: static MemoryOrder
   ) =
     ## Low-level 16-byte atomic store emit. Backend-dispatched (see
     ## `dwcasLoad`). Prefer `store(Atomic[Pair[A, B]])` for the
@@ -776,34 +756,24 @@ when sizeof(pointer) == 8:
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _new = *(__int128*)&",
-          desired,
-          "; __int128 _old, _prev;",
-          " do { _old = *(volatile __int128*)&",
-          loc,
-          "; _prev = __sync_val_compare_and_swap((__int128*)&",
-          loc,
-          ", _old, _new); } while (_prev != _old); }"
+          "{ __int128 _new = *(__int128*)&", desired, "; __int128 _old, _prev;",
+          " do { _old = *(volatile __int128*)&", loc,
+          "; _prev = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _old, _new); } while (_prev != _old); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; __atomic_store_n((__int128*)&",
-          loc,
-          ", _d, __ATOMIC_SEQ_CST); }"
+          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)&",
+          loc, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; __atomic_store_n((__int128*)&",
-          loc,
-          ", _d, __ATOMIC_SEQ_CST); }"
+          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)&",
+          loc, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:
@@ -812,7 +782,7 @@ when sizeof(pointer) == 8:
   proc store*[A, B](
       loc: var Atomic[Pair[A, B]],
       desired: Pair[A, B],
-      order: static MemoryOrder = moSequentiallyConsistent
+      order: static MemoryOrder = moSequentiallyConsistent,
   ) {.inline.} =
     ## 16-byte atomic store via DWCAS substrate. Always seq_cst at the
     ## instruction level; sub-seq_cst `order` values emit a compile-time
@@ -831,9 +801,7 @@ when sizeof(pointer) == 8:
     dwcasStore(loc, desired, order)
 
   template dwcasExchange*[A, B](
-      loc: var Atomic[Pair[A, B]],
-      desired: Pair[A, B],
-      order: static MemoryOrder
+      loc: var Atomic[Pair[A, B]], desired: Pair[A, B], order: static MemoryOrder
   ): Pair[A, B] =
     ## Low-level 16-byte atomic exchange emit. Backend-dispatched
     ## (see `dwcasLoad`). Prefer `exchange(Atomic[Pair[A, B]])` for
@@ -844,43 +812,27 @@ when sizeof(pointer) == 8:
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _new = *(__int128*)&",
-          desired,
-          "; __int128 _old, _prev;",
-          " do { _old = *(volatile __int128*)&",
-          loc,
-          "; _prev = __sync_val_compare_and_swap((__int128*)&",
-          loc,
-          ", _old, _new); } while (_prev != _old);",
-          " *(__int128*)&",
-          result,
-          " = _prev; }"
+          "{ __int128 _new = *(__int128*)&", desired, "; __int128 _old, _prev;",
+          " do { _old = *(volatile __int128*)&", loc,
+          "; _prev = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _old, _new); } while (_prev != _old);", " *(__int128*)&", result,
+          " = _prev; }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; __int128 _prev = __atomic_exchange_n((__int128*)&",
-          loc,
-          ", _d, __ATOMIC_SEQ_CST);",
-          " *(__int128*)&",
-          result,
-          " = _prev; }"
+          "{ __int128 _d = *(__int128*)&", desired,
+          "; __int128 _prev = __atomic_exchange_n((__int128*)&", loc,
+          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)&", result, " = _prev; }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; __int128 _prev = __atomic_exchange_n((__int128*)&",
-          loc,
-          ", _d, __ATOMIC_SEQ_CST);",
-          " *(__int128*)&",
-          result,
-          " = _prev; }"
+          "{ __int128 _d = *(__int128*)&", desired,
+          "; __int128 _prev = __atomic_exchange_n((__int128*)&", loc,
+          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)&", result, " = _prev; }",
         ]
       .}
     else:
@@ -890,7 +842,7 @@ when sizeof(pointer) == 8:
   proc exchange*[A, B](
       loc: var Atomic[Pair[A, B]],
       desired: Pair[A, B],
-      order: static MemoryOrder = moSequentiallyConsistent
+      order: static MemoryOrder = moSequentiallyConsistent,
   ): Pair[A, B] {.inline.} =
     ## 16-byte atomic exchange via DWCAS substrate. Atomically replaces the
     ## value at `loc` with `desired` and returns the prior value. Always
@@ -927,47 +879,26 @@ when sizeof(pointer) == 8:
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)&",
-          expected,
-          "; __int128 _d = *(__int128*)&",
-          desired,
-          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&",
-          loc,
-          ", _e, _d);",
-          " *(__int128*)&",
-          expected,
-          " = _prev;",
-          " ",
-          result,
-          " = (_prev == _e); }"
+          "{ __int128 _e = *(__int128*)&", expected, "; __int128 _d = *(__int128*)&",
+          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _e, _d);", " *(__int128*)&", expected, " = _prev;", " ", result,
+          " = (_prev == _e); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; ",
-          result,
-          " = __atomic_compare_exchange_n((__int128*)&",
-          loc,
-          ", (__int128*)&",
-          expected,
-          ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }"
+          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
+          expected, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; ",
-          result,
-          " = __atomic_compare_exchange_n((__int128*)&",
-          loc,
-          ", (__int128*)&",
-          expected,
-          ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }"
+          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
+          expected, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:
@@ -1076,33 +1007,18 @@ when sizeof(pointer) == 8:
       # arm (design §4.5.1 documents this fallthrough).
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)&",
-          expected,
-          "; __int128 _d = *(__int128*)&",
-          desired,
-          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&",
-          loc,
-          ", _e, _d);",
-          " *(__int128*)&",
-          expected,
-          " = _prev;",
-          " ",
-          result,
-          " = (_prev == _e); }"
+          "{ __int128 _e = *(__int128*)&", expected, "; __int128 _d = *(__int128*)&",
+          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _e, _d);", " *(__int128*)&", expected, " = _prev;", " ", result,
+          " = (_prev == _e); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; ",
-          result,
-          " = __atomic_compare_exchange_n((__int128*)&",
-          loc,
-          ", (__int128*)&",
-          expected,
-          ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }"
+          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
+          expected, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
@@ -1111,15 +1027,9 @@ when sizeof(pointer) == 8:
       # weak flag is a no-op when LSE is active.
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&",
-          desired,
-          "; ",
-          result,
-          " = __atomic_compare_exchange_n((__int128*)&",
-          loc,
-          ", (__int128*)&",
-          expected,
-          ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }"
+          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
+          expected, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:

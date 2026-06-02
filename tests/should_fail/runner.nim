@@ -28,9 +28,10 @@ type
     eoCompileFails # `nim c` must exit non-zero; substring must appear.
 
   ArchGate = enum
-    agAny       # Runs on every arch (default).
-    agAmd64Gcc  # amd64 only AND real GCC (Apple Clang allows __sync_*_16
-                # without -mcx16 so the fixture cannot be exercised).
+    agAny # Runs on every arch (default).
+    agAmd64Gcc
+      # amd64 only AND real GCC (Apple Clang allows __sync_*_16
+      # without -mcx16 so the fixture cannot be exercised).
 
   Case = object
     name: string
@@ -106,12 +107,9 @@ proc detectHostArch(): string =
     return "unknown"
   let s = uname.strip()
   case s
-  of "x86_64", "amd64":
-    "amd64"
-  of "arm64", "aarch64":
-    "arm64"
-  else:
-    s
+  of "x86_64", "amd64": "amd64"
+  of "arm64", "aarch64": "arm64"
+  else: s
 
 proc detectIsRealGcc(): bool =
   ## True only if `cc --version` reports GNU GCC (not Apple Clang or

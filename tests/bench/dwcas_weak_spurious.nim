@@ -65,13 +65,10 @@ proc worker(arg: WorkerArg) {.thread.} =
     for _ in 0 ..< ItersPerThread:
       let cellIdx = rng.rand(NumCells - 1)
       var expected = cells[cellIdx].load(moRelaxed)
-      let desired = Pair[uint64, uint64](
-        first: expected.first + 1'u64, second: arg.tid
-      )
+      let desired = Pair[uint64, uint64](first: expected.first + 1'u64, second: arg.tid)
       inc attempts
-      let ok = cells[cellIdx].compareExchangeWeak(
-        expected, desired, moRelease, moRelaxed
-      )
+      let ok =
+        cells[cellIdx].compareExchangeWeak(expected, desired, moRelease, moRelaxed)
       if not ok:
         inc failures
         # Re-read to detect spurious failure: if the current value still
@@ -81,8 +78,7 @@ proc worker(arg: WorkerArg) {.thread.} =
         # re-read), but the upper bound is sufficient for the 5%
         # threshold.
         let postFail = cells[cellIdx].load(moRelaxed)
-        if postFail.first == expected.first and
-            postFail.second == expected.second:
+        if postFail.first == expected.first and postFail.second == expected.second:
           inc spurious
   discard totalAttempts.fetchAdd(attempts, moRelaxed)
   discard totalFailures.fetchAdd(failures, moRelaxed)
@@ -106,19 +102,14 @@ proc isAarch64Llsc(): bool =
   # macOS arm64 (Apple Silicon) has LSE (FEAT_LSE) since the M1, so DWCAS
   # may compile to a casp / ldxp+stxp depending on the backend. Surface
   # the rate; let the operator decide.
-  when defined(arm64):
-    true
-  else:
-    false
+  when defined(arm64): true else: false
 
 proc main() =
   # Initialize cells with distinct values so each thread observes a real
   # pre-state instead of all-zero.
   for i in 0 ..< NumCells:
     dwcasOrderRelaxedCAS:
-      cells[i].store(
-        Pair[uint64, uint64](first: 0'u64, second: 0'u64), moRelaxed
-      )
+      cells[i].store(Pair[uint64, uint64](first: 0'u64, second: 0'u64), moRelaxed)
   totalAttempts.store(0'u64, moRelaxed)
   totalFailures.store(0'u64, moRelaxed)
   totalSpurious.store(0'u64, moRelaxed)
@@ -127,9 +118,7 @@ proc main() =
   let t0 = epochTime()
   for i in 0 ..< NumThreads:
     createThread(
-      threads[i],
-      worker,
-      WorkerArg(tid: uint64(i), seed: int64(0xC0FFEE) + int64(i)),
+      threads[i], worker, WorkerArg(tid: uint64(i), seed: int64(0xC0FFEE) + int64(i))
     )
   joinThreads(threads)
   let elapsed = epochTime() - t0

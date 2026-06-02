@@ -21,8 +21,10 @@ a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
 let r = a.load()
 let prev = a.exchange(Pair[uint64, uint64](first: 3'u64, second: 4'u64))
 var expected = r
-discard a.compareExchangeStrong(expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64))
-discard a.compareExchangeWeak(expected, Pair[uint64, uint64](first: 7'u64, second: 8'u64))
+discard
+  a.compareExchangeStrong(expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64))
+discard
+  a.compareExchangeWeak(expected, Pair[uint64, uint64](first: 7'u64, second: 8'u64))
 
 # Force the ops to not be dead-code eliminated by the optimizer.
 echo prev.first, " ", prev.second

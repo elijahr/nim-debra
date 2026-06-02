@@ -34,8 +34,7 @@ import unittest2
 
 import debra/atomics
 
-type
-  P = Pair[uint64, uint64]
+type P = Pair[uint64, uint64]
 
 # Worker config. Conservative to keep total test time bounded.
 const
@@ -54,9 +53,8 @@ proc worker(arg: WorkerArg) {.thread.} =
     for _ in 0 ..< ItersPerWorker:
       var expected = cells[cellIdx].load()
       while true:
-        let desired = Pair[uint64, uint64](
-          first: expected.first + 1'u64, second: arg.tid
-        )
+        let desired =
+          Pair[uint64, uint64](first: expected.first + 1'u64, second: arg.tid)
         if cells[cellIdx].compareExchangeStrong(expected, desired):
           break
         # On CAS failure, `expected` was overwritten with the current

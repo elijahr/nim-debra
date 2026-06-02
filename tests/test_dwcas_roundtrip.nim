@@ -86,18 +86,16 @@ suite "DWCAS round-trip: compareExchangeStrong overloads":
     var a: Atomic[P]
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(1'u64, 2'u64)
-    check a.compareExchangeStrong(
-      expected, mkP(7'u64, 8'u64), moSequentiallyConsistent
-    )
+    check a.compareExchangeStrong(expected, mkP(7'u64, 8'u64), moSequentiallyConsistent)
     check a.load() == mkP(7'u64, 8'u64)
 
   test "4-arg single-order: failure path":
     var a: Atomic[P]
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(99'u64, 99'u64)
-    check (not a.compareExchangeStrong(
-      expected, mkP(7'u64, 8'u64), moSequentiallyConsistent
-    ))
+    check (
+      not a.compareExchangeStrong(expected, mkP(7'u64, 8'u64), moSequentiallyConsistent)
+    )
     check expected == mkP(1'u64, 2'u64)
 
   test "5-arg explicit success+failure orders: success path":
@@ -105,10 +103,7 @@ suite "DWCAS round-trip: compareExchangeStrong overloads":
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(1'u64, 2'u64)
     check a.compareExchangeStrong(
-      expected,
-      mkP(9'u64, 10'u64),
-      moSequentiallyConsistent,
-      moSequentiallyConsistent,
+      expected, mkP(9'u64, 10'u64), moSequentiallyConsistent, moSequentiallyConsistent
     )
     check a.load() == mkP(9'u64, 10'u64)
 
@@ -116,12 +111,11 @@ suite "DWCAS round-trip: compareExchangeStrong overloads":
     var a: Atomic[P]
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(99'u64, 99'u64)
-    check (not a.compareExchangeStrong(
-      expected,
-      mkP(9'u64, 10'u64),
-      moSequentiallyConsistent,
-      moSequentiallyConsistent,
-    ))
+    check (
+      not a.compareExchangeStrong(
+        expected, mkP(9'u64, 10'u64), moSequentiallyConsistent, moSequentiallyConsistent
+      )
+    )
     check expected == mkP(1'u64, 2'u64)
 
 suite "DWCAS round-trip: compareExchangeWeak overloads":
@@ -135,9 +129,7 @@ suite "DWCAS round-trip: compareExchangeWeak overloads":
     for _ in 0 ..< SpuriousRetries:
       a.store(mkP(1'u64, 2'u64))
       var expected = mkP(1'u64, 2'u64)
-      if a.compareExchangeWeak(
-        expected, mkP(5'u64, 6'u64), moSequentiallyConsistent
-      ):
+      if a.compareExchangeWeak(expected, mkP(5'u64, 6'u64), moSequentiallyConsistent):
         ok = true
         break
     check ok
@@ -148,9 +140,9 @@ suite "DWCAS round-trip: compareExchangeWeak overloads":
     var a: Atomic[P]
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(99'u64, 99'u64)
-    check (not a.compareExchangeWeak(
-      expected, mkP(5'u64, 6'u64), moSequentiallyConsistent
-    ))
+    check (
+      not a.compareExchangeWeak(expected, mkP(5'u64, 6'u64), moSequentiallyConsistent)
+    )
     check expected == mkP(1'u64, 2'u64)
     check a.load() == mkP(1'u64, 2'u64)
 
@@ -175,12 +167,14 @@ suite "DWCAS round-trip: compareExchangeWeak overloads":
     var a: Atomic[P]
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(99'u64, 99'u64)
-    check (not a.compareExchangeWeak(
-      expected,
-      mkP(11'u64, 12'u64),
-      moSequentiallyConsistent,
-      moSequentiallyConsistent,
-    ))
+    check (
+      not a.compareExchangeWeak(
+        expected,
+        mkP(11'u64, 12'u64),
+        moSequentiallyConsistent,
+        moSequentiallyConsistent,
+      )
+    )
     check expected == mkP(1'u64, 2'u64)
 
   test "3-arg default-order weak: eventual success":
@@ -217,9 +211,7 @@ suite "DWCAS round-trip: compareExchange aliases":
     var a: Atomic[P]
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(1'u64, 2'u64)
-    check a.compareExchange(
-      expected, mkP(5'u64, 6'u64), moSequentiallyConsistent
-    )
+    check a.compareExchange(expected, mkP(5'u64, 6'u64), moSequentiallyConsistent)
     check a.load() == mkP(5'u64, 6'u64)
 
   test "5-arg explicit-orders alias routes to Strong":
@@ -227,9 +219,6 @@ suite "DWCAS round-trip: compareExchange aliases":
     a.store(mkP(1'u64, 2'u64))
     var expected = mkP(1'u64, 2'u64)
     check a.compareExchange(
-      expected,
-      mkP(7'u64, 8'u64),
-      moSequentiallyConsistent,
-      moSequentiallyConsistent,
+      expected, mkP(7'u64, 8'u64), moSequentiallyConsistent, moSequentiallyConsistent
     )
     check a.load() == mkP(7'u64, 8'u64)
