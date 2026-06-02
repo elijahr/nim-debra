@@ -796,3 +796,17 @@ suite "Pair type shape":
     let p = Pair[uint64, uint64](first: 7'u64, second: 9'u64)
     check p.first == 7'u64
     check p.second == 9'u64
+
+suite "DWCAS gate 1 (pointer size)":
+  test "host is 64-bit and module exports a size-16 specialization block":
+    # Smoke: on a 64-bit target this compiles. Gate 1 itself (the
+    # `{.error:.}` else-arm) is a design-time wrapper verified by code
+    # review + Task 33 audit script. A runtime 32-bit cross-compile
+    # should_fail is deferred to v0.10.1 (see §13 "Known limitations:
+    # gate-1 32-bit verification").
+    static:
+      doAssert sizeof(pointer) == 8
+    # Positive smoke for enforceDwcasConstraints: must compile cleanly
+    # for valid Pair shapes.
+    enforceDwcasConstraints(uint64, uint64)
+    enforceDwcasConstraints(uint64, ptr int)

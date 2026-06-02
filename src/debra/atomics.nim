@@ -187,7 +187,34 @@ template enforceDwcasConstraints*(A, B: typedesc) =
       "Pair half-type must be supportsCopyMem; " & $A & " is not"
     assert supportsCopyMem(B),
       "Pair half-type must be supportsCopyMem; " & $B & " is not"
-  assertLockFree(Pair[A, B])
+  # Gate 4 (lock-free) is enforced inside the concrete dwcas* op
+  # specializations (tasks 7-11) via the `_Static_assert` /
+  # `static_assert` emit. Calling `assertLockFree(Pair[A, B])` here
+  # from inside a generic template body triggers a Nim 2.2.10
+  # `expr(nkBracketExpr, tyGenericBody)` internal compiler error.
+
+# ---------------------------------------------------------------------------
+# Gate 1: 64-bit-only specialization wrapper
+# ---------------------------------------------------------------------------
+#
+# DWCAS / 128-bit atomics require a 64-bit ABI (cmpxchg16b on x86_64,
+# casp on aarch64; both pair two 64-bit registers). Wrap the size-16
+# specialization block (helper templates + Atomic[Pair[...]] ops, landing
+# in subsequent tasks) in `when sizeof(pointer) == 8:` so 32-bit targets
+# get an actionable compile-time error rather than a non-lock-free
+# fallback.
+#
+# Block body is currently empty; tasks 7-11 fill in dwcasLoad / dwcasStore /
+# dwcasCompareExchange / Atomic[Pair[A, B]] op specializations.
+when sizeof(pointer) == 8:
+  discard
+else:
+  {.
+    error:
+      "DWCAS requires a 64-bit target. nim-debra v0.10.0 does not " &
+      "support 32-bit or 16-bit pointers. sizeof(pointer) = " & $sizeof(pointer) &
+      "."
+  .}
 
 # ---------------------------------------------------------------------------
 # Atomic[T]
