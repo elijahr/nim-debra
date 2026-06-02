@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - unreleased
+
+### Added
+
+- DWCAS (16-byte / 128-bit atomics) support in `src/debra/atomics.nim`:
+  `Atomic[Pair[A, B]]` with full op surface — `load`, `store`,
+  `exchange`, `compareExchangeStrong` (3 overloads: (success,failure),
+  single-order, default-order), `compareExchangeWeak` (2 overloads),
+  and `compareExchange` unsuffixed-name aliases (3 overloads, route
+  to `compareExchangeStrong` for `std/atomics`-compatible spelling).
+- `Pair[A, B]` type with field-level `{.align: 16.}` on `first` for
+  16-byte cell layout (object-level align pragma is rejected by Nim
+  2.2.10 scope rules; the field-level form elevates the whole object).
+- `dwcasOrderRelaxedCAS` template for per-callsite suppression of the
+  DWCAS seq_cst-upgrade warning. Wraps `{.push warning[User]: off.}` /
+  `{.pop.}` around a single call site so an audited intentional
+  relaxation (notably the LCRQ producer publish CAS) does not silence
+  the warning globally.
+- Cross-compiler macro probe in CI: 4 cells (gcc / clang ×
+  linux-x86_64 / linux-arm64 / macos-arm64) verify
+  `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` (or arch equivalent) before
+  any DWCAS test runs.
+- `objdump` regex verification in CI confirms emit inlines to
+  `cmpxchg16b` (x86_64) or `casp` / `caspal` (arm64) — no silent
+  fallback to a library call.
+- TSAN cell on ubuntu-24.04 for DWCAS contention tests.
+- Weak-CAS spurious-failure micro-benchmark
+  (`tests/bench/dwcas_weak_spurious.nim`).
+- User guide `docs/guide/atomics.md`: 7-section overview covering why
+  the module exists, side-by-side comparison with `std/atomics`, v0.10.0
+  DWCAS surface, when NOT to use it, memory-order policy + seq_cst
+  upgrade, cross-compiler/arch compatibility matrix, and an LCRQ-style
+  worked example using `Pair[uint64, ptr Node]`.
+- Auto-generated API docs for the full DWCAS surface; api.md preamble
+  cross-links the new guide and adds a dedicated `::: debra.atomics`
+  mkdocstrings entry.
+- Release-blocking docs CI gates: `mkdocs build --strict` and a
+  doc-comment audit (`scripts/audit_atomics_doc_comments.sh`) that
+  fails the workflow if any exported proc/template inside the DWCAS
+  specialization block lacks a `##` doc-comment.
+
+### Constraints
+
+- DWCAS requires a 64-bit target (gate 1: `sizeof(pointer) == 8`).
+  32-bit ABIs fail at compile time with an actionable error message.
+- gcc + x86_64 requires `-mcx16` (shipped via `nim.cfg`); without it,
+  the per-op `_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)`
+  fails at compile time and names the missing flag.
+- arm64 + gcc requires `-march=armv8.1-a+lse -mno-outline-atomics`
+  (shipped via `nim.cfg`); LSE provides the `casp` / `caspal`
+  instruction that the emit inlines to.
+- MSVC and Windows out of scope (pre-existing; nim-debra has never
+  supported MSVC).
+- macOS x86_64 NOT in the CI matrix (macos-13 retired by GitHub
+  2025-12-08; macOS coverage = macos-15 arm64 only). Mitigated by
+  linux-x86_64 carrying x86_64 platform coverage and macos-15 carrying
+  macOS platform coverage.
+- macos-14 deprecation begins 2026-07-06. v0.10.x lifecycle may
+  require forward-pin to macos-16 or later.
+- 16-byte `fetchAdd` / `fetchSub` / `fetchAnd` / `fetchOr` /
+  `fetchXor` are OUT of scope for v0.10.0 (LCRQ does not require
+  16-byte arithmetic RMW; deferred to a future revision).
+
+### Attribution
+
+- DWCAS compiler-dispatch pattern (gcc-amd64 `__sync_*` vs clang/arm64
+  `__atomic_*`) adapted from
+  [atomic128](https://github.com/patternnoster/atomic128) by
+  patternnoster (MIT licensed). Pinned to upstream commit
+  `d45ba3d348a9620a25552f9cf50dc7ccef05ef90`. See
+  `THIRD_PARTY_LICENSES.md` for the verbatim MIT text.
+
+### Known Gaps (deferred to v0.10.1+)
+
+- Pair generation / ABA helper procs (e.g. `bumpGen`, monotonic
+  sequence-counter helpers) — v0.10.1 candidate per the design doc
+  §10. Not required for the v0.10.0 release scope; LCRQ callers can
+  bump the generation half manually in the interim.
+
 ## [0.9.0] - 2026-05-30
 
 ### Added
