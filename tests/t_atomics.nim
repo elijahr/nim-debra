@@ -820,3 +820,11 @@ suite "DWCAS load (round-trip seed)":
     let r = a.load()
     check r.first == 7'u64
     check r.second == 9'u64
+
+suite "DWCAS store/load round-trip":
+  test "store then load returns same Pair":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 11'u64, second: 13'u64))
+    let r = a.load()
+    check r.first == 11'u64
+    check r.second == 13'u64

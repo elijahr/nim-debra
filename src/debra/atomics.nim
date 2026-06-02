@@ -739,3 +739,66 @@ when sizeof(pointer) == 8:
     when not defined(release):
       doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
     dwcasLoad(loc, order)
+
+  template dwcasStore*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      desired: Pair[A, B],
+      order: static MemoryOrder
+  ) =
+    enforceDwcasConstraints(A, B)
+    dwcasGate3Assert()
+    when defined(gcc) and not defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _new = *(__int128*)&",
+          desired,
+          "; __int128 _old, _prev;",
+          " do { _old = *(volatile __int128*)&",
+          loc,
+          "; _prev = __sync_val_compare_and_swap((__int128*)&",
+          loc,
+          ", _old, _new); } while (_prev != _old); }"
+        ]
+      .}
+    elif defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _d = *(__int128*)&",
+          desired,
+          "; __atomic_store_n((__int128*)&",
+          loc,
+          ", _d, __ATOMIC_SEQ_CST); }"
+        ]
+      .}
+    elif defined(arm64):
+      {.
+        emit: [
+          "{ __int128 _d = *(__int128*)&",
+          desired,
+          "; __atomic_store_n((__int128*)&",
+          loc,
+          ", _d, __ATOMIC_SEQ_CST); }"
+        ]
+      .}
+    else:
+      {.error: "DWCAS unsupported backend / arch combo".}
+
+  proc store*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      desired: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent
+  ) {.inline.} =
+    ## 16-byte atomic store via DWCAS substrate. Always seq_cst at the
+    ## instruction level; sub-seq_cst `order` values emit a compile-time
+    ## warning (see §3 of the DWCAS design doc).
+    when order != moSequentiallyConsistent:
+      {.
+        warning:
+          "nim-debra DWCAS upgrades memory order to moSequentiallyConsistent " &
+          "at the instruction level. Pass moSequentiallyConsistent to silence " &
+          "this warning, or wrap the call site in `dwcasOrderRelaxedCAS:` if " &
+          "the relaxation is intentional."
+      .}
+    when not defined(release):
+      doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
+    dwcasStore(loc, desired, order)
