@@ -20,6 +20,7 @@ import ./t_integration
 import ./t_atomics
 import ./test_dwcas_roundtrip
 import ./test_dwcas_generation_rollover
+import ./test_dwcas_pair_ptr
 import ./t_atomics_dsl
 import ./t_thread_id
 import ./t_item_processing
