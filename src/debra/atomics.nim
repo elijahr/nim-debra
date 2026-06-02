@@ -166,6 +166,29 @@ type Pair*[A, B] = object
   first* {.align: 16.}: A
   second*: B
 
+template enforceDwcasConstraints*(A, B: typedesc) =
+  ## Gate 2 (Pair shape) + Gate 4 (lock-free) for `Atomic[Pair[A, B]]`.
+  ##
+  ## Checks `sizeof(A) + sizeof(B) == 16` rather than `sizeof(Pair[A, B]) == 16`:
+  ## the field-level `{.align: 16.}` on `first` pads any undersized Pair up to
+  ## 16 bytes, so the outer sizeof would silently mask half-size mismatches
+  ## (e.g. `Pair[uint64, uint32]` has 12 bytes of payload + 4 padding). DWCAS
+  ## requires both halves live (cmpxchg16b / casp compares all 128 bits), so
+  ## the payload sum is the real safety invariant.
+  static:
+    assert sizeof(A) + sizeof(B) == 16,
+      "Pair[" & $A & ", " & $B & "] must be exactly 16 bytes; got " &
+        $(sizeof(A) + sizeof(B)) & " (sizeof(" & $A & ")=" & $sizeof(A) &
+        ", sizeof(" & $B & ")=" & $sizeof(B) & ")"
+    assert alignof(Pair[A, B]) == 16,
+      "Pair[" & $A & ", " & $B & "] must be 16-byte aligned; got " &
+        $alignof(Pair[A, B])
+    assert supportsCopyMem(A),
+      "Pair half-type must be supportsCopyMem; " & $A & " is not"
+    assert supportsCopyMem(B),
+      "Pair half-type must be supportsCopyMem; " & $B & " is not"
+  assertLockFree(Pair[A, B])
+
 # ---------------------------------------------------------------------------
 # Atomic[T]
 # ---------------------------------------------------------------------------

@@ -58,6 +58,12 @@ const cases = @[
     outcome: eoCompileFails,
     substring: "T: ptr | pointer",
   ),
+  Case(
+    name: "DWCAS gate 2: undersized Pair halves rejected (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_gate2_misalign.nim",
+    outcome: eoCompileFails,
+    substring: "must be exactly 16 bytes",
+  ),
 ]
 
 proc runCase(c: Case): bool =
