@@ -64,6 +64,24 @@ const cases = @[
     outcome: eoCompileFails,
     substring: "must be exactly 16 bytes",
   ),
+  Case(
+    name: "DWCAS load rejects moRelease (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_load_moRelease.nim",
+    outcome: eoCompileFails,
+    substring: "moRelease / moAcquireRelease is not a valid memory order for load",
+  ),
+  Case(
+    name: "DWCAS store rejects moAcquire (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_store_moAcquire.nim",
+    outcome: eoCompileFails,
+    substring: "moAcquire / moAcquireRelease / moConsume is not a valid",
+  ),
+  Case(
+    name: "DWCAS CAS rejects failure-order moRelease (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_cas_failure_moRelease.nim",
+    outcome: eoCompileFails,
+    substring: "compareExchange failure order",
+  ),
 ]
 
 proc runCase(c: Case): bool =

@@ -719,6 +719,7 @@ when sizeof(pointer) == 8:
     ## of `loc` as a `Pair[A, B]`. Always seq_cst at the instruction level;
     ## sub-seq_cst `order` values are accepted but upgraded with a compile-
     ## time warning (see §3 of the DWCAS design doc).
+    validLoadOrder(order)
     when order != moSequentiallyConsistent:
       {.
         warning:
@@ -791,6 +792,7 @@ when sizeof(pointer) == 8:
     ## 16-byte atomic store via DWCAS substrate. Always seq_cst at the
     ## instruction level; sub-seq_cst `order` values emit a compile-time
     ## warning (see §3 of the DWCAS design doc).
+    validStoreOrder(order)
     when order != moSequentiallyConsistent:
       {.
         warning:
