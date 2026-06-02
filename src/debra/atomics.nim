@@ -821,13 +821,16 @@ when sizeof(pointer) == 8:
     dwcasGate3Assert()
     var result: Pair[A, B]
     when defined(gcc) and not defined(clang) and defined(amd64):
+      # Same _prev reuse pattern as dwcasStore: avoid a non-atomic volatile
+      # re-read of loc on each retry. __sync_val_compare_and_swap returns
+      # the atomically-observed prior value on failure.
       {.
         emit: [
-          "{ __int128 _new = *(__int128*)&", desired, "; __int128 _old, _prev;",
-          " do { _old = *(volatile __int128*)&", loc,
-          "; _prev = __sync_val_compare_and_swap((__int128*)&", loc,
-          ", _old, _new); } while (_prev != _old);", " *(__int128*)&", result,
-          " = _prev; }",
+          "{ __int128 _new = *(__int128*)&", desired,
+          "; __int128 _prev = *(volatile __int128*)&", loc, "; __int128 _ret;",
+          " do { _ret = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1);",
+          " *(__int128*)&", result, " = _prev; }",
         ]
       .}
     elif defined(clang) and defined(amd64):
