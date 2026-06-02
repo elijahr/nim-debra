@@ -72,6 +72,12 @@ const cases = @[
     substring: "must be exactly 16 bytes",
   ),
   Case(
+    name: "DWCAS gate 2: oversized Pair half rejected (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_gate2_halfsize.nim",
+    outcome: eoCompileFails,
+    substring: "must be <= 8 bytes",
+  ),
+  Case(
     name: "DWCAS load rejects moRelease (must fail-with-substring)",
     file: "tests/should_fail/t_dwcas_load_moRelease.nim",
     outcome: eoCompileFails,

@@ -192,6 +192,12 @@ template enforceDwcasConstraints*(A, B: typedesc) =
   ## requires both halves live (cmpxchg16b / casp compares all 128 bits), so
   ## the payload sum is the real safety invariant.
   static:
+    assert sizeof(A) <= 8,
+      "Pair half-type sizeof(" & $A & ") = " & $sizeof(A) &
+        " must be <= 8 bytes (DWCAS pairs two 64-bit registers)"
+    assert sizeof(B) <= 8,
+      "Pair half-type sizeof(" & $B & ") = " & $sizeof(B) &
+        " must be <= 8 bytes (DWCAS pairs two 64-bit registers)"
     assert sizeof(A) + sizeof(B) == 16,
       "Pair[" & $A & ", " & $B & "] must be exactly 16 bytes; got " &
         $(sizeof(A) + sizeof(B)) & " (sizeof(" & $A & ")=" & $sizeof(A) & ", sizeof(" &
