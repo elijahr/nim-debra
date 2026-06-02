@@ -23,6 +23,10 @@ tests/**/[a-z_]*
 !tests/**/*.nim
 !tests/**/*.nim.cfg
 !tests/**/*.sh
+!tests/**/*.c
+!tests/**/*.expected.*
+!tests/**/*.supp
+!tests/**/README.md
 ## Debug binaries and symbols
 tests/debug_*
 **/*.dSYM/
