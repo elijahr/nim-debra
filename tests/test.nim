@@ -22,6 +22,7 @@ import ./test_dwcas_roundtrip
 import ./test_dwcas_generation_rollover
 import ./test_dwcas_pair_ptr
 import ./test_dwcas_pair_alignment
+import ./test_dwcas_pair_shape_positive
 import ./t_atomics_dsl
 import ./t_thread_id
 import ./t_item_processing
