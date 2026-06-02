@@ -2,6 +2,23 @@
 
 Auto-generated API documentation from source code.
 
+For a high-level overview of the custom atomics module — including the
+DWCAS (16-byte / 128-bit) surface introduced in v0.10.0 — see the
+[Atomics guide](guide/atomics.md). The auto-extracted entries below
+cover every public symbol; the guide covers the *why* and the worked
+LCRQ example.
+
+## Atomics
+
+Custom atomics module with compile-time lock-free guarantees, per-op
+memory-order validation, and DWCAS (16-byte / 128-bit) atomics via
+`Atomic[Pair[A, B]]`. See [guide/atomics.md](guide/atomics.md) for the
+narrative overview.
+
+::: debra.atomics
+
+---
+
 ## Main Module
 
 ::: debra

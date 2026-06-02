@@ -16,6 +16,11 @@
 ##
 ## Design doc: docs/design/2026-04-25-custom-atomics.md
 ##
+## User guide: see docs/guide/atomics.md for a side-by-side comparison
+## with std/atomics, the DWCAS surface overview, memory-order policy,
+## cross-compiler/arch compatibility matrix, and an LCRQ-style worked
+## example.
+##
 ## Backend strategy: wrap GCC/Clang `__atomic_*_n` builtins (already
 ## bound by Nim's `std/sysatomics` module). MSVC fallback is a future
 ## item; this module currently requires gcc, clang, llvm_gcc, or the
@@ -171,6 +176,9 @@ type Pair*[A, B] = object
   ##
   ## `ptr T` fields are explicitly opt-out of ARC: `Pair` makes no claim
   ## on the lifetime of whatever a contained `ptr` points at.
+  ##
+  ## See `docs/guide/atomics.md` §7 for an LCRQ-style worked example
+  ## using `Pair[uint64, ptr Node]`.
   first* {.align: 16.}: A
   second*: B
 
@@ -1232,8 +1240,9 @@ when sizeof(pointer) == 8:
     ## passing `moRelease` / `moRelaxed`). The warning continues to
     ## fire at unwrapped call sites.
     ##
-    ## See `docs/design/2026-06-02-dwcas-design.md` §3 for the
-    ## memory-model rationale.
+    ## See `docs/design/2026-04-25-custom-atomics.md` §3 and the
+    ## user guide `docs/guide/atomics.md` §5 (Memory-order policy) for
+    ## the memory-model rationale.
     {.push warning[User]: off.}
     body
     {.pop.}
