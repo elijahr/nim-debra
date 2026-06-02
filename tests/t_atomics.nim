@@ -897,3 +897,72 @@ suite "DWCAS compareExchangeStrong":
     let cur = a.load()
     check cur.first == 23'u64
     check cur.second == 24'u64
+
+suite "DWCAS compareExchangeWeak":
+  test "success: expected matches, returns true, slot updated":
+    # Note: weak CAS can spuriously fail on aarch64 LL/SC even under
+    # no contention; retry loop guards against the spurious-failure case.
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    var ok = false
+    for _ in 0 ..< 64:
+      expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+      ok = a.compareExchangeWeak(
+        expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+      )
+      if ok:
+        break
+      # If spurious-failure path, the slot should still hold (1, 2).
+      check a.load().first == 1'u64
+    check ok
+    let cur = a.load()
+    check cur.first == 5'u64
+    check cur.second == 6'u64
+
+  test "failure: expected mismatch, returns false, expected updated":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 99'u64, second: 99'u64)
+    let ok = a.compareExchangeWeak(
+      expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+    )
+    check not ok
+    check expected.first == 1'u64
+    check expected.second == 2'u64
+
+suite "DWCAS compareExchange aliases":
+  test "compareExchange (3-arg default-order) routes to Strong":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchange(
+      expected, Pair[uint64, uint64](first: 7'u64, second: 8'u64)
+    )
+    check ok
+    let cur = a.load()
+    check cur.first == 7'u64
+    check cur.second == 8'u64
+
+  test "compareExchange (4-arg single-order) routes to Strong":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchange(
+      expected,
+      Pair[uint64, uint64](first: 7'u64, second: 8'u64),
+      moSequentiallyConsistent,
+    )
+    check ok
+
+  test "compareExchange (5-arg explicit-orders) routes to Strong":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchange(
+      expected,
+      Pair[uint64, uint64](first: 7'u64, second: 8'u64),
+      moSequentiallyConsistent,
+      moSequentiallyConsistent,
+    )
+    check ok
