@@ -89,6 +89,7 @@ nav:
     - Epoch Advancement: guide/epoch-advancement.md
     - Neutralization: guide/neutralization.md
     - Integration: guide/integration.md
+    - Atomics: guide/atomics.md
   - API Reference: api.md
   - Contributing: contributing.md
 
