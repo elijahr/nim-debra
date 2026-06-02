@@ -760,12 +760,17 @@ when sizeof(pointer) == 8:
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     when defined(gcc) and not defined(clang) and defined(amd64):
+      # Initial volatile load once; on CAS failure, __sync_val_compare_and_swap
+      # returns the atomically-observed prior value, which we reuse as _prev
+      # for the next iteration. Avoids a non-atomic volatile re-read per retry
+      # (which can read torn values under contention and inflates cache-line
+      # pressure).
       {.
         emit: [
-          "{ __int128 _new = *(__int128*)&", desired, "; __int128 _old, _prev;",
-          " do { _old = *(volatile __int128*)&", loc,
-          "; _prev = __sync_val_compare_and_swap((__int128*)&", loc,
-          ", _old, _new); } while (_prev != _old); }",
+          "{ __int128 _new = *(__int128*)&", desired,
+          "; __int128 _prev = *(volatile __int128*)&", loc, "; __int128 _ret;",
+          " do { _ret = __sync_val_compare_and_swap((__int128*)&", loc,
+          ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
