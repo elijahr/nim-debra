@@ -163,6 +163,24 @@ jobs:
             echo "counter-test PASSED: compile correctly failed under -mno-cx16"
           fi
 
+      - name: TSAN DWCAS contention (ubuntu-24.04 only, design §7.3)
+        # Branch A: zero unsuppressed races attributable to DWCAS frames.
+        # Branch B tripwire: > 5 suppressions in tests/tsan.supp halts impl.
+        # Branch C: operator-approved fallback documented in CHANGELOG.
+        if: matrix.runs-on == 'ubuntu-24.04' && matrix.mm == 'arc' && matrix.backend == 'c'
+        env:
+          TSAN_OPTIONS: "suppressions=tests/tsan.supp"
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f tests/t_atomics_concurrent.nim ]]; then
+            echo "::warning::tests/t_atomics_concurrent.nim not yet present (Task 14); skipping TSAN cell"
+            exit 0
+          fi
+          nim c --threads:on -d:useMalloc \
+            --passC:-fsanitize=thread --passL:-fsanitize=thread \
+            -r tests/t_atomics_concurrent.nim
+
       - name: Test examples
         shell: bash
         run: |

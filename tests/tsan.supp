@@ -1,0 +1,27 @@
+# ThreadSanitizer suppression file for nim-debra DWCAS contention tests.
+#
+# Policy (design §7.3): max 5 pre-existing-race entries.
+#
+# Branch B tripwire: if reaching a green TSAN run requires MORE than 5
+# suppressions, the implementation phase STOPS and surfaces to the
+# operator via AskUserQuestion. The threshold is deliberately tight —
+# exceeding it means TSAN attachment surfaced a structural problem
+# with Nim's runtime under DWCAS workloads, which is out of scope for
+# v0.10.0.
+#
+# Branch C (operator-approved fallback): ship v0.10.0 without TSAN
+# coverage, documenting the gap in CHANGELOG ## Known Gaps and filing
+# a tracking issue for v0.10.1.
+#
+# Each entry MUST be annotated with:
+#   - The exact stack frame (`fun:<symbol>` or `race:<file>:<line>`)
+#   - A one-line justification
+#   - A category tag: pre-existing-nim-runtime, pre-existing-test-harness, or false-positive
+#
+# DWCAS-attributed race policy: any race whose stack contains a frame
+# from src/debra/atomics.nim DWCAS code paths is a RELEASE BLOCKER
+# regardless of the suppression budget. The success metric is "zero
+# unsuppressed races on DWCAS-attributed call frames over ≥ 10,000
+# iterations" (design §7.3).
+#
+# Suppressions below this line:
