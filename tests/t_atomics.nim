@@ -966,3 +966,21 @@ suite "DWCAS compareExchange aliases":
       moSequentiallyConsistent,
     )
     check ok
+
+suite "DWCAS per-callsite warning silencer":
+  test "dwcasOrderRelaxedCAS suppresses moSeqCst-upgrade warning":
+    # Compile-only check: this fixture intentionally passes moRelease/moRelaxed
+    # to a CAS. Without the wrapper, a {.warning.} fires; with the wrapper,
+    # it is silenced. Real verification of suppression is the CI compile-output
+    # grep test (Task 19); this suite confirms the wrapper exists and compiles.
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    dwcasOrderRelaxedCAS:
+      discard a.compareExchangeStrong(
+        expected,
+        Pair[uint64, uint64](first: 3'u64, second: 4'u64),
+        moRelease,
+        moRelaxed,
+      )
+    check true

@@ -1204,3 +1204,26 @@ when sizeof(pointer) == 8:
     ## 16-byte ops re-document it here because the wider value makes
     ## accidental aliasing more tempting in LCRQ-style consumer code.
     compareExchangeStrong(loc, expected, desired)
+
+  # -------------------------------------------------------------------------
+  # Per-callsite memory-order silencer (design §3, Friction-1 closure).
+  # Wraps a DWCAS call site in `{.push warning[User]: off.}` / `{.pop.}`
+  # so that an intentional, audited memory-order relaxation (notably the
+  # LCRQ producer publish CAS, which passes `moRelease`/`moRelaxed`) does
+  # not emit the seq_cst-upgrade warning at that single site. Outside the
+  # wrapper, the warning continues to fire for all other call sites.
+  # -------------------------------------------------------------------------
+
+  template dwcasOrderRelaxedCAS*(body: untyped): untyped =
+    ## Wraps a DWCAS call site, suppressing the moSeqCst-upgrade
+    ## warning emitted by the 16-byte ops (load / store / exchange /
+    ## compareExchange*) for that site only. Use when the upgrade is
+    ## intentional and audited (e.g. the LCRQ producer publish CAS
+    ## passing `moRelease` / `moRelaxed`). The warning continues to
+    ## fire at unwrapped call sites.
+    ##
+    ## See `docs/design/2026-06-02-dwcas-design.md` §3 for the
+    ## memory-model rationale.
+    {.push warning[User]: off.}
+    body
+    {.pop.}
