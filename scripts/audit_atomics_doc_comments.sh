@@ -42,7 +42,14 @@ fi
 
 # Extract line numbers of all exported procs/templates inside the DWCAS
 # specialization block (lines >= dwcas_start).
-mapfile -t def_lines < <(
+#
+# Uses a portable `while read` loop instead of `mapfile -t` because macOS
+# ships Bash 3.2 (GPLv3-licensing constraints) which predates `mapfile`
+# (Bash 4.0+). The audit script runs in CI and on contributor laptops.
+def_lines=()
+while IFS= read -r line; do
+  def_lines+=("$line")
+done < <(
   awk -v start="$dwcas_start" '
     NR >= start && /^[[:space:]]*(proc|template) [a-zA-Z]+\*/ { print NR }
   ' "$SRC"
