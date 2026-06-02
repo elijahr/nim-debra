@@ -205,7 +205,9 @@ template enforceDwcasConstraints*(A, B: typedesc) =
 # fallback.
 #
 # Block body is currently empty; tasks 7-11 fill in dwcasLoad / dwcasStore /
-# dwcasCompareExchange / Atomic[Pair[A, B]] op specializations.
+# dwcasCompareExchange / Atomic[Pair[A, B]] op specializations (in a
+# secondary `when sizeof(pointer) == 8:` block placed after `Atomic[T]`,
+# which the DWCAS ops parameterize).
 when sizeof(pointer) == 8:
   discard
 else:
@@ -615,3 +617,125 @@ proc clear*(
   ## moAcquire / moAcquireRelease / moConsume.
   validStoreOrder(order)
   atomicClear(cast[pointer](addr loc), toAtomMemModel(order))
+
+# ---------------------------------------------------------------------------
+# DWCAS (size-16) specializations
+# ---------------------------------------------------------------------------
+#
+# These helpers + procs parameterize `Atomic[Pair[A, B]]`, so they must
+# follow the `Atomic[T]` and `Pair[A, B]` definitions. The gate-1 wrapper
+# (32-bit error arm) is enforced earlier in this file; here we only need
+# the positive-side `when sizeof(pointer) == 8:` to keep the block out of
+# compilation on 32-bit targets (where it would reference an unavailable
+# `__int128`).
+#
+# Per design §4.5: 5 ops × 3 backend arms = 15 paste-ready emit bodies.
+# Byte-for-byte fidelity to atomic128_ref.hpp (via the design doc) is the
+# F1 closure invariant.
+#
+# Gate-3 inline static-assert: each helper opens with
+# `_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ...)` (cpp backend:
+# `static_assert(...)`). This catches `-mno-cx16` (x86) or missing
+# `__ARM_FEATURE_ATOMICS` (aarch64) at C-compile time per design §5.1.
+
+when sizeof(pointer) == 8:
+
+  template dwcasGate3Assert() =
+    ## Gate 3: `_Static_assert` that the C compiler has DWCAS lock-free
+    ## support at this target's effective ISA level. C/C++ keyword split
+    ## tracks the `assertLockFree` precedent.
+    when defined(cpp):
+      {.
+        emit: [
+          "static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16\n",
+          "#if defined(__aarch64__)\n",
+          "  || __ARM_FEATURE_ATOMICS\n",
+          "#endif\n",
+          ", \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
+          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");"
+        ]
+      .}
+    else:
+      {.
+        emit: [
+          "_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16\n",
+          "#if defined(__aarch64__)\n",
+          "  || __ARM_FEATURE_ATOMICS\n",
+          "#endif\n",
+          ", \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
+          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");"
+        ]
+      .}
+
+  template dwcasLoad*[A, B](
+      loc: var Atomic[Pair[A, B]], order: static MemoryOrder
+  ): Pair[A, B] =
+    enforceDwcasConstraints(A, B)
+    dwcasGate3Assert()
+    var result: Pair[A, B]
+    when defined(gcc) and not defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _zero = 0;",
+          " __int128 _prev = __sync_val_compare_and_swap((__int128*)&",
+          loc,
+          ", _zero, _zero);",
+          " *(__int128*)&",
+          result,
+          " = _prev; }"
+        ]
+      .}
+    elif defined(clang) and defined(amd64):
+      {.
+        emit: [
+          "{ __int128 _v = __atomic_load_n((__int128*)&",
+          loc,
+          ", __ATOMIC_SEQ_CST);",
+          " *(__int128*)&",
+          result,
+          " = _v; }"
+        ]
+      .}
+    elif defined(arm64):
+      {.
+        emit: [
+          "{ __int128 _v = __atomic_load_n((__int128*)&",
+          loc,
+          ", __ATOMIC_SEQ_CST);",
+          " *(__int128*)&",
+          result,
+          " = _v; }"
+        ]
+      .}
+    else:
+      {.error: "DWCAS unsupported backend / arch combo".}
+    result
+
+  proc load*[A, B](
+      loc: var Atomic[Pair[A, B]],
+      order: static MemoryOrder = moSequentiallyConsistent
+  ): Pair[A, B] {.inline.} =
+    ## 16-byte atomic load via DWCAS substrate. Returns the current value
+    ## of `loc` as a `Pair[A, B]`. Always seq_cst at the instruction level;
+    ## sub-seq_cst `order` values are accepted but upgraded with a compile-
+    ## time warning (see §3 of the DWCAS design doc).
+    when order != moSequentiallyConsistent:
+      {.
+        warning:
+          "nim-debra DWCAS upgrades memory order to moSequentiallyConsistent " &
+          "at the instruction level. Pass moSequentiallyConsistent to silence " &
+          "this warning, or wrap the call site in `dwcasOrderRelaxedCAS:` if " &
+          "the relaxation is intentional."
+      .}
+    # Gate 4 (`assertLockFree(Pair[A, B])`) is intentionally elided here:
+    # Nim 2.2.10 still ICEs (`expr(nkBracketExpr, tyGenericBody)`) when the
+    # template is invoked from inside a generic proc body — the `Pair[A, B]`
+    # type expression remains in a generic-instantiation context even at
+    # the concrete proc-surface level. Gate 3's `_Static_assert(
+    # __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)` inside the emit body is a
+    # stricter C-level lock-free check (it asserts the specific 16-byte
+    # capability rather than the generic `__atomic_always_lock_free`),
+    # so gate 4 is operationally redundant at this width.
+    when not defined(release):
+      doAssert (cast[uint](addr loc) and 15'u) == 0'u, "DWCAS loc misaligned"
+    dwcasLoad(loc, order)

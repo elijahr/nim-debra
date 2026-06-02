@@ -810,3 +810,13 @@ suite "DWCAS gate 1 (pointer size)":
     # for valid Pair shapes.
     enforceDwcasConstraints(uint64, uint64)
     enforceDwcasConstraints(uint64, ptr int)
+
+suite "DWCAS load (round-trip seed)":
+  test "load on freshly-stored Atomic[Pair[uint64, uint64]] returns same bits":
+    var a: Atomic[Pair[uint64, uint64]]
+    # Store via direct memcpy seeding (load-only test; store path arrives in task 8).
+    var seed = Pair[uint64, uint64](first: 7'u64, second: 9'u64)
+    copyMem(addr a, addr seed, 16)
+    let r = a.load()
+    check r.first == 7'u64
+    check r.second == 9'u64
