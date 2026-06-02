@@ -27,11 +27,17 @@ type
     eoCompiles # `nim c` must exit 0; no substring needed.
     eoCompileFails # `nim c` must exit non-zero; substring must appear.
 
+  ArchGate = enum
+    agAny       # Runs on every arch (default).
+    agAmd64Gcc  # amd64 only AND real GCC (Apple Clang allows __sync_*_16
+                # without -mcx16 so the fixture cannot be exercised).
+
   Case = object
     name: string
     file: string
     outcome: ExpectedOutcome
     substring: string
+    archGate: ArchGate
 
 const cases = @[
   Case(
@@ -82,7 +88,49 @@ const cases = @[
     outcome: eoCompileFails,
     substring: "compareExchange failure order",
   ),
+  Case(
+    name:
+      "DWCAS gate 3: -mno-cx16 trips inline _Static_assert " &
+      "(must fail-with-substring, amd64+GCC only)",
+    file: "tests/should_fail/t_dwcas_no_mcx16.nim",
+    outcome: eoCompileFails,
+    substring: "nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16",
+    archGate: agAmd64Gcc,
+  ),
 ]
+
+proc detectHostArch(): string =
+  ## Returns "amd64", "arm64", or whatever `uname -m` reports normalized.
+  let (uname, rc) = execCmdEx("uname -m")
+  if rc != 0:
+    return "unknown"
+  let s = uname.strip()
+  case s
+  of "x86_64", "amd64":
+    "amd64"
+  of "arm64", "aarch64":
+    "arm64"
+  else:
+    s
+
+proc detectIsRealGcc(): bool =
+  ## True only if `cc --version` reports GNU GCC (not Apple Clang or
+  ## llvm-clang). Apple Clang's banner starts with "Apple clang"; real
+  ## GCC's banner contains "gcc (GCC)" or "Free Software Foundation".
+  let (banner, rc) = execCmdEx("cc --version")
+  if rc != 0:
+    return false
+  let s = banner.toLowerAscii()
+  result = ("gcc" in s) and ("clang" notin s)
+
+proc shouldSkip(c: Case): bool =
+  case c.archGate
+  of agAny:
+    false
+  of agAmd64Gcc:
+    let arch = detectHostArch()
+    let gcc = detectIsRealGcc()
+    not (arch == "amd64" and gcc)
 
 proc runCase(c: Case): bool =
   let cmd =
@@ -112,12 +160,18 @@ proc runCase(c: Case): bool =
 
 proc main() =
   var failed = 0
+  var skipped = 0
   for c in cases:
+    if shouldSkip(c):
+      echo &"[SKIP] {c.name} (archGate={c.archGate}, host arch/cc mismatch)"
+      inc skipped
+      continue
     if not runCase(c):
       inc failed
   if failed > 0:
     echo &"\n{failed} compile-fail case(s) failed."
     quit(1)
-  echo &"\nAll {cases.len} compile-fail cases passed."
+  echo &"\nAll {cases.len - skipped} compile-fail cases passed " &
+    &"({skipped} skipped by archGate)."
 
 main()
