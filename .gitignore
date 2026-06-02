@@ -22,6 +22,7 @@ tests/**/[a-z_]*
 !tests/**/
 !tests/**/*.nim
 !tests/**/*.nim.cfg
+!tests/**/*.sh
 ## Debug binaries and symbols
 tests/debug_*
 **/*.dSYM/
