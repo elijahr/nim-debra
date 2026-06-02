@@ -234,6 +234,17 @@ If you ship a project that depends on nim-debra, send a PR adding it here.
 Bug reports and PRs are welcome. Development setup, the cross-manager test
 matrix, and PR conventions are in [docs/contributing.md](docs/contributing.md).
 
+## Attribution
+
+nim-debra v0.10.0's 16-byte atomics (DWCAS) implementation borrows the
+compiler-dispatch pattern from [atomic128](https://github.com/patternnoster/atomic128)
+by patternnoster (MIT licensed). The GCC `__sync_val_compare_and_swap` /
+Clang `__atomic_compare_exchange_n` split documented in
+atomic128's `atomic128_ref.hpp` is the canonical reference for working
+around GCC's silent libatomic-fallback behavior on `__atomic_compare_exchange_16`.
+See [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) for the verbatim MIT
+license text, pinned to commit `d45ba3d348a9620a25552f9cf50dc7ccef05ef90`.
+
 ## License
 
 MIT. See the `license` field in [`debra.nimble`](debra.nimble).
