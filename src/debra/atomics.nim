@@ -665,7 +665,12 @@ proc clear*(
 # compilation on 32-bit targets (where it would reference an unavailable
 # `__int128`).
 #
-# Per design §4.5: 5 ops × 3 backend arms = 15 paste-ready emit bodies.
+# Per design §4.5: 5 ops × 2 backend arms = 10 paste-ready emit bodies.
+# Dispatch is by COMPILER (gcc → __sync_*, clang/llvm_gcc → __atomic_*),
+# not architecture: GCC's __atomic_* family at 16 bytes falls back to
+# `__atomic_load_16` etc. library calls on BOTH x86_64 (no -mcx16 inline)
+# AND aarch64 (no LSE inline), so the only consistent inlining path under
+# gcc is `__sync_val_compare_and_swap` on `__int128` (cmpxchg16b / casp).
 # Byte-for-byte fidelity to atomic128_ref.hpp (via the design doc) is the
 # F1 closure invariant.
 #
@@ -727,9 +732,11 @@ when sizeof(pointer) == 8:
   template dwcasLoad*[A, B](
       loc: var Atomic[Pair[A, B]], order: static MemoryOrder
   ): Pair[A, B] =
-    ## Low-level 16-byte atomic load emit. Backend-dispatched between
-    ## gcc-amd64 `__sync_*`, clang-amd64 `__atomic_*`, and arm64
-    ## `__atomic_*`. Callers should prefer `load(Atomic[Pair[A, B]])`
+    ## Low-level 16-byte atomic load emit. Backend-dispatched by compiler:
+    ## gcc → `__sync_val_compare_and_swap` on `__int128` (inlines
+    ## `cmpxchg16b` on x86_64 with `-mcx16` and `casp` on aarch64 with
+    ## `-march=armv8.1-a+lse`); clang / llvm_gcc → `__atomic_load_n` on
+    ## `__int128`. Callers should prefer `load(Atomic[Pair[A, B]])`
     ## which carries the per-callsite memory-order validation and
     ## seq_cst-upgrade warning. Exposed for testing and for callers
     ## that have already validated the order policy externally.
@@ -742,7 +749,13 @@ when sizeof(pointer) == 8:
     # local `ptr` so the emit references the atomic object directly.
     let locPtr = addr loc
     let resultPtr = addr result
-    when defined(gcc) and not defined(clang) and defined(amd64):
+    # Backend dispatch (Option B, v0.10.0 cycle-12 CRITICAL fix): split by
+    # COMPILER, not architecture. GCC's `__atomic_*_n` family at 16 bytes
+    # emits library calls (`__atomic_load_16` etc.) on BOTH x86_64 AND
+    # aarch64 — only `__sync_val_compare_and_swap` inlines `cmpxchg16b` /
+    # `casp` on the respective ISAs. Clang inlines both families. Symmetric
+    # 2-arm dispatch: gcc → __sync_*, clang/llvm_gcc → __atomic_*.
+    when defined(gcc) and not defined(clang):
       {.
         emit: [
           "{ __int128 _zero = 0;",
@@ -750,14 +763,7 @@ when sizeof(pointer) == 8:
           ", _zero, _zero);", " __builtin_memcpy(", resultPtr, ", &_prev, 16); }",
         ]
       .}
-    elif defined(clang) and defined(amd64):
-      {.
-        emit: [
-          "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
-          " __builtin_memcpy(", resultPtr, ", &_v, 16); }",
-        ]
-      .}
-    elif defined(arm64):
+    elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
       {.
         emit: [
           "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
@@ -813,17 +819,20 @@ when sizeof(pointer) == 8:
     let locPtr = addr loc
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
-    when defined(gcc) and not defined(clang) and defined(amd64):
+    # Backend dispatch (Option B): see `dwcasLoad` for rationale. Two arms
+    # (gcc → __sync_*, clang/llvm_gcc → __atomic_*) cover both x86_64 and
+    # aarch64 without library-call fallbacks.
+    when defined(gcc) and not defined(clang):
       # Initial atomic load via cas-with-self (__sync_val_compare_and_swap
       # with expected=desired=0): returns the current 128-bit value
       # atomically without modifying loc (the swap is a no-op unless loc
       # actually holds 0, in which case writing 0 over 0 is also a no-op).
       # Standard idiom for atomic 16-byte load when only __sync_* builtins
-      # are available. A plain `*(volatile __int128*)` read is NOT atomic on
-      # x86_64 (the CPU may split it into two 64-bit loads, causing torn
-      # reads under concurrent writes). On CAS failure, the retry loop
-      # reuses __sync_val_compare_and_swap's atomically-observed prior value
-      # as _prev for the next iteration.
+      # are available. A plain `*(volatile __int128*)` read is NOT atomic
+      # (the CPU may split it into two 64-bit loads, causing torn reads
+      # under concurrent writes). On CAS failure, the retry loop reuses
+      # __sync_val_compare_and_swap's atomically-observed prior value as
+      # _prev for the next iteration.
       {.
         emit: [
           "{ __int128 _new; __builtin_memcpy(&_new, ", desiredPtr,
@@ -833,14 +842,7 @@ when sizeof(pointer) == 8:
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1); }",
         ]
       .}
-    elif defined(clang) and defined(amd64):
-      {.
-        emit: [
-          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
-          ", 16); __atomic_store_n((__int128*)", locPtr, ", _d, __ATOMIC_SEQ_CST); }",
-        ]
-      .}
-    elif defined(arm64):
+    elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
       {.
         emit: [
           "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
@@ -889,14 +891,15 @@ when sizeof(pointer) == 8:
     let resultPtr = addr result
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
-    when defined(gcc) and not defined(clang) and defined(amd64):
+    # Backend dispatch (Option B): see `dwcasLoad` for rationale.
+    when defined(gcc) and not defined(clang):
       # Same _prev reuse pattern as dwcasStore. Initial atomic load via
       # cas-with-self (__sync_val_compare_and_swap with expected=desired=0):
       # returns the current 128-bit value atomically without modifying loc.
-      # A plain `*(volatile __int128*)` read is NOT atomic on x86_64 (may
-      # split into two 64-bit loads). On CAS failure,
-      # __sync_val_compare_and_swap returns the atomically-observed prior
-      # value, reused as _prev for the next iteration.
+      # A plain `*(volatile __int128*)` read is NOT atomic (may split into
+      # two 64-bit loads). On CAS failure, __sync_val_compare_and_swap
+      # returns the atomically-observed prior value, reused as _prev for
+      # the next iteration.
       {.
         emit: [
           "{ __int128 _new; __builtin_memcpy(&_new, ", desiredPtr,
@@ -907,16 +910,7 @@ when sizeof(pointer) == 8:
           " __builtin_memcpy(", resultPtr, ", &_prev, 16); }",
         ]
       .}
-    elif defined(clang) and defined(amd64):
-      {.
-        emit: [
-          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
-          ", 16); __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
-          ", _d, __ATOMIC_SEQ_CST);", " __builtin_memcpy(", resultPtr,
-          ", &_prev, 16); }",
-        ]
-      .}
-    elif defined(arm64):
+    elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
       {.
         emit: [
           "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
@@ -958,8 +952,8 @@ when sizeof(pointer) == 8:
       failure: static MemoryOrder,
   ): bool =
     ## Low-level 16-byte strong CAS emit. Backend-dispatched (see
-    ## `dwcasLoad`). On gcc-amd64 maps to `__sync_val_compare_and_swap`
-    ## (always-strong); on clang-amd64 and arm64 maps to
+    ## `dwcasLoad`). On gcc maps to `__sync_val_compare_and_swap`
+    ## (always-strong); on clang / llvm_gcc maps to
     ## `__atomic_compare_exchange_n` with the weak flag = 0. Prefer
     ## `compareExchangeStrong(Atomic[Pair[A, B]])` for the validated,
     ## warning-emitting surface.
@@ -974,7 +968,8 @@ when sizeof(pointer) == 8:
     let expectedPtr = addr expected
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
-    when defined(gcc) and not defined(clang) and defined(amd64):
+    # Backend dispatch (Option B): see `dwcasLoad` for rationale.
+    when defined(gcc) and not defined(clang):
       {.
         emit: [
           "{ __int128 _e; __builtin_memcpy(&_e, ", expectedPtr,
@@ -984,15 +979,7 @@ when sizeof(pointer) == 8:
           result, " = (_prev == _e); }",
         ]
       .}
-    elif defined(clang) and defined(amd64):
-      {.
-        emit: [
-          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
-          " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
-          expectedPtr, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
-        ]
-      .}
-    elif defined(arm64):
+    elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
       {.
         emit: [
           "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
@@ -1089,10 +1076,11 @@ when sizeof(pointer) == 8:
       failure: static MemoryOrder,
   ): bool =
     ## Low-level 16-byte weak CAS emit. Backend-dispatched (see
-    ## `dwcasLoad`). On gcc-amd64 `cmpxchg16b` is always-strong, so the
-    ## weak/strong distinction is a no-op; on clang-amd64 maps to
-    ## `__atomic_compare_exchange_n` with weak=1; on ARMv8.0 LL/SC
-    ## (no LSE) `stlxp` may genuinely fail spuriously, while arm64
+    ## `dwcasLoad`). On gcc, `__sync_val_compare_and_swap` is always-strong
+    ## on both x86_64 (`cmpxchg16b`) and aarch64+LSE (`casp`), so the
+    ## weak/strong distinction is a no-op; on clang / llvm_gcc maps to
+    ## `__atomic_compare_exchange_n` with weak=1, where ARMv8.0 LL/SC
+    ## (no LSE) `stlxp` may genuinely fail spuriously, while aarch64
     ## FEAT_LSE / LSE2 (`caspal`, objdump-verified on Apple Silicon)
     ## is always-strong. Prefer
     ## `compareExchangeWeak(Atomic[Pair[A, B]])` for the validated,
@@ -1108,10 +1096,15 @@ when sizeof(pointer) == 8:
     let expectedPtr = addr expected
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
-    when defined(gcc) and not defined(clang) and defined(amd64):
-      # cmpxchg16b is always-strong on x86; weak/strong distinction is a
-      # no-op on this backend. Body identical to dwcasCasStrong's gcc-amd64
-      # arm (design §4.5.1 documents this fallthrough).
+    # Backend dispatch (Option B): see `dwcasLoad` for rationale. On the
+    # gcc arm, `__sync_val_compare_and_swap` is always-strong on both
+    # x86_64 (`cmpxchg16b`) and aarch64+LSE (`casp`), so the weak/strong
+    # distinction collapses there — body matches `dwcasCasStrong`'s gcc
+    # arm (design §4.5.1 documents this fallthrough). On the clang/llvm_gcc
+    # arm, `__atomic_compare_exchange_n` with weak=1 genuinely permits
+    # spurious failure on ARMv8.0 LL/SC (`stlxp`); LSE `caspal` makes weak
+    # equivalent to strong.
+    when defined(gcc) and not defined(clang):
       {.
         emit: [
           "{ __int128 _e; __builtin_memcpy(&_e, ", expectedPtr,
@@ -1121,18 +1114,7 @@ when sizeof(pointer) == 8:
           result, " = (_prev == _e); }",
         ]
       .}
-    elif defined(clang) and defined(amd64):
-      {.
-        emit: [
-          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
-          " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
-          expectedPtr, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
-        ]
-      .}
-    elif defined(arm64):
-      # aarch64 LL/SC genuinely supports weak CAS via `weak=1` (`stlxp`
-      # spurious failure permitted); LSE `caspal` is always-strong so the
-      # weak flag is a no-op when LSE is active.
+    elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
       {.
         emit: [
           "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
