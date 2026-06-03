@@ -26,10 +26,17 @@ suite "ThreadId":
     let tid2 = currentThreadId()
     check tid1 == tid2
 
-  test "different ThreadIds are not equal":
-    let tid1 = unsafeThreadIdFromInt(1)
-    let tid2 = unsafeThreadIdFromInt(2)
-    check tid1 != tid2
+  when not defined(windows):
+    # The Windows `==` operator calls `GetThreadId(handle)`, which
+    # requires real thread handles. Fabricated integer handles fail
+    # at runtime — see `unsafeThreadIdFromInt`'s docstring. The
+    # discrimination this test exercises (two distinct fake IDs
+    # comparing unequal) is covered indirectly on Windows by the
+    # `InvalidThreadId == unsafeThreadIdFromInt(0)` test below.
+    test "different ThreadIds are not equal":
+      let tid1 = unsafeThreadIdFromInt(1)
+      let tid2 = unsafeThreadIdFromInt(2)
+      check tid1 != tid2
 
   test "isValid returns true for valid thread ID":
     let tid = currentThreadId()
