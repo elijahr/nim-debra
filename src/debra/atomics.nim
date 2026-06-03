@@ -248,7 +248,39 @@ template assertLockFree(T: typedesc) =
   ## clang accepts both in either mode, which is why this divergence
   ## only surfaces on Linux g++.)
   when not defined(debraAllowNonLockFreeAtomics):
-    when defined(cpp):
+    when defined(vcc):
+      # MSVC does not provide `__atomic_always_lock_free`. The
+      # `_Interlocked*` intrinsics family is always-lock-free for sizes
+      # 1/2/4/8 on every Windows target we ship (x86_64 with
+      # `cmpxchg`/`xchg`/`xadd`/etc., aarch64 with `casa`/`swpa`/`ldadda`
+      # under FEAT_LSE or LL/SC fallback). The natural-alignment guard
+      # `enforceAtomicConstraints` already asserts at the Nim level rules
+      # out the 32-bit split-lock pathology that __atomic_always_lock_free
+      # catches on GCC for `Atomic[uint64]` on i386 — vcc only targets 64-bit
+      # Windows so sizeof(T) <= 8 with natural alignment is sufficient.
+      # We emit a C-level static_assert on sizeof(T) <= 8 (the surface
+      # boundary; DWCAS handles size 16 separately).
+      when defined(cpp):
+        {.
+          emit: [
+            "static_assert(sizeof(",
+            T,
+            ") <= 8, \"Atomic[" & astToStr(T) & "] vcc backend supports only " &
+              "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
+              "-d:debraAllowNonLockFreeAtomics to override\");",
+          ]
+        .}
+      else:
+        {.
+          emit: [
+            "_Static_assert(sizeof(",
+            T,
+            ") <= 8, \"Atomic[" & astToStr(T) & "] vcc backend supports only " &
+              "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
+              "-d:debraAllowNonLockFreeAtomics to override\");",
+          ]
+        .}
+    elif defined(cpp):
       {.
         emit: [
           "static_assert(__atomic_always_lock_free(sizeof(",
@@ -485,18 +517,59 @@ proc load*[T](
 ): T {.inline.} =
   enforceAtomicConstraints(T)
   validLoadOrder(order)
-  cast[T](atomicLoadN(cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)))
+  when defined(vcc):
+    # MSVC `_InterlockedCompareExchange*(p, 0, 0)` is the standard atomic
+    # load idiom: returns the prior value, performs a no-op swap (0 over
+    # 0 if equal, no write otherwise). Always seq_cst at the hardware
+    # level — sub-seq_cst orders honored only as compile barriers, which
+    # the lock-prefixed instruction implies.
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedCompareExchange8(
+        cast[pointer](addr loc.value), 0'i8, 0'i8))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedCompareExchange16(
+        cast[pointer](addr loc.value), 0'i16, 0'i16))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedCompareExchange32(
+        cast[pointer](addr loc.value), 0'i32, 0'i32))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedCompareExchange64(
+        cast[pointer](addr loc.value), 0'i64, 0'i64))
+    else:
+      {.error: "Atomic[T] vcc load supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicLoadN(cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)))
 
 proc store*[T](
     loc: var Atomic[T], desired: T, order: static MemoryOrder = moSequentiallyConsistent
 ) {.inline.} =
   enforceAtomicConstraints(T)
   validStoreOrder(order)
-  atomicStoreN(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](desired),
-    toAtomMemModel(order),
-  )
+  when defined(vcc):
+    # Atomic store via `_InterlockedExchange*` (discard the prior value).
+    # The exchange itself is seq_cst on x86_64; sub-seq_cst orders are
+    # honored as compile-barriers via the implicit barrier in the
+    # function call.
+    when sizeof(T) == 1:
+      discard msvcInterlockedExchange8(
+        cast[pointer](addr loc.value), cast[int8](desired))
+    elif sizeof(T) == 2:
+      discard msvcInterlockedExchange16(
+        cast[pointer](addr loc.value), cast[int16](desired))
+    elif sizeof(T) == 4:
+      discard msvcInterlockedExchange32(
+        cast[pointer](addr loc.value), cast[int32](desired))
+    elif sizeof(T) == 8:
+      discard msvcInterlockedExchange64(
+        cast[pointer](addr loc.value), cast[int64](desired))
+    else:
+      {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
+  else:
+    atomicStoreN(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](desired),
+      toAtomMemModel(order),
+    )
 
 # ---------------------------------------------------------------------------
 # Read-modify-write
@@ -506,11 +579,27 @@ proc exchange*[T](
     loc: var Atomic[T], desired: T, order: static MemoryOrder = moSequentiallyConsistent
 ): T {.inline.} =
   enforceAtomicConstraints(T)
-  cast[T](atomicExchangeN(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](desired),
-    toAtomMemModel(order),
-  ))
+  when defined(vcc):
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedExchange8(
+        cast[pointer](addr loc.value), cast[int8](desired)))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedExchange16(
+        cast[pointer](addr loc.value), cast[int16](desired)))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedExchange32(
+        cast[pointer](addr loc.value), cast[int32](desired)))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedExchange64(
+        cast[pointer](addr loc.value), cast[int64](desired)))
+    else:
+      {.error: "Atomic[T] vcc exchange supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicExchangeN(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](desired),
+      toAtomMemModel(order),
+    ))
 
 proc compareExchangeStrong*[T](
     loc: var Atomic[T],
@@ -523,14 +612,54 @@ proc compareExchangeStrong*[T](
   ## overwrites `expected` with the current value of `loc`.
   enforceAtomicConstraints(T)
   validCasFailureOrder(success, failure)
-  atomicCompareExchangeN(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[ptr nonAtomicType(T)](addr expected),
-    cast[nonAtomicType(T)](desired),
-    weak = false,
-    toAtomMemModel(success),
-    toAtomMemModel(failure),
-  )
+  when defined(vcc):
+    # MSVC `_InterlockedCompareExchange*` returns the prior value.
+    # success ⇔ (prior == expected). On failure, overwrite `expected`
+    # with the prior value to match the C11 / __atomic_compare_exchange
+    # contract. Always-strong (no spurious failure on x86_64).
+    when sizeof(T) == 1:
+      let exp8 = cast[int8](expected)
+      let prev = msvcInterlockedCompareExchange8(
+        cast[pointer](addr loc.value), cast[int8](desired), exp8)
+      let ok = prev == exp8
+      if not ok:
+        expected = cast[T](prev)
+      ok
+    elif sizeof(T) == 2:
+      let exp16 = cast[int16](expected)
+      let prev = msvcInterlockedCompareExchange16(
+        cast[pointer](addr loc.value), cast[int16](desired), exp16)
+      let ok = prev == exp16
+      if not ok:
+        expected = cast[T](prev)
+      ok
+    elif sizeof(T) == 4:
+      let exp32 = cast[int32](expected)
+      let prev = msvcInterlockedCompareExchange32(
+        cast[pointer](addr loc.value), cast[int32](desired), exp32)
+      let ok = prev == exp32
+      if not ok:
+        expected = cast[T](prev)
+      ok
+    elif sizeof(T) == 8:
+      let exp64 = cast[int64](expected)
+      let prev = msvcInterlockedCompareExchange64(
+        cast[pointer](addr loc.value), cast[int64](desired), exp64)
+      let ok = prev == exp64
+      if not ok:
+        expected = cast[T](prev)
+      ok
+    else:
+      {.error: "Atomic[T] vcc CAS supports only 1/2/4/8 byte T".}
+  else:
+    atomicCompareExchangeN(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[ptr nonAtomicType(T)](addr expected),
+      cast[nonAtomicType(T)](desired),
+      weak = false,
+      toAtomMemModel(success),
+      toAtomMemModel(failure),
+    )
 
 proc compareExchangeWeak*[T](
     loc: var Atomic[T],
@@ -543,14 +672,20 @@ proc compareExchangeWeak*[T](
   ## even when current value equals `expected`. Cheaper inside a loop.
   enforceAtomicConstraints(T)
   validCasFailureOrder(success, failure)
-  atomicCompareExchangeN(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[ptr nonAtomicType(T)](addr expected),
-    cast[nonAtomicType(T)](desired),
-    weak = true,
-    toAtomMemModel(success),
-    toAtomMemModel(failure),
-  )
+  when defined(vcc):
+    # MSVC `_InterlockedCompareExchange*` is always-strong (no spurious
+    # failure) on x86_64. Weak ≡ Strong on vcc. Route to the strong
+    # implementation rather than duplicate the body.
+    compareExchangeStrong(loc, expected, desired, success, failure)
+  else:
+    atomicCompareExchangeN(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[ptr nonAtomicType(T)](addr expected),
+      cast[nonAtomicType(T)](desired),
+      weak = true,
+      toAtomMemModel(success),
+      toAtomMemModel(failure),
+    )
 
 proc compareExchangeStrong*[T](
     loc: var Atomic[T], expected: var T, desired: T, order: static MemoryOrder
@@ -629,51 +764,135 @@ proc fetchAdd*[T: SomeInteger](
     loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
 ): T {.inline.} =
   enforceAtomicConstraints(T)
-  cast[T](atomicFetchAdd(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](v),
-    toAtomMemModel(order),
-  ))
+  when defined(vcc):
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedExchangeAdd8(
+        cast[pointer](addr loc.value), cast[int8](v)))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedExchangeAdd16(
+        cast[pointer](addr loc.value), cast[int16](v)))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedExchangeAdd32(
+        cast[pointer](addr loc.value), cast[int32](v)))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedExchangeAdd64(
+        cast[pointer](addr loc.value), cast[int64](v)))
+    else:
+      {.error: "Atomic[T] vcc fetchAdd supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicFetchAdd(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](v),
+      toAtomMemModel(order),
+    ))
 
 proc fetchSub*[T: SomeInteger](
     loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
 ): T {.inline.} =
   enforceAtomicConstraints(T)
-  cast[T](atomicFetchSub(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](v),
-    toAtomMemModel(order),
-  ))
+  when defined(vcc):
+    # MSVC has no _InterlockedExchangeSub; we emit fetchAdd of the
+    # two's-complement negation. Works for signed and unsigned T because
+    # the bit-level negation behavior is identical (uint8/16/32/64 are
+    # cast through the matching signed int*).
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedExchangeAdd8(
+        cast[pointer](addr loc.value), -cast[int8](v)))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedExchangeAdd16(
+        cast[pointer](addr loc.value), -cast[int16](v)))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedExchangeAdd32(
+        cast[pointer](addr loc.value), -cast[int32](v)))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedExchangeAdd64(
+        cast[pointer](addr loc.value), -cast[int64](v)))
+    else:
+      {.error: "Atomic[T] vcc fetchSub supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicFetchSub(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](v),
+      toAtomMemModel(order),
+    ))
 
 proc fetchAnd*[T: SomeInteger](
     loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
 ): T {.inline.} =
   enforceAtomicConstraints(T)
-  cast[T](atomicFetchAnd(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](v),
-    toAtomMemModel(order),
-  ))
+  when defined(vcc):
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedAnd8(
+        cast[pointer](addr loc.value), cast[int8](v)))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedAnd16(
+        cast[pointer](addr loc.value), cast[int16](v)))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedAnd32(
+        cast[pointer](addr loc.value), cast[int32](v)))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedAnd64(
+        cast[pointer](addr loc.value), cast[int64](v)))
+    else:
+      {.error: "Atomic[T] vcc fetchAnd supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicFetchAnd(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](v),
+      toAtomMemModel(order),
+    ))
 
 proc fetchOr*[T: SomeInteger](
     loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
 ): T {.inline.} =
   enforceAtomicConstraints(T)
-  cast[T](atomicFetchOr(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](v),
-    toAtomMemModel(order),
-  ))
+  when defined(vcc):
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedOr8(
+        cast[pointer](addr loc.value), cast[int8](v)))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedOr16(
+        cast[pointer](addr loc.value), cast[int16](v)))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedOr32(
+        cast[pointer](addr loc.value), cast[int32](v)))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedOr64(
+        cast[pointer](addr loc.value), cast[int64](v)))
+    else:
+      {.error: "Atomic[T] vcc fetchOr supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicFetchOr(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](v),
+      toAtomMemModel(order),
+    ))
 
 proc fetchXor*[T: SomeInteger](
     loc: var Atomic[T], v: T, order: static MemoryOrder = moSequentiallyConsistent
 ): T {.inline.} =
   enforceAtomicConstraints(T)
-  cast[T](atomicFetchXor(
-    cast[ptr nonAtomicType(T)](addr loc.value),
-    cast[nonAtomicType(T)](v),
-    toAtomMemModel(order),
-  ))
+  when defined(vcc):
+    when sizeof(T) == 1:
+      cast[T](msvcInterlockedXor8(
+        cast[pointer](addr loc.value), cast[int8](v)))
+    elif sizeof(T) == 2:
+      cast[T](msvcInterlockedXor16(
+        cast[pointer](addr loc.value), cast[int16](v)))
+    elif sizeof(T) == 4:
+      cast[T](msvcInterlockedXor32(
+        cast[pointer](addr loc.value), cast[int32](v)))
+    elif sizeof(T) == 8:
+      cast[T](msvcInterlockedXor64(
+        cast[pointer](addr loc.value), cast[int64](v)))
+    else:
+      {.error: "Atomic[T] vcc fetchXor supports only 1/2/4/8 byte T".}
+  else:
+    cast[T](atomicFetchXor(
+      cast[ptr nonAtomicType(T)](addr loc.value),
+      cast[nonAtomicType(T)](v),
+      toAtomMemModel(order),
+    ))
 
 # ---------------------------------------------------------------------------
 # Numeric (SomeFloat)
@@ -750,12 +969,38 @@ proc fetchAdd*[T: SomeFloat](
 
 proc threadFence*(order: MemoryOrder) {.inline.} =
   ## Full memory fence between threads. All memory orders are valid.
-  atomicThreadFence(toAtomMemModel(order))
+  when defined(vcc):
+    # On vcc, moSeqCst maps to the full hardware `MemoryBarrier` macro
+    # (mfence on x86_64; dmb sy on ARM64). All weaker orders map to a
+    # compile-only `_ReadWriteBarrier` because the strong memory model
+    # of x86 (TSO) plus the locked semantics of MSVC's `_Interlocked*`
+    # intrinsics means a hardware fence is only required at seq_cst.
+    # On Windows-on-ARM64, MSVC's documented stance is identical:
+    # `_InterlockedExchange`-family ops carry implicit dmb semantics; only
+    # standalone seq_cst fences (`MemoryBarrier`) emit a bare dmb.
+    case order
+    of moSequentiallyConsistent:
+      msvcMemoryBarrier()
+    else:
+      msvcReadWriteBarrier()
+  else:
+    atomicThreadFence(toAtomMemModel(order))
 
 proc signalFence*(order: MemoryOrder) {.inline.} =
   ## Compiler-only fence. Prevents the compiler from reordering across
   ## the fence; emits no CPU instructions. All memory orders are valid.
-  atomicSignalFence(toAtomMemModel(order))
+  when defined(vcc):
+    # `_ReadWriteBarrier` is the C-equivalent of GCC's
+    # `__atomic_signal_fence` — it constrains the optimizer without
+    # emitting any CPU instruction. Memory order is honored only as the
+    # barrier strength expected of the compiler-side reordering; all
+    # MSVC documentation treats `_ReadWriteBarrier` as the strongest
+    # compile-only barrier. `order` is accepted but unused beyond the
+    # barrier call (matching GCC's seq_cst-implicit behavior).
+    discard order
+    msvcReadWriteBarrier()
+  else:
+    atomicSignalFence(toAtomMemModel(order))
 
 # ---------------------------------------------------------------------------
 # AtomicFlag
@@ -771,7 +1016,15 @@ proc testAndSet*(
     loc: var AtomicFlag, order: static MemoryOrder = moSequentiallyConsistent
 ): bool {.inline.} =
   ## Atomically set the flag and return its previous value.
-  atomicTestAndSet(cast[pointer](addr loc), toAtomMemModel(order))
+  when defined(vcc):
+    # MSVC has no direct `_InterlockedTestAndSet`; canonical impl is
+    # `_InterlockedExchange8(p, 1) != 0`. Returns whether the prior
+    # byte was non-zero (i.e. flag was set). seq_cst at the hardware
+    # level on x86_64; sub-seq_cst order accepted but not honored
+    # beyond compile-barrier semantics implicit in the call.
+    msvcInterlockedExchange8(cast[pointer](addr loc), 1'i8) != 0'i8
+  else:
+    atomicTestAndSet(cast[pointer](addr loc), toAtomMemModel(order))
 
 proc clear*(
     loc: var AtomicFlag, order: static MemoryOrder = moSequentiallyConsistent
@@ -779,7 +1032,11 @@ proc clear*(
   ## Atomically reset the flag to false. `order` must not be
   ## moAcquire / moAcquireRelease / moConsume.
   validStoreOrder(order)
-  atomicClear(cast[pointer](addr loc), toAtomMemModel(order))
+  when defined(vcc):
+    # Atomic store of 0 via _InterlockedExchange8 (discard prior).
+    discard msvcInterlockedExchange8(cast[pointer](addr loc), 0'i8)
+  else:
+    atomicClear(cast[pointer](addr loc), toAtomMemModel(order))
 
 # ---------------------------------------------------------------------------
 # DWCAS (size-16) specializations
