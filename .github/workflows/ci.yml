@@ -39,12 +39,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # v0.10.0 DWCAS matrix (design §7.1): 3 OS × 4 MM × 2 backend = 24 cells.
+        # v0.10.0 DWCAS matrix (design §7.1) + MSVC: 4 OS × 4 MM × 2 backend = 32 cells.
         # - ubuntu-24.04         : pinned over ubuntu-latest for reproducibility (x86_64 cmpxchg16b cell)
         # - ubuntu-24.04-arm     : Graviton2-class aarch64 runner (LSE casp[al] cell)
         # - macos-15             : current GA Apple Silicon image; chosen over macos-14 (deprecation 2026-07-06)
+        # - windows-2022         : MSVC/vcc cell exercising _InterlockedCompareExchange128 + _Interlocked* family
         # macOS x86_64 has no CI coverage in v0.10.0 (see §7.1 / §14 m4).
-        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
+        runs-on: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, windows-2022]
         nim-version: ['stable']
         mm: [arc, orc, refc, atomicArc]
         backend: [c, cpp]
@@ -70,6 +71,12 @@ jobs:
           key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
 
       - name: DWCAS macro probe (gates downstream cells)
+        # Probe compiles a C fixture with __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16
+        # macro inspection. MSVC does not provide that macro family
+        # (_InterlockedCompareExchange128 is gated at the Nim level via the
+        # vcc arm in dwcasGate3Assert), so the probe is meaningless on
+        # windows-2022 and we skip it there.
+        if: matrix.runs-on != 'windows-2022'
         shell: bash
         run: |
           set -euo pipefail
@@ -122,12 +129,26 @@ jobs:
               return 1
             fi
           }
-          nimble_run nimble test --passNim:--mm:${{ matrix.mm }} --passNim:--backend:${{ matrix.backend }}
+          # On windows-2022 we explicitly select the vcc (MSVC) backend; the
+          # default Nim install via setup-nim-action ships with both MinGW
+          # gcc and the ability to drive MSVC via --cc:vcc. The vcc arms in
+          # src/debra/atomics.nim are only exercised when the active C
+          # compiler is MSVC.
+          EXTRA_FLAGS=""
+          if [[ "${{ matrix.runs-on }}" == windows-* ]]; then
+            EXTRA_FLAGS="--passNim:--cc:vcc"
+          fi
+          nimble_run nimble test --passNim:--mm:${{ matrix.mm }} --passNim:--backend:${{ matrix.backend }} $EXTRA_FLAGS
 
       - name: objdump regex verification
         # Only run once per runner (not per mm/backend axis) — the emit
         # is fixed by the compiler + flags, not by --mm or --backend.
-        if: matrix.mm == 'arc' && matrix.backend == 'c'
+        # Skipped on windows-2022: MSVC's `dumpbin /disasm` produces a
+        # different format, and the gcc/clang mnemonic checks (`cmpxchg16b`,
+        # `caspal`, `ldaxp`/`stlxp`) are backend-specific. The vcc DWCAS
+        # path is exercised end-to-end by the test suite itself, which is
+        # sufficient at this width.
+        if: matrix.mm == 'arc' && matrix.backend == 'c' && matrix.runs-on != 'windows-2022'
         shell: bash
         run: |
           set -euo pipefail
@@ -214,4 +235,8 @@ jobs:
               return 1
             fi
           }
-          nimble_run nimble testExamples
+          EXTRA_FLAGS=""
+          if [[ "${{ matrix.runs-on }}" == windows-* ]]; then
+            EXTRA_FLAGS="--passNim:--cc:vcc"
+          fi
+          nimble_run nimble testExamples $EXTRA_FLAGS
