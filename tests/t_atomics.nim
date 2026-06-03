@@ -999,4 +999,7 @@ suite "DWCAS per-callsite warning silencer":
         moRelease,
         moRelaxed,
       )
-    check true
+    # No runtime check: the real verification is the CI compile-output grep
+    # (Task 19) that confirms the moSeqCst-upgrade warning is silenced. This
+    # test block exists so the dwcasOrderRelaxedCAS wrapper is exercised at
+    # compile time; reaching this point IS the smoke test.
