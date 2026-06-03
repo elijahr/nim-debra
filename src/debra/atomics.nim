@@ -78,81 +78,117 @@ when defined(vcc):
   {.emit: "#include <intrin.h>".}
 
   # ---- exchange (sizes 1/2/4/8, fully-generic on the pointer type) ----
-  proc msvcInterlockedExchange8(p: pointer, val: int8): int8 {.
-    importc: "_InterlockedExchange8", header: "<intrin.h>".}
-  proc msvcInterlockedExchange16(p: pointer, val: int16): int16 {.
-    importc: "_InterlockedExchange16", header: "<intrin.h>".}
-  proc msvcInterlockedExchange32(p: pointer, val: int32): int32 {.
-    importc: "_InterlockedExchange", header: "<intrin.h>".}
-  proc msvcInterlockedExchange64(p: pointer, val: int64): int64 {.
-    importc: "_InterlockedExchange64", header: "<intrin.h>".}
+  proc msvcInterlockedExchange8(
+    p: pointer, val: int8
+  ): int8 {.importc: "_InterlockedExchange8", header: "<intrin.h>".}
+
+  proc msvcInterlockedExchange16(
+    p: pointer, val: int16
+  ): int16 {.importc: "_InterlockedExchange16", header: "<intrin.h>".}
+
+  proc msvcInterlockedExchange32(
+    p: pointer, val: int32
+  ): int32 {.importc: "_InterlockedExchange", header: "<intrin.h>".}
+
+  proc msvcInterlockedExchange64(
+    p: pointer, val: int64
+  ): int64 {.importc: "_InterlockedExchange64", header: "<intrin.h>".}
 
   # ---- compare-exchange (sizes 1/2/4/8) ----
   # MSVC signature: T _InterlockedCompareExchange*(volatile T* Dest,
   # T Exchange, T Comparand); returns the prior value at Dest.
   proc msvcInterlockedCompareExchange8(
-      p: pointer, exchange, comparand: int8): int8 {.
-    importc: "_InterlockedCompareExchange8", header: "<intrin.h>".}
+    p: pointer, exchange, comparand: int8
+  ): int8 {.importc: "_InterlockedCompareExchange8", header: "<intrin.h>".}
+
   proc msvcInterlockedCompareExchange16(
-      p: pointer, exchange, comparand: int16): int16 {.
-    importc: "_InterlockedCompareExchange16", header: "<intrin.h>".}
+    p: pointer, exchange, comparand: int16
+  ): int16 {.importc: "_InterlockedCompareExchange16", header: "<intrin.h>".}
+
   proc msvcInterlockedCompareExchange32(
-      p: pointer, exchange, comparand: int32): int32 {.
-    importc: "_InterlockedCompareExchange", header: "<intrin.h>".}
+    p: pointer, exchange, comparand: int32
+  ): int32 {.importc: "_InterlockedCompareExchange", header: "<intrin.h>".}
+
   proc msvcInterlockedCompareExchange64(
-      p: pointer, exchange, comparand: int64): int64 {.
-    importc: "_InterlockedCompareExchange64", header: "<intrin.h>".}
+    p: pointer, exchange, comparand: int64
+  ): int64 {.importc: "_InterlockedCompareExchange64", header: "<intrin.h>".}
 
   # ---- fetch-add (sizes 1/2/4/8). fetch-sub = fetch-add with negated val. ----
-  proc msvcInterlockedExchangeAdd8(p: pointer, val: int8): int8 {.
-    importc: "_InterlockedExchangeAdd8", header: "<intrin.h>".}
-  proc msvcInterlockedExchangeAdd16(p: pointer, val: int16): int16 {.
-    importc: "_InterlockedExchangeAdd16", header: "<intrin.h>".}
-  proc msvcInterlockedExchangeAdd32(p: pointer, val: int32): int32 {.
-    importc: "_InterlockedExchangeAdd", header: "<intrin.h>".}
-  proc msvcInterlockedExchangeAdd64(p: pointer, val: int64): int64 {.
-    importc: "_InterlockedExchangeAdd64", header: "<intrin.h>".}
+  proc msvcInterlockedExchangeAdd8(
+    p: pointer, val: int8
+  ): int8 {.importc: "_InterlockedExchangeAdd8", header: "<intrin.h>".}
+
+  proc msvcInterlockedExchangeAdd16(
+    p: pointer, val: int16
+  ): int16 {.importc: "_InterlockedExchangeAdd16", header: "<intrin.h>".}
+
+  proc msvcInterlockedExchangeAdd32(
+    p: pointer, val: int32
+  ): int32 {.importc: "_InterlockedExchangeAdd", header: "<intrin.h>".}
+
+  proc msvcInterlockedExchangeAdd64(
+    p: pointer, val: int64
+  ): int64 {.importc: "_InterlockedExchangeAdd64", header: "<intrin.h>".}
 
   # ---- fetch-and / fetch-or / fetch-xor (sizes 1/2/4/8) ----
-  proc msvcInterlockedAnd8(p: pointer, val: int8): int8 {.
-    importc: "_InterlockedAnd8", header: "<intrin.h>".}
-  proc msvcInterlockedAnd16(p: pointer, val: int16): int16 {.
-    importc: "_InterlockedAnd16", header: "<intrin.h>".}
-  proc msvcInterlockedAnd32(p: pointer, val: int32): int32 {.
-    importc: "_InterlockedAnd", header: "<intrin.h>".}
-  proc msvcInterlockedAnd64(p: pointer, val: int64): int64 {.
-    importc: "_InterlockedAnd64", header: "<intrin.h>".}
+  proc msvcInterlockedAnd8(
+    p: pointer, val: int8
+  ): int8 {.importc: "_InterlockedAnd8", header: "<intrin.h>".}
 
-  proc msvcInterlockedOr8(p: pointer, val: int8): int8 {.
-    importc: "_InterlockedOr8", header: "<intrin.h>".}
-  proc msvcInterlockedOr16(p: pointer, val: int16): int16 {.
-    importc: "_InterlockedOr16", header: "<intrin.h>".}
-  proc msvcInterlockedOr32(p: pointer, val: int32): int32 {.
-    importc: "_InterlockedOr", header: "<intrin.h>".}
-  proc msvcInterlockedOr64(p: pointer, val: int64): int64 {.
-    importc: "_InterlockedOr64", header: "<intrin.h>".}
+  proc msvcInterlockedAnd16(
+    p: pointer, val: int16
+  ): int16 {.importc: "_InterlockedAnd16", header: "<intrin.h>".}
 
-  proc msvcInterlockedXor8(p: pointer, val: int8): int8 {.
-    importc: "_InterlockedXor8", header: "<intrin.h>".}
-  proc msvcInterlockedXor16(p: pointer, val: int16): int16 {.
-    importc: "_InterlockedXor16", header: "<intrin.h>".}
-  proc msvcInterlockedXor32(p: pointer, val: int32): int32 {.
-    importc: "_InterlockedXor", header: "<intrin.h>".}
-  proc msvcInterlockedXor64(p: pointer, val: int64): int64 {.
-    importc: "_InterlockedXor64", header: "<intrin.h>".}
+  proc msvcInterlockedAnd32(
+    p: pointer, val: int32
+  ): int32 {.importc: "_InterlockedAnd", header: "<intrin.h>".}
+
+  proc msvcInterlockedAnd64(
+    p: pointer, val: int64
+  ): int64 {.importc: "_InterlockedAnd64", header: "<intrin.h>".}
+
+  proc msvcInterlockedOr8(
+    p: pointer, val: int8
+  ): int8 {.importc: "_InterlockedOr8", header: "<intrin.h>".}
+
+  proc msvcInterlockedOr16(
+    p: pointer, val: int16
+  ): int16 {.importc: "_InterlockedOr16", header: "<intrin.h>".}
+
+  proc msvcInterlockedOr32(
+    p: pointer, val: int32
+  ): int32 {.importc: "_InterlockedOr", header: "<intrin.h>".}
+
+  proc msvcInterlockedOr64(
+    p: pointer, val: int64
+  ): int64 {.importc: "_InterlockedOr64", header: "<intrin.h>".}
+
+  proc msvcInterlockedXor8(
+    p: pointer, val: int8
+  ): int8 {.importc: "_InterlockedXor8", header: "<intrin.h>".}
+
+  proc msvcInterlockedXor16(
+    p: pointer, val: int16
+  ): int16 {.importc: "_InterlockedXor16", header: "<intrin.h>".}
+
+  proc msvcInterlockedXor32(
+    p: pointer, val: int32
+  ): int32 {.importc: "_InterlockedXor", header: "<intrin.h>".}
+
+  proc msvcInterlockedXor64(
+    p: pointer, val: int64
+  ): int64 {.importc: "_InterlockedXor64", header: "<intrin.h>".}
 
   # ---- compiler reorder barrier (used as signalFence and as the
   # compile-barrier for sub-seq_cst fences) ----
-  proc msvcReadWriteBarrier() {.
-    importc: "_ReadWriteBarrier", header: "<intrin.h>".}
+  proc msvcReadWriteBarrier() {.importc: "_ReadWriteBarrier", header: "<intrin.h>".}
 
   # ---- full hardware memory fence for moSequentiallyConsistent
   # thread fences. `MemoryBarrier` is a macro in <intrin.h>; we wrap it
   # in a no-arg importc with the macro name. Per Microsoft Learn it
   # expands to `__faststorefence` on x86_64 (or `__dmb(_ARM64_BARRIER_SY)`
   # on aarch64), both of which are full hardware fences. ----
-  proc msvcMemoryBarrier() {.
-    importc: "MemoryBarrier", header: "<intrin.h>".}
+  proc msvcMemoryBarrier() {.importc: "MemoryBarrier", header: "<intrin.h>".}
 
   # ---- 16-byte DWCAS: _InterlockedCompareExchange128.
   # MSVC signature: unsigned char _InterlockedCompareExchange128(
@@ -170,9 +206,8 @@ when defined(vcc):
   # (`casp` via __dmb-stamped LL/SC); both support _InterlockedCompareExchange128
   # from VS2013 onward.
   proc msvcInterlockedCompareExchange128(
-      p: pointer, exchangeHigh, exchangeLow: int64,
-      comparandResult: pointer): uint8 {.
-    importc: "_InterlockedCompareExchange128", header: "<intrin.h>".}
+    p: pointer, exchangeHigh, exchangeLow: int64, comparandResult: pointer
+  ): uint8 {.importc: "_InterlockedCompareExchange128", header: "<intrin.h>".}
 
 # ---------------------------------------------------------------------------
 # MemoryOrder
@@ -524,21 +559,25 @@ proc load*[T](
     # level — sub-seq_cst orders honored only as compile barriers, which
     # the lock-prefixed instruction implies.
     when sizeof(T) == 1:
-      cast[T](msvcInterlockedCompareExchange8(
-        cast[pointer](addr loc.value), 0'i8, 0'i8))
+      cast[T](msvcInterlockedCompareExchange8(cast[pointer](addr loc.value), 0'i8, 0'i8))
     elif sizeof(T) == 2:
       cast[T](msvcInterlockedCompareExchange16(
-        cast[pointer](addr loc.value), 0'i16, 0'i16))
+        cast[pointer](addr loc.value), 0'i16, 0'i16
+      ))
     elif sizeof(T) == 4:
       cast[T](msvcInterlockedCompareExchange32(
-        cast[pointer](addr loc.value), 0'i32, 0'i32))
+        cast[pointer](addr loc.value), 0'i32, 0'i32
+      ))
     elif sizeof(T) == 8:
       cast[T](msvcInterlockedCompareExchange64(
-        cast[pointer](addr loc.value), 0'i64, 0'i64))
+        cast[pointer](addr loc.value), 0'i64, 0'i64
+      ))
     else:
       {.error: "Atomic[T] vcc load supports only 1/2/4/8 byte T".}
   else:
-    cast[T](atomicLoadN(cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)))
+    cast[T](atomicLoadN(
+      cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)
+    ))
 
 proc store*[T](
     loc: var Atomic[T], desired: T, order: static MemoryOrder = moSequentiallyConsistent
@@ -551,17 +590,17 @@ proc store*[T](
     # honored as compile-barriers via the implicit barrier in the
     # function call.
     when sizeof(T) == 1:
-      discard msvcInterlockedExchange8(
-        cast[pointer](addr loc.value), cast[int8](desired))
+      discard
+        msvcInterlockedExchange8(cast[pointer](addr loc.value), cast[int8](desired))
     elif sizeof(T) == 2:
-      discard msvcInterlockedExchange16(
-        cast[pointer](addr loc.value), cast[int16](desired))
+      discard
+        msvcInterlockedExchange16(cast[pointer](addr loc.value), cast[int16](desired))
     elif sizeof(T) == 4:
-      discard msvcInterlockedExchange32(
-        cast[pointer](addr loc.value), cast[int32](desired))
+      discard
+        msvcInterlockedExchange32(cast[pointer](addr loc.value), cast[int32](desired))
     elif sizeof(T) == 8:
-      discard msvcInterlockedExchange64(
-        cast[pointer](addr loc.value), cast[int64](desired))
+      discard
+        msvcInterlockedExchange64(cast[pointer](addr loc.value), cast[int64](desired))
     else:
       {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
   else:
@@ -582,16 +621,20 @@ proc exchange*[T](
   when defined(vcc):
     when sizeof(T) == 1:
       cast[T](msvcInterlockedExchange8(
-        cast[pointer](addr loc.value), cast[int8](desired)))
+        cast[pointer](addr loc.value), cast[int8](desired)
+      ))
     elif sizeof(T) == 2:
       cast[T](msvcInterlockedExchange16(
-        cast[pointer](addr loc.value), cast[int16](desired)))
+        cast[pointer](addr loc.value), cast[int16](desired)
+      ))
     elif sizeof(T) == 4:
       cast[T](msvcInterlockedExchange32(
-        cast[pointer](addr loc.value), cast[int32](desired)))
+        cast[pointer](addr loc.value), cast[int32](desired)
+      ))
     elif sizeof(T) == 8:
       cast[T](msvcInterlockedExchange64(
-        cast[pointer](addr loc.value), cast[int64](desired)))
+        cast[pointer](addr loc.value), cast[int64](desired)
+      ))
     else:
       {.error: "Atomic[T] vcc exchange supports only 1/2/4/8 byte T".}
   else:
@@ -620,7 +663,8 @@ proc compareExchangeStrong*[T](
     when sizeof(T) == 1:
       let exp8 = cast[int8](expected)
       let prev = msvcInterlockedCompareExchange8(
-        cast[pointer](addr loc.value), cast[int8](desired), exp8)
+        cast[pointer](addr loc.value), cast[int8](desired), exp8
+      )
       let ok = prev == exp8
       if not ok:
         expected = cast[T](prev)
@@ -628,7 +672,8 @@ proc compareExchangeStrong*[T](
     elif sizeof(T) == 2:
       let exp16 = cast[int16](expected)
       let prev = msvcInterlockedCompareExchange16(
-        cast[pointer](addr loc.value), cast[int16](desired), exp16)
+        cast[pointer](addr loc.value), cast[int16](desired), exp16
+      )
       let ok = prev == exp16
       if not ok:
         expected = cast[T](prev)
@@ -636,7 +681,8 @@ proc compareExchangeStrong*[T](
     elif sizeof(T) == 4:
       let exp32 = cast[int32](expected)
       let prev = msvcInterlockedCompareExchange32(
-        cast[pointer](addr loc.value), cast[int32](desired), exp32)
+        cast[pointer](addr loc.value), cast[int32](desired), exp32
+      )
       let ok = prev == exp32
       if not ok:
         expected = cast[T](prev)
@@ -644,7 +690,8 @@ proc compareExchangeStrong*[T](
     elif sizeof(T) == 8:
       let exp64 = cast[int64](expected)
       let prev = msvcInterlockedCompareExchange64(
-        cast[pointer](addr loc.value), cast[int64](desired), exp64)
+        cast[pointer](addr loc.value), cast[int64](desired), exp64
+      )
       let ok = prev == exp64
       if not ok:
         expected = cast[T](prev)
@@ -766,17 +813,19 @@ proc fetchAdd*[T: SomeInteger](
   enforceAtomicConstraints(T)
   when defined(vcc):
     when sizeof(T) == 1:
-      cast[T](msvcInterlockedExchangeAdd8(
-        cast[pointer](addr loc.value), cast[int8](v)))
+      cast[T](msvcInterlockedExchangeAdd8(cast[pointer](addr loc.value), cast[int8](v)))
     elif sizeof(T) == 2:
       cast[T](msvcInterlockedExchangeAdd16(
-        cast[pointer](addr loc.value), cast[int16](v)))
+        cast[pointer](addr loc.value), cast[int16](v)
+      ))
     elif sizeof(T) == 4:
       cast[T](msvcInterlockedExchangeAdd32(
-        cast[pointer](addr loc.value), cast[int32](v)))
+        cast[pointer](addr loc.value), cast[int32](v)
+      ))
     elif sizeof(T) == 8:
       cast[T](msvcInterlockedExchangeAdd64(
-        cast[pointer](addr loc.value), cast[int64](v)))
+        cast[pointer](addr loc.value), cast[int64](v)
+      ))
     else:
       {.error: "Atomic[T] vcc fetchAdd supports only 1/2/4/8 byte T".}
   else:
@@ -796,17 +845,19 @@ proc fetchSub*[T: SomeInteger](
     # the bit-level negation behavior is identical (uint8/16/32/64 are
     # cast through the matching signed int*).
     when sizeof(T) == 1:
-      cast[T](msvcInterlockedExchangeAdd8(
-        cast[pointer](addr loc.value), -cast[int8](v)))
+      cast[T](msvcInterlockedExchangeAdd8(cast[pointer](addr loc.value), -cast[int8](v)))
     elif sizeof(T) == 2:
       cast[T](msvcInterlockedExchangeAdd16(
-        cast[pointer](addr loc.value), -cast[int16](v)))
+        cast[pointer](addr loc.value), -cast[int16](v)
+      ))
     elif sizeof(T) == 4:
       cast[T](msvcInterlockedExchangeAdd32(
-        cast[pointer](addr loc.value), -cast[int32](v)))
+        cast[pointer](addr loc.value), -cast[int32](v)
+      ))
     elif sizeof(T) == 8:
       cast[T](msvcInterlockedExchangeAdd64(
-        cast[pointer](addr loc.value), -cast[int64](v)))
+        cast[pointer](addr loc.value), -cast[int64](v)
+      ))
     else:
       {.error: "Atomic[T] vcc fetchSub supports only 1/2/4/8 byte T".}
   else:
@@ -822,17 +873,13 @@ proc fetchAnd*[T: SomeInteger](
   enforceAtomicConstraints(T)
   when defined(vcc):
     when sizeof(T) == 1:
-      cast[T](msvcInterlockedAnd8(
-        cast[pointer](addr loc.value), cast[int8](v)))
+      cast[T](msvcInterlockedAnd8(cast[pointer](addr loc.value), cast[int8](v)))
     elif sizeof(T) == 2:
-      cast[T](msvcInterlockedAnd16(
-        cast[pointer](addr loc.value), cast[int16](v)))
+      cast[T](msvcInterlockedAnd16(cast[pointer](addr loc.value), cast[int16](v)))
     elif sizeof(T) == 4:
-      cast[T](msvcInterlockedAnd32(
-        cast[pointer](addr loc.value), cast[int32](v)))
+      cast[T](msvcInterlockedAnd32(cast[pointer](addr loc.value), cast[int32](v)))
     elif sizeof(T) == 8:
-      cast[T](msvcInterlockedAnd64(
-        cast[pointer](addr loc.value), cast[int64](v)))
+      cast[T](msvcInterlockedAnd64(cast[pointer](addr loc.value), cast[int64](v)))
     else:
       {.error: "Atomic[T] vcc fetchAnd supports only 1/2/4/8 byte T".}
   else:
@@ -848,17 +895,13 @@ proc fetchOr*[T: SomeInteger](
   enforceAtomicConstraints(T)
   when defined(vcc):
     when sizeof(T) == 1:
-      cast[T](msvcInterlockedOr8(
-        cast[pointer](addr loc.value), cast[int8](v)))
+      cast[T](msvcInterlockedOr8(cast[pointer](addr loc.value), cast[int8](v)))
     elif sizeof(T) == 2:
-      cast[T](msvcInterlockedOr16(
-        cast[pointer](addr loc.value), cast[int16](v)))
+      cast[T](msvcInterlockedOr16(cast[pointer](addr loc.value), cast[int16](v)))
     elif sizeof(T) == 4:
-      cast[T](msvcInterlockedOr32(
-        cast[pointer](addr loc.value), cast[int32](v)))
+      cast[T](msvcInterlockedOr32(cast[pointer](addr loc.value), cast[int32](v)))
     elif sizeof(T) == 8:
-      cast[T](msvcInterlockedOr64(
-        cast[pointer](addr loc.value), cast[int64](v)))
+      cast[T](msvcInterlockedOr64(cast[pointer](addr loc.value), cast[int64](v)))
     else:
       {.error: "Atomic[T] vcc fetchOr supports only 1/2/4/8 byte T".}
   else:
@@ -874,17 +917,13 @@ proc fetchXor*[T: SomeInteger](
   enforceAtomicConstraints(T)
   when defined(vcc):
     when sizeof(T) == 1:
-      cast[T](msvcInterlockedXor8(
-        cast[pointer](addr loc.value), cast[int8](v)))
+      cast[T](msvcInterlockedXor8(cast[pointer](addr loc.value), cast[int8](v)))
     elif sizeof(T) == 2:
-      cast[T](msvcInterlockedXor16(
-        cast[pointer](addr loc.value), cast[int16](v)))
+      cast[T](msvcInterlockedXor16(cast[pointer](addr loc.value), cast[int16](v)))
     elif sizeof(T) == 4:
-      cast[T](msvcInterlockedXor32(
-        cast[pointer](addr loc.value), cast[int32](v)))
+      cast[T](msvcInterlockedXor32(cast[pointer](addr loc.value), cast[int32](v)))
     elif sizeof(T) == 8:
-      cast[T](msvcInterlockedXor64(
-        cast[pointer](addr loc.value), cast[int64](v)))
+      cast[T](msvcInterlockedXor64(cast[pointer](addr loc.value), cast[int64](v)))
     else:
       {.error: "Atomic[T] vcc fetchXor supports only 1/2/4/8 byte T".}
   else:
@@ -1188,8 +1227,7 @@ when sizeof(pointer) == 8:
         emit: [
           "{ __int64 _cmp[2] = {0, 0};",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", 0, 0, _cmp);",
-          " memcpy(", resultPtr, ", _cmp, 16); }",
+          ", 0, 0, _cmp);", " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1297,10 +1335,8 @@ when sizeof(pointer) == 8:
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp)) {\n",
-          "#if defined(_M_X64)\n", "_mm_pause();\n",
-          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n",
-          " } }",
+          ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
+          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " } }",
         ]
       .}
     else:
@@ -1389,11 +1425,9 @@ when sizeof(pointer) == 8:
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp)) {\n",
-          "#if defined(_M_X64)\n", "_mm_pause();\n",
-          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n",
-          " }",
-          " memcpy(", resultPtr, ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
+          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }", " memcpy(",
+          resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1477,11 +1511,9 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
-          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); ", result,
+          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16); ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp) != 0);",
-          " memcpy(", expectedPtr, ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp) != 0);", " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1620,11 +1652,9 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
-          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); ", result,
+          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16); ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp) != 0);",
-          " memcpy(", expectedPtr, ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp) != 0);", " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
