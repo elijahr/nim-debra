@@ -665,22 +665,36 @@ when sizeof(pointer) == 8:
     ## Gate 3: `_Static_assert` that the C compiler has DWCAS lock-free
     ## support at this target's effective ISA level. C/C++ keyword split
     ## tracks the `assertLockFree` precedent.
+    # Preprocessor directives (#if/#elif/#endif) embedded inside a
+    # _Static_assert / static_assert argument list are undefined behavior
+    # in standard C/C++ and may reject under strict compilers/static
+    # analyzers. We hoist the #if cascade outside the assertion: a single
+    # NIMDEBRA_DWCAS_OK macro carries the lock-free predicate, and the
+    # assertion body itself is plain.
     when defined(cpp):
       {.
         emit: [
-          "static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16\n",
-          "#if defined(__aarch64__)\n", "  || __ARM_FEATURE_ATOMICS\n", "#endif\n",
-          ", \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
-          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");",
+          "\n#if defined(__aarch64__)\n",
+          "  #define NIMDEBRA_DWCAS_OK (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 || __ARM_FEATURE_ATOMICS)\n",
+          "#else\n",
+          "  #define NIMDEBRA_DWCAS_OK (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)\n",
+          "#endif\n",
+          "static_assert(NIMDEBRA_DWCAS_OK, \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
+          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");\n",
+          "\n#undef NIMDEBRA_DWCAS_OK\n",
         ]
       .}
     else:
       {.
         emit: [
-          "_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16\n",
-          "#if defined(__aarch64__)\n", "  || __ARM_FEATURE_ATOMICS\n", "#endif\n",
-          ", \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
-          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");",
+          "\n#if defined(__aarch64__)\n",
+          "  #define NIMDEBRA_DWCAS_OK (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 || __ARM_FEATURE_ATOMICS)\n",
+          "#else\n",
+          "  #define NIMDEBRA_DWCAS_OK (__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)\n",
+          "#endif\n",
+          "_Static_assert(NIMDEBRA_DWCAS_OK, \"nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16 ",
+          "(x86_64: needs -mcx16; aarch64: needs -march=armv8.1-a+lse or later)\");\n",
+          "\n#undef NIMDEBRA_DWCAS_OK\n",
         ]
       .}
 
