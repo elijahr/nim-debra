@@ -37,7 +37,7 @@ missing=()
 # were added earlier in the file). The header is part of the file's
 # load-bearing block divider and is asserted to be unique below.
 header_re='^# DWCAS \(size-16\) specializations$'
-header_count=$(grep -cE "$header_re" "$SRC")
+header_count=$(grep -cE "$header_re" "$SRC" || true)
 if [[ "$header_count" -ne 1 ]]; then
   echo "audit: expected exactly 1 DWCAS section-header comment in $SRC, found $header_count" >&2
   exit 2
