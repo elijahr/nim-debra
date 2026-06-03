@@ -134,19 +134,19 @@ jobs:
           nim c -d:release --passC:-fno-lto -o:/tmp/fixture tests/probes/dwcas_objdump_fixture.nim
           case "${{ matrix.runs-on }}" in
             ubuntu-24.04)
-              objdump -d /tmp/fixture | grep -Eq '(^|\s)(lock\s+)?cmpxchg16b\s' \
+              objdump -d /tmp/fixture | grep -Eq '(^|[[:space:]])(lock[[:space:]]+)?cmpxchg16b([[:space:]]|$)' \
                 || (echo "::error::expected cmpxchg16b mnemonic missing"; exit 1)
-              if objdump -d /tmp/fixture | grep -Eq 'bl\s+__aarch64_cas16_'; then
+              if objdump -d /tmp/fixture | grep -Eq 'bl[[:space:]]+__aarch64_cas16_'; then
                 echo "::error::outline-atomics libcall detected on x86_64 (impossible — investigate)"
                 exit 1
               fi
               ;;
             ubuntu-24.04-arm|macos-15)
-              if objdump -d /tmp/fixture | grep -Eq 'bl\s+__aarch64_cas16_'; then
+              if objdump -d /tmp/fixture | grep -Eq 'bl[[:space:]]+__aarch64_cas16_'; then
                 echo "::error::outline-atomics libcall detected — -mno-outline-atomics not in effect"
                 exit 1
               fi
-              objdump -d /tmp/fixture | grep -Eq '(^|\s)caspal?\s' \
+              objdump -d /tmp/fixture | grep -Eq '(^|[[:space:]])caspal?([[:space:]]|$)' \
                 || (objdump -d /tmp/fixture | grep -A 5 'ldaxp' | grep -q 'stlxp') \
                 || (echo "::error::expected caspal or ldaxp/stlxp pair missing"; exit 1)
               ;;
