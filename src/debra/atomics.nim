@@ -735,21 +735,21 @@ when sizeof(pointer) == 8:
         emit: [
           "{ __int128 _zero = 0;",
           " __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", _zero, _zero);", " *(__int128*)", resultPtr, " = _prev; }",
+          ", _zero, _zero);", " __builtin_memcpy(", resultPtr, ", &_prev, 16); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
           "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
-          " *(__int128*)", resultPtr, " = _v; }",
+          " __builtin_memcpy(", resultPtr, ", &_v, 16); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
           "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
-          " *(__int128*)", resultPtr, " = _v; }",
+          " __builtin_memcpy(", resultPtr, ", &_v, 16); }",
         ]
       .}
     else:
@@ -795,8 +795,12 @@ when sizeof(pointer) == 8:
     dwcasGate3Assert()
     # See `dwcasLoad` for the rationale: `var` parameters compile to C pointers,
     # so we bind `addr loc` to a local `ptr` to reference the atomic object
-    # directly inside the emit body.
+    # directly inside the emit body. Bind `desired` to a `let` local first so
+    # taking its address is safe even when callers pass an rvalue
+    # (e.g., `dwcasStore(a, makePair(...))`).
     let locPtr = addr loc
+    let desiredLocal = desired
+    let desiredPtr = addr desiredLocal
     when defined(gcc) and not defined(clang) and defined(amd64):
       # Initial atomic load via cas-with-self (__sync_val_compare_and_swap
       # with expected=desired=0): returns the current 128-bit value
@@ -810,8 +814,8 @@ when sizeof(pointer) == 8:
       # as _prev for the next iteration.
       {.
         emit: [
-          "{ __int128 _new = *(__int128*)&", desired,
-          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          "{ __int128 _new; __builtin_memcpy(&_new, ", desiredPtr,
+          ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", 0, 0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1); }",
@@ -820,15 +824,15 @@ when sizeof(pointer) == 8:
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)",
-          locPtr, ", _d, __ATOMIC_SEQ_CST); }",
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
+          ", 16); __atomic_store_n((__int128*)", locPtr, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)",
-          locPtr, ", _d, __ATOMIC_SEQ_CST); }",
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
+          ", 16); __atomic_store_n((__int128*)", locPtr, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:
@@ -866,9 +870,13 @@ when sizeof(pointer) == 8:
     var result: Pair[A, B]
     # See `dwcasLoad` for the rationale: bind `addr loc` / `addr result` to
     # local `ptr` variables so the emit body references the underlying objects
-    # rather than the address of the C pointer parameter.
+    # rather than the address of the C pointer parameter. Bind `desired` to a
+    # `let` local first so taking its address is safe even when callers pass
+    # an rvalue (e.g., `dwcasExchange(a, makePair(...))`).
     let locPtr = addr loc
     let resultPtr = addr result
+    let desiredLocal = desired
+    let desiredPtr = addr desiredLocal
     when defined(gcc) and not defined(clang) and defined(amd64):
       # Same _prev reuse pattern as dwcasStore. Initial atomic load via
       # cas-with-self (__sync_val_compare_and_swap with expected=desired=0):
@@ -879,28 +887,30 @@ when sizeof(pointer) == 8:
       # value, reused as _prev for the next iteration.
       {.
         emit: [
-          "{ __int128 _new = *(__int128*)&", desired,
-          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          "{ __int128 _new; __builtin_memcpy(&_new, ", desiredPtr,
+          ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", 0, 0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1);",
-          " *(__int128*)", resultPtr, " = _prev; }",
+          " __builtin_memcpy(", resultPtr, ", &_prev, 16); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired,
-          "; __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
-          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)", resultPtr, " = _prev; }",
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
+          ", 16); __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
+          ", _d, __ATOMIC_SEQ_CST);", " __builtin_memcpy(", resultPtr,
+          ", &_prev, 16); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired,
-          "; __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
-          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)", resultPtr, " = _prev; }",
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
+          ", 16); __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
+          ", _d, __ATOMIC_SEQ_CST);", " __builtin_memcpy(", resultPtr,
+          ", &_prev, 16); }",
         ]
       .}
     else:
@@ -946,22 +956,26 @@ when sizeof(pointer) == 8:
     var result: bool
     # See `dwcasLoad` for the rationale: both `loc` and `expected` are `var`
     # parameters that compile to C pointers, so bind their addresses to local
-    # `ptr` variables before the emit body.
+    # `ptr` variables before the emit body. Bind `desired` to a `let` local
+    # first so taking its address is safe even when callers pass an rvalue.
     let locPtr = addr loc
     let expectedPtr = addr expected
+    let desiredLocal = desired
+    let desiredPtr = addr desiredLocal
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)", expectedPtr, "; __int128 _d = *(__int128*)&",
-          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", _e, _d);", " *(__int128*)", expectedPtr, " = _prev;", " ", result,
-          " = (_prev == _e); }",
+          "{ __int128 _e; __builtin_memcpy(&_e, ", expectedPtr,
+          ", 16); __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
+          ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", _e, _d);", " __builtin_memcpy(", expectedPtr, ", &_prev, 16);", " ",
+          result, " = (_prev == _e); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
           " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
           expectedPtr, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
@@ -969,7 +983,7 @@ when sizeof(pointer) == 8:
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
           " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
           expectedPtr, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
@@ -1076,25 +1090,29 @@ when sizeof(pointer) == 8:
     var result: bool
     # See `dwcasLoad` for the rationale: both `loc` and `expected` are `var`
     # parameters that compile to C pointers, so bind their addresses to local
-    # `ptr` variables before the emit body.
+    # `ptr` variables before the emit body. Bind `desired` to a `let` local
+    # first so taking its address is safe even when callers pass an rvalue.
     let locPtr = addr loc
     let expectedPtr = addr expected
+    let desiredLocal = desired
+    let desiredPtr = addr desiredLocal
     when defined(gcc) and not defined(clang) and defined(amd64):
       # cmpxchg16b is always-strong on x86; weak/strong distinction is a
       # no-op on this backend. Body identical to dwcasCasStrong's gcc-amd64
       # arm (design §4.5.1 documents this fallthrough).
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)", expectedPtr, "; __int128 _d = *(__int128*)&",
-          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", _e, _d);", " *(__int128*)", expectedPtr, " = _prev;", " ", result,
-          " = (_prev == _e); }",
+          "{ __int128 _e; __builtin_memcpy(&_e, ", expectedPtr,
+          ", 16); __int128 _d; __builtin_memcpy(&_d, ", desiredPtr,
+          ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", _e, _d);", " __builtin_memcpy(", expectedPtr, ", &_prev, 16);", " ",
+          result, " = (_prev == _e); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
           " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
           expectedPtr, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
@@ -1105,7 +1123,7 @@ when sizeof(pointer) == 8:
       # weak flag is a no-op when LSE is active.
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; ", result,
+          "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
           " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
           expectedPtr, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
