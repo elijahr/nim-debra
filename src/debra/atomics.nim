@@ -1229,11 +1229,21 @@ when sizeof(pointer) == 8:
       # MSDN: ComparandResult must be 16-byte aligned. `__declspec(align(16))`
       # on the stack array satisfies the requirement; misalignment raises a
       # GP fault on x64 and unaligned-access trap on ARM64.
+      #
+      # MSVC `_InterlockedCompareExchange128` is documented seq_cst on x64
+      # (implicit `lock`) but only release-acquire on ARM64 (it lowers to
+      # `caspal` or `ldaxp`/`stlxp`). We add explicit `MemoryBarrier()`
+      # before and after to upgrade to full seq_cst uniformly. On x64
+      # `MemoryBarrier` lowers to `mfence` (or `lock or [rsp], 0`) and is
+      # effectively a no-op alongside the implicit `lock` of the CAS; on
+      # ARM64 it emits the missing `dmb sy` to close the gap.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          " MemoryBarrier();",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", 0, 0, _cmp);", " memcpy(", resultPtr, ", _cmp, 16); }",
+          ", 0, 0, _cmp);", " MemoryBarrier();",
+          " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1342,15 +1352,21 @@ when sizeof(pointer) == 8:
       # GP fault on x64 and unaligned-access trap on ARM64. (`_new` is only
       # decomposed into scalar ExchangeHigh/ExchangeLow args, so it does not
       # need alignment.)
+      #
+      # `MemoryBarrier()` before and after the CAS loop upgrades MSVC's
+      # release-acquire semantics on ARM64 to full seq_cst (see dwcasLoad
+      # comment). No-op on x64.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
           ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          " MemoryBarrier();",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
-          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " } }",
+          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
+          " MemoryBarrier(); }",
         ]
       .}
     else:
@@ -1434,16 +1450,19 @@ when sizeof(pointer) == 8:
       # `_cmp` holds the prior value seen each iteration; on CAS success
       # it carries the value that was atomically replaced (returned).
       # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
-      # alignment rationale; `_new` does not need it.
+      # alignment rationale; `_new` does not need it. `MemoryBarrier()`
+      # before/after upgrades MSVC release-acquire on ARM64 to seq_cst.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
           ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          " MemoryBarrier();",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
-          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }", " memcpy(",
+          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
+          " MemoryBarrier();", " memcpy(",
           resultPtr, ", _cmp, 16); }",
         ]
       .}
@@ -1526,13 +1545,17 @@ when sizeof(pointer) == 8:
       # x86_64 or ARM64 — MSVC implements both natively and there's no
       # weak variant).
       # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
-      # alignment rationale; `_new` does not need it.
+      # alignment rationale; `_new` does not need it. `MemoryBarrier()`
+      # before/after upgrades MSVC release-acquire on ARM64 to seq_cst.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
-          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16); ", result,
+          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16);",
+          " MemoryBarrier(); ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp) != 0);", " memcpy(", expectedPtr, ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp) != 0);",
+          " MemoryBarrier();",
+          " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1669,13 +1692,17 @@ when sizeof(pointer) == 8:
       # presented to the caller as always-strong). Weak ≡ Strong; emit
       # the same body as dwcasCasStrong.
       # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
-      # alignment rationale; `_new` does not need it.
+      # alignment rationale; `_new` does not need it. `MemoryBarrier()`
+      # before/after upgrades MSVC release-acquire on ARM64 to seq_cst.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
-          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16); ", result,
+          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16);",
+          " MemoryBarrier(); ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp) != 0);", " memcpy(", expectedPtr, ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp) != 0);",
+          " MemoryBarrier();",
+          " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
