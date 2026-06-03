@@ -380,15 +380,33 @@ suite "static rejection":
     )
 
   test "compareExchange failure stronger than success does not compile":
-    # success=moRelease, failure=moAcquire: failure is not <= success
-    # ordinally (moAcquire=2, moRelease=3) so this passes; let's pick
-    # a real violation: success=moAcquire (2), failure=moSeqCst (5).
+    # Real ord violation: success=moAcquire (2), failure=moSeqCst (5).
     check not compiles(
       block:
         var a: Atomic[int]
         var expected = 0
         discard
           a.compareExchangeStrong(expected, 1, moAcquire, moSequentiallyConsistent)
+    )
+
+  test "compareExchange success=moRelease, failure=moAcquire does not compile":
+    # C11 §7.17.7.4: moRelease has no load-acquire on the success path,
+    # so the failure load cannot acquire either. The prior raw
+    # `ord(failure) <= ord(success)` check would have allowed this
+    # (moAcquire=2 <= moRelease=3) — the stricter lattice check forbids it.
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(expected, 1, moRelease, moAcquire)
+    )
+
+  test "compareExchange success=moRelease, failure=moConsume does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(expected, 1, moRelease, moConsume)
     )
 
   test "compareExchange failure=moRelease does not compile":

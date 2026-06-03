@@ -307,9 +307,22 @@ template validCasFailureOrder(success, failure: MemoryOrder) =
       "compareExchange failure order moRelease / moAcquireRelease " &
         "is invalid; failure must be moRelaxed, moConsume, " &
         "moAcquire, or moSequentiallyConsistent"
-    assert ord(failure) <= ord(success),
-      "compareExchange failure order is stronger than success " &
-        "order; failure must be <= success"
+    # C11 §7.17.7.4: failure order must be no stronger than the LOAD
+    # component of the success order. `moRelease` has no load-acquire on
+    # the success path, so the failure load cannot acquire either —
+    # `success=moRelease, failure=moAcquire` is invalid even though
+    # `ord(moAcquire) <= ord(moRelease)`. Other success orders use the
+    # ordinal comparison correctly for the lattice.
+    when success == moRelease:
+      assert failure == moRelaxed,
+        "compareExchange failure with success=moRelease requires " &
+          "failure=moRelaxed (moRelease has no load-acquire component " &
+          "for the failure path; use moAcquireRelease as success if you " &
+          "need acquire-on-failure)"
+    else:
+      assert ord(failure) <= ord(success),
+        "compareExchange failure order is stronger than success " &
+          "order; failure must be <= success"
 
 func casFailureFromSuccess(s: MemoryOrder): MemoryOrder {.compileTime.} =
   ## Derive a CAS failure order from a success order per C11: drop the

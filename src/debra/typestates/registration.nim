@@ -86,7 +86,7 @@ proc register*[MaxThreads: static int, CC: static PinScopeCardinality](
     while (expected and bit) == 0:
       let desired = expected or bit
       if mgr.activeThreadMask.compareExchangeWeak(
-        expected, desired, moRelease, moAcquire
+        expected, desired, moAcquireRelease, moAcquire
       ):
         # Successfully claimed slot i
         # Store thread ID for signaling

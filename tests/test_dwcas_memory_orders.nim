@@ -79,10 +79,14 @@ suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
 
   test "compareExchangeStrong accepts every (success, failure) order pair":
     # Failure order must be load-compatible (validCasFailureOrder rejects
-    # moRelease / moAcquireRelease as failure orders) AND
-    # ord(failure) <= ord(success).
+    # moRelease / moAcquireRelease as failure orders), AND must be no
+    # stronger than the LOAD component of the success order per C11
+    # §7.17.7.4. The lattice is non-trivial only for success=moRelease:
+    # moRelease has no load-acquire on the success path, so failure must
+    # be moRelaxed. Other success orders use ord-comparison correctly.
     template casBody(sOrd, fOrd: static MemoryOrder) =
-      when ord(fOrd) <= ord(sOrd) and fOrd != moRelease and fOrd != moAcquireRelease:
+      when ord(fOrd) <= ord(sOrd) and fOrd != moRelease and fOrd != moAcquireRelease and
+          not (sOrd == moRelease and fOrd != moRelaxed):
         var a: Atomic[P]
         a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
         var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
@@ -109,7 +113,8 @@ suite "DWCAS memory-order matrix (positive: every valid order round-trips)":
 
   test "compareExchangeWeak accepts every (success, failure) order pair":
     template casBody(sOrd, fOrd: static MemoryOrder) =
-      when ord(fOrd) <= ord(sOrd) and fOrd != moRelease and fOrd != moAcquireRelease:
+      when ord(fOrd) <= ord(sOrd) and fOrd != moRelease and fOrd != moAcquireRelease and
+          not (sOrd == moRelease and fOrd != moRelaxed):
         var ok = false
         var a: Atomic[P]
         # Loop to absorb spurious weak failures on aarch64 LL/SC.
