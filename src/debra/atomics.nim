@@ -710,26 +710,32 @@ when sizeof(pointer) == 8:
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: Pair[A, B]
+    # In Nim, `var` parameters compile to pointers in generated C, so `&loc`
+    # inside an emit body would take the address of the POINTER parameter
+    # (`Atomic_Pair**`), not the atomic object itself. Bind `addr loc` to a
+    # local `ptr` so the emit references the atomic object directly.
+    let locPtr = addr loc
+    let resultPtr = addr result
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
           "{ __int128 _zero = 0;",
-          " __int128 _prev = __sync_val_compare_and_swap((__int128*)&", loc,
-          ", _zero, _zero);", " *(__int128*)&", result, " = _prev; }",
+          " __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", _zero, _zero);", " *(__int128*)", resultPtr, " = _prev; }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _v = __atomic_load_n((__int128*)&", loc, ", __ATOMIC_SEQ_CST);",
-          " *(__int128*)&", result, " = _v; }",
+          "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
+          " *(__int128*)", resultPtr, " = _v; }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _v = __atomic_load_n((__int128*)&", loc, ", __ATOMIC_SEQ_CST);",
-          " *(__int128*)&", result, " = _v; }",
+          "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
+          " *(__int128*)", resultPtr, " = _v; }",
         ]
       .}
     else:
@@ -773,6 +779,10 @@ when sizeof(pointer) == 8:
     ## validated, warning-emitting surface.
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
+    # See `dwcasLoad` for the rationale: `var` parameters compile to C pointers,
+    # so we bind `addr loc` to a local `ptr` to reference the atomic object
+    # directly inside the emit body.
+    let locPtr = addr loc
     when defined(gcc) and not defined(clang) and defined(amd64):
       # Initial volatile load once; on CAS failure, __sync_val_compare_and_swap
       # returns the atomically-observed prior value, which we reuse as _prev
@@ -782,23 +792,23 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int128 _new = *(__int128*)&", desired,
-          "; __int128 _prev = *(volatile __int128*)&", loc, "; __int128 _ret;",
-          " do { _ret = __sync_val_compare_and_swap((__int128*)&", loc,
+          "; __int128 _prev = *(volatile __int128*)", locPtr, "; __int128 _ret;",
+          " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1); }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)&",
-          loc, ", _d, __ATOMIC_SEQ_CST); }",
+          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)",
+          locPtr, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
-          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)&",
-          loc, ", _d, __ATOMIC_SEQ_CST); }",
+          "{ __int128 _d = *(__int128*)&", desired, "; __atomic_store_n((__int128*)",
+          locPtr, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:
@@ -834,6 +844,11 @@ when sizeof(pointer) == 8:
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: Pair[A, B]
+    # See `dwcasLoad` for the rationale: bind `addr loc` / `addr result` to
+    # local `ptr` variables so the emit body references the underlying objects
+    # rather than the address of the C pointer parameter.
+    let locPtr = addr loc
+    let resultPtr = addr result
     when defined(gcc) and not defined(clang) and defined(amd64):
       # Same _prev reuse pattern as dwcasStore: avoid a non-atomic volatile
       # re-read of loc on each retry. __sync_val_compare_and_swap returns
@@ -841,26 +856,26 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int128 _new = *(__int128*)&", desired,
-          "; __int128 _prev = *(volatile __int128*)&", loc, "; __int128 _ret;",
-          " do { _ret = __sync_val_compare_and_swap((__int128*)&", loc,
+          "; __int128 _prev = *(volatile __int128*)", locPtr, "; __int128 _ret;",
+          " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1);",
-          " *(__int128*)&", result, " = _prev; }",
+          " *(__int128*)", resultPtr, " = _prev; }",
         ]
       .}
     elif defined(clang) and defined(amd64):
       {.
         emit: [
           "{ __int128 _d = *(__int128*)&", desired,
-          "; __int128 _prev = __atomic_exchange_n((__int128*)&", loc,
-          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)&", result, " = _prev; }",
+          "; __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
+          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)", resultPtr, " = _prev; }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
           "{ __int128 _d = *(__int128*)&", desired,
-          "; __int128 _prev = __atomic_exchange_n((__int128*)&", loc,
-          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)&", result, " = _prev; }",
+          "; __int128 _prev = __atomic_exchange_n((__int128*)", locPtr,
+          ", _d, __ATOMIC_SEQ_CST);", " *(__int128*)", resultPtr, " = _prev; }",
         ]
       .}
     else:
@@ -904,12 +919,18 @@ when sizeof(pointer) == 8:
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: bool
+    # See `dwcasLoad` for the rationale: both `loc` and `expected` are `var`
+    # parameters that compile to C pointers, so bind their addresses to local
+    # `ptr` variables before the emit body.
+    let locPtr = addr loc
+    let expectedPtr = addr expected
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)&", expected, "; __int128 _d = *(__int128*)&",
-          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&", loc,
-          ", _e, _d);", " *(__int128*)&", expected, " = _prev;", " ", result,
+          "{ __int128 _e = *(__int128*)", expectedPtr,
+          "; __int128 _d = *(__int128*)&", desired,
+          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", _e, _d);", " *(__int128*)", expectedPtr, " = _prev;", " ", result,
           " = (_prev == _e); }",
         ]
       .}
@@ -917,16 +938,16 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int128 _d = *(__int128*)&", desired, "; ", result,
-          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
-          expected, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
+          " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
+          expectedPtr, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
       {.
         emit: [
           "{ __int128 _d = *(__int128*)&", desired, "; ", result,
-          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
-          expected, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
+          " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
+          expectedPtr, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:
@@ -1029,15 +1050,21 @@ when sizeof(pointer) == 8:
     enforceDwcasConstraints(A, B)
     dwcasGate3Assert()
     var result: bool
+    # See `dwcasLoad` for the rationale: both `loc` and `expected` are `var`
+    # parameters that compile to C pointers, so bind their addresses to local
+    # `ptr` variables before the emit body.
+    let locPtr = addr loc
+    let expectedPtr = addr expected
     when defined(gcc) and not defined(clang) and defined(amd64):
       # cmpxchg16b is always-strong on x86; weak/strong distinction is a
       # no-op on this backend. Body identical to dwcasCasStrong's gcc-amd64
       # arm (design §4.5.1 documents this fallthrough).
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)&", expected, "; __int128 _d = *(__int128*)&",
-          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)&", loc,
-          ", _e, _d);", " *(__int128*)&", expected, " = _prev;", " ", result,
+          "{ __int128 _e = *(__int128*)", expectedPtr,
+          "; __int128 _d = *(__int128*)&", desired,
+          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", _e, _d);", " *(__int128*)", expectedPtr, " = _prev;", " ", result,
           " = (_prev == _e); }",
         ]
       .}
@@ -1045,8 +1072,8 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int128 _d = *(__int128*)&", desired, "; ", result,
-          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
-          expected, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
+          " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
+          expectedPtr, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     elif defined(arm64):
@@ -1056,8 +1083,8 @@ when sizeof(pointer) == 8:
       {.
         emit: [
           "{ __int128 _d = *(__int128*)&", desired, "; ", result,
-          " = __atomic_compare_exchange_n((__int128*)&", loc, ", (__int128*)&",
-          expected, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
+          " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
+          expectedPtr, ", _d, 1 /* weak */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
         ]
       .}
     else:
