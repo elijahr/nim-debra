@@ -73,4 +73,6 @@ suite "DWCAS Pair shape gate (positive instantiations)":
     enforceDwcasConstraints(uint64, ptr int)
     enforceDwcasConstraints(uint64, float64)
     enforceDwcasConstraints(int64, ptr int)
-    check true
+    # No runtime check: enforceDwcasConstraints is a compile-time
+    # template; reaching this point means every combo above compiled,
+    # which IS the test. A runtime assertion would be a green mirage.
