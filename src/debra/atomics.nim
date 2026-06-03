@@ -202,24 +202,11 @@ when defined(vcc):
   # hardware fences. ----
   proc msvcMemoryBarrier() {.importc: "MemoryBarrier", header: "<windows.h>".}
 
-  # ---- 16-byte DWCAS: _InterlockedCompareExchange128.
-  # MSVC signature: unsigned char _InterlockedCompareExchange128(
-  #   __int64 volatile *Destination,
-  #   __int64 ExchangeHigh,
-  #   __int64 ExchangeLow,
-  #   __int64 *ComparandResult);
-  # Returns 1 if the exchange happened, 0 otherwise. ComparandResult
-  # is read as the expected value AND written with the prior value
-  # (whether or not the exchange happened). This is the inverse-order
-  # mirror of GCC's `__sync_val_compare_and_swap` (which returns the
-  # prior value); we adapt at the call site rather than in the binding.
-  # Defined unconditionally on vcc — the only platform where vcc is
-  # valid is Windows-on-AMD64 (cmpxchg16b) or Windows-on-ARM64
-  # (`casp` via __dmb-stamped LL/SC); both support _InterlockedCompareExchange128
-  # from VS2013 onward.
-  proc msvcInterlockedCompareExchange128(
-    p: pointer, exchangeHigh, exchangeLow: int64, comparandResult: pointer
-  ): uint8 {.importc: "_InterlockedCompareExchange128", header: "<intrin.h>".}
+  # NOTE: The 16-byte DWCAS path on vcc emits inline C calls to
+  # `_InterlockedCompareExchange128` directly via `{.emit:.}` (see the
+  # `dwcasCmpExch` family below). No Nim-level `importc` binding for
+  # `_InterlockedCompareExchange128` is needed; an earlier declaration
+  # was removed as dead code (gemini cycle-22).
 
 # ---------------------------------------------------------------------------
 # MemoryOrder

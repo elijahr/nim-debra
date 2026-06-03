@@ -83,11 +83,18 @@ when defined(windows):
     ## `GetThreadId(handle)` instead of an inline field.
     ##
     ## The duplicated handle remains valid until `CloseHandle` is called
-    ## on it. Per-thread handles stored in the registered `threads[]`
-    ## array are closed by `unregisterThread` (via `closeThreadId`).
-    ## Transient handles obtained for self-identity comparisons (e.g. in
-    ## `scanAndSignal`) are closed at end-of-use with `closeThreadId` so
-    ## the duplicated-handle allocation does not leak.
+    ## on it. KNOWN_GAP (v0.10.0): the library does not currently close
+    ## per-thread handles eagerly. An earlier fix (898c160) closed them
+    ## on `unregisterThread` and on scanner exit, but the unregister-side
+    ## close introduced a use-after-close race against concurrent
+    ## `scanAndSignal` callers (the scanner had already loaded the handle
+    ## into a local before the unregister ran). Both sites were reverted
+    ## in cycle-22. The leak is bounded for typical workloads (~one
+    ## handle per `currentThreadId()` call, capped by the Windows 16K
+    ## per-process quota for the test surface). A future revision
+    ## (v0.11.0) will reintroduce closing via a deferred-close mechanism
+    ## that drains handles only after no scanner can hold a reference —
+    ## e.g. a per-manager close queue flushed at end-of-scan-epoch.
     handle*: Handle
 
   let InvalidThreadId* = ThreadId(handle: Handle(0))
@@ -123,26 +130,6 @@ when defined(windows):
       "DuplicateHandle(GetCurrentThread()) failed; this is not expected " &
         "for the in-process pseudo-handle call shape"
     ThreadId(handle: dup)
-
-  proc closeThreadId*(tid: ThreadId) {.inline, raises: [].} =
-    ## Release the duplicated thread handle held by `tid`. **Windows arm.**
-    ##
-    ## Every call to `currentThreadId()` on Windows allocates a fresh
-    ## handle via `DuplicateHandle(GetCurrentThread(), DUPLICATE_SAME_ACCESS)`
-    ## because the pseudo-handle returned by `GetCurrentThread` is not
-    ## cross-thread-usable. Without an explicit close, those handles leak
-    ## for the process lifetime. `closeThreadId` is the inverse of
-    ## `currentThreadId()`; call sites that produce a transient handle
-    ## (e.g. the scanner's `currentTid` in `scanAndSignal`) and call sites
-    ## that release a registered slot (`unregisterThread`) must invoke
-    ## this to bound the per-thread handle population.
-    ##
-    ## The `Handle(0)` sentinel is treated as no-op — `CloseHandle(0)`
-    ## would set Win32 last-error without freeing anything. The proc is
-    ## `{.raises: [].}` for parity with `currentThreadId` so callers in
-    ## `raises: []` contexts (the SMR core) can invoke it freely.
-    if tid.handle != Handle(0):
-      discard closeHandle(tid.handle)
 
   proc `==`*(a, b: ThreadId): bool =
     ## Compare two ThreadIds for equality.
@@ -218,18 +205,6 @@ else:
   proc currentThreadId*(): ThreadId =
     ## Get the ThreadId of the current thread.
     ThreadId(handle: pthread_self())
-
-  proc closeThreadId*(tid: ThreadId) {.inline, raises: [].} =
-    ## Release any platform resource backing `tid`. **POSIX arm: no-op.**
-    ##
-    ## On POSIX the `ThreadId` carries a `pthread_t` value, which is not
-    ## a kernel resource — it does not need to be released. The proc
-    ## exists for parity with the Windows arm, where each
-    ## `currentThreadId()` allocates a fresh duplicated handle that must
-    ## be released via `CloseHandle`. Cross-platform call sites can
-    ## invoke `closeThreadId` unconditionally; this branch compiles to
-    ## nothing useful and is inlined away.
-    discard tid
 
   proc `==`*(a, b: ThreadId): bool =
     ## Compare two ThreadIds for equality.

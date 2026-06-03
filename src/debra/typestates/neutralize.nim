@@ -89,13 +89,16 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
   var ctx = NeutralizeContext[MaxThreads, CC](s)
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
   let currentTid = currentThreadId()
-  # On Windows `currentThreadId()` allocates a fresh duplicated handle
-  # via `DuplicateHandle` (the pseudo-handle from `GetCurrentThread` is
-  # not cross-thread-usable). Without an explicit close, every scan
-  # leaks a handle for the process lifetime. `defer` releases it on
-  # all return paths; on POSIX `closeThreadId` is a no-op.
-  defer:
-    closeThreadId(currentTid)
+  # KNOWN_GAP (Windows): on Windows `currentThreadId()` allocates a fresh
+  # duplicated handle via `DuplicateHandle`; the handle leaks per scan
+  # iteration. An earlier `defer closeThreadId(currentTid)` was reverted
+  # alongside the unregister-side close (898c160 -> v0.10.0 cycle-22)
+  # because the paired unregister-side close introduced a Windows
+  # use-after-close crash in `examples/reclamation_background`. The
+  # scanner-side close on its own is safe (the handle is scanner-local),
+  # but is reverted in tandem so the documented leak is uniform until
+  # v0.11.0 introduces a deferred-close mechanism. On POSIX this is a
+  # non-issue: `ThreadId` is a `pthread_t`, no kernel resource attached.
 
   for i in 0 ..< MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:

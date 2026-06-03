@@ -138,16 +138,22 @@ proc unregisterThread*[
   # Inverse order would expose a window where the mask says "free" but the
   # threadId still points at the (now-departing) thread.
   #
-  # On Windows the slot's ThreadId carries a duplicated thread handle
-  # allocated by `currentThreadId()` at `registerThread` time. Exchange
-  # for `InvalidThreadId` (instead of a plain store) so we recover the
-  # outgoing handle and can release it via `closeThreadId`. Without
-  # this, every register/unregister cycle leaks one handle. On POSIX
-  # `closeThreadId` is a no-op (the `Pthread` value owns no resource),
-  # so the exchange is semantically identical to a release-store there.
-  let prevTid =
-    manager.threads[handle.idx].threadId.exchange(InvalidThreadId, moAcquireRelease)
-  closeThreadId(prevTid)
+  # KNOWN_GAP (Windows): the slot's `ThreadId` carries a duplicated thread
+  # handle allocated by `currentThreadId()` at `registerThread` time.
+  # We do NOT close it here. An earlier attempt (898c160) used
+  # `exchange + closeThreadId` to recover and release the outgoing
+  # handle, but that introduced a use-after-close race window: a
+  # concurrent `scanAndSignal` could have already loaded the handle into
+  # a local variable before this `unregisterThread` ran, and would then
+  # call `SuspendThread` on the freed handle. Bounding the leak safely
+  # requires either (a) deferring the close until no scanner can hold a
+  # reference (per-manager pending-close queue drained inside scan epoch)
+  # or (b) reclaiming on next slot reuse / manager `=destroy`. v0.11.0
+  # will pick one; v0.10.0 keeps the previously-documented leak (~3200
+  # handles per stress run, bounded for the test surface but unbounded
+  # for production callers with heavy thread churn) rather than ship a
+  # crash regression on Windows. See PR #14 cycle-22 for the CI trace.
+  manager.threads[handle.idx].threadId.store(InvalidThreadId, moRelease)
 
   # Step 2: clear the mask bit via CAS-with-retry, mirroring the
   # claim-side pattern in `register` (registration.nim:82-90).
