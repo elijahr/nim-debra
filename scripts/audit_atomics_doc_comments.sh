@@ -30,11 +30,19 @@ fi
 
 missing=()
 
-# Locate the start of the DWCAS specialization block. The block opens with
-# the second occurrence of `^when sizeof(pointer) == 8:` in the file (the
-# first occurrence on line 219ish is the gate-1 error-out block; the
-# second is the DWCAS-op specialization block).
-dwcas_start=$(grep -n '^when sizeof(pointer) == 8:' "$SRC" | sed -n '2p' | cut -d: -f1)
+# Locate the start of the DWCAS specialization block via its unique
+# section-header comment. Using the header comment is more robust than
+# counting occurrences of `when sizeof(pointer) == 8:` (a fragile
+# heuristic that would silently shift if any other 64-bit-only block
+# were added earlier in the file). The header is part of the file's
+# load-bearing block divider and is asserted to be unique below.
+header_re='^# DWCAS \(size-16\) specializations$'
+header_count=$(grep -cE "$header_re" "$SRC")
+if [[ "$header_count" -ne 1 ]]; then
+  echo "audit: expected exactly 1 DWCAS section-header comment in $SRC, found $header_count" >&2
+  exit 2
+fi
+dwcas_start=$(grep -nE "$header_re" "$SRC" | head -n 1 | cut -d: -f1)
 if [[ -z "$dwcas_start" ]]; then
   echo "audit: failed to locate DWCAS specialization block start in $SRC" >&2
   exit 2
