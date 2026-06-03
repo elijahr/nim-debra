@@ -857,13 +857,18 @@ when sizeof(pointer) == 8:
     let locPtr = addr loc
     let resultPtr = addr result
     when defined(gcc) and not defined(clang) and defined(amd64):
-      # Same _prev reuse pattern as dwcasStore: avoid a non-atomic volatile
-      # re-read of loc on each retry. __sync_val_compare_and_swap returns
-      # the atomically-observed prior value on failure.
+      # Same _prev reuse pattern as dwcasStore. Initial atomic load via
+      # cas-with-self (__sync_val_compare_and_swap with expected=desired=0):
+      # returns the current 128-bit value atomically without modifying loc.
+      # A plain `*(volatile __int128*)` read is NOT atomic on x86_64 (may
+      # split into two 64-bit loads). On CAS failure,
+      # __sync_val_compare_and_swap returns the atomically-observed prior
+      # value, reused as _prev for the next iteration.
       {.
         emit: [
           "{ __int128 _new = *(__int128*)&", desired,
-          "; __int128 _prev = *(volatile __int128*)", locPtr, "; __int128 _ret;",
+          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", 0, 0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1);",
           " *(__int128*)", resultPtr, " = _prev; }",
