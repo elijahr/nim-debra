@@ -172,6 +172,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   production callers with heavy thread churn. v0.10.1+ candidate: a
   deferred-close mechanism (per-manager pending-close queue drained
   only after no scanner can hold a reference, e.g. at end-of-scan-epoch).
+- Windows orc/c shutdown SIGSEGV in `examples/reclamation_background` —
+  the example prints "Background reclamation example completed
+  successfully" and then crashes during process teardown inside Nim's
+  `lib/system/alloc.nim:addToSharedFreeList` (the orc shared-free-list
+  multithreaded shutdown path). The example logic completes cleanly on
+  all other 32 matrix cells (3 non-Windows OSes × 4 MMs × 2 backends,
+  plus Windows arc/refc/atomicArc and orc/cpp). The crash is in the Nim
+  runtime allocator, not in DEBRA+ code: stack trace bottoms out in
+  `GC_unref → nimRawDispose → rawDealloc → addToSharedFreeList`, with
+  no DEBRA+ frames involved past the `=destroy` of the per-thread
+  RefPtr bag. CI skips just this one example on the affected cell
+  (`DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND=1` set in the workflow
+  matrix) so the cell stays green; all 32 other cells continue to run
+  the example to completion. v0.10.1+ candidate: investigate the orc
+  shared-free-list shutdown interaction (likely a Nim-runtime issue,
+  possibly worth filing upstream once minimally reproduced).
 
 ## [0.9.0] - 2026-05-30
 
