@@ -11,6 +11,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Full MSVC (vcc) backend support** in `src/debra/atomics.nim`. The
+  module gate at the top of the file accepts `defined(vcc)` alongside
+  the existing gcc / clang / llvm_gcc / nintendoswitch arms. Every op
+  in the `Atomic[T]` surface — `load`, `store`, `exchange`,
+  `compareExchangeStrong`, `compareExchangeWeak`, `fetchAdd`, `fetchSub`,
+  `fetchAnd`, `fetchOr`, `fetchXor`, `threadFence`, `signalFence`,
+  `AtomicFlag.testAndSet`, `AtomicFlag.clear` — gains a vcc arm that
+  routes to the MSVC `_Interlocked*` intrinsics family (declared in
+  `<intrin.h>` via importc bindings). DWCAS (`Atomic[Pair[A, B]]`)
+  gains a third backend arm in each of the 5 emit templates
+  (`dwcasLoad`, `dwcasStore`, `dwcasExchange`, `dwcasCasStrong`,
+  `dwcasCasWeak`) routing to `_InterlockedCompareExchange128`. Memory
+  orders are accepted at the surface for API parity but honored only
+  as compile barriers (the underlying `_Interlocked*` intrinsics are
+  always seq_cst at the hardware level on x86_64 and ARM64). MSVC has
+  no `__atomic_always_lock_free` equivalent; the `assertLockFree`
+  template's vcc arm emits `_Static_assert(sizeof(T) <= 8, ...)`,
+  which is the actual lock-free invariant of the MSVC surface (DWCAS
+  handles size 16 separately). `compareExchangeWeak` ≡ Strong on vcc
+  (`_Interlocked*` CAS is always-strong; no spurious failure on either
+  arch). The `dwcasGate3Assert` template's vcc arm elides the emit
+  body — `_InterlockedCompareExchange128` is unconditionally available
+  on every Windows-on-AMD64 (cmpxchg16b mandatory since Vista) and
+  Windows-on-ARM64 target, with no preprocessor predicate to gate on.
+- **windows-2022 cell in the CI test matrix** exercising the new vcc
+  arms end-to-end under all 4 memory managers and both `c` / `cpp`
+  backends (8 new cells; matrix grows from 24 to 32 cells). The Run
+  tests step prepends `--passNim:--cc:vcc` so each inner `nim c -r`
+  invocation drives MSVC rather than the MinGW gcc that ships with
+  `setup-nim-action` by default. The DWCAS macro probe step and the
+  objdump regex verification step are skipped on windows-2022 (no
+  `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` on MSVC; `dumpbin /disasm` has
+  a different format from objdump and the gcc/clang mnemonic checks
+  are backend-specific).
 - DWCAS (16-byte / 128-bit atomics) support in `src/debra/atomics.nim`:
   `Atomic[Pair[A, B]]` with full op surface — `load`, `store`,
   `exchange`, `compareExchangeStrong` (3 overloads: (success,failure),

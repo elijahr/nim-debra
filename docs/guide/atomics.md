@@ -52,7 +52,7 @@ standard one.
 | Under-aligned `Atomic[T]`            | Allowed; depends on the natural alignment of `T`                    | **Compile error**: `alignof(Atomic[T]) >= sizeof(T)` is asserted                 |
 | 16-byte atomics (DWCAS)              | Not supported                                                       | `Atomic[Pair[A, B]]` with load/store/exchange/compareExchange{Strong,Weak}       |
 | Per-callsite memory-order relaxation | N/A                                                                 | `dwcasOrderRelaxedCAS:` template                                                 |
-| MSVC                                 | Supported                                                           | **Not supported** (gcc / clang / llvm_gcc / nintendoswitch only)                 |
+| MSVC                                 | Supported                                                           | Supported (full `Atomic[T]` surface + DWCAS via `_InterlockedCompareExchange128`) |
 | 32-bit targets                       | Supported                                                           | Supported for ≤8 bytes; **DWCAS rejected** at compile time on 32-bit ABIs        |
 
 ### Concrete: the silent-spinlock footgun
@@ -119,9 +119,12 @@ Don't reach for this module just because nim-debra uses it. Concrete
 - **You don't need lock-free guarantees.** A single mutex around a
   shared mutable struct is dramatically easier to reason about than a
   hand-rolled CAS loop. Reach for `Lock` first.
-- **You're on MSVC, or any compiler that isn't gcc / clang / llvm_gcc /
-  nintendoswitch.** `debra/atomics` errors out at import time on
-  unsupported toolchains. v0.10.x does not target MSVC.
+- **You're on a compiler that isn't gcc / clang / llvm_gcc /
+  nintendoswitch / vcc (MSVC).** `debra/atomics` errors out at import
+  time on unsupported toolchains. v0.10.0 adds full MSVC support; the
+  vcc arms route to `_InterlockedCompareExchange*` for 1/2/4/8 byte ops
+  and `_InterlockedCompareExchange128` for DWCAS. Other backends (tcc,
+  bcc, etc.) remain unsupported.
 - **You're on a 32-bit ABI and want 16-byte atomics.** DWCAS requires a
   64-bit target. The 32-bit ABI fails gate 1 (`sizeof(pointer) == 8`)
   at compile time.
@@ -245,11 +248,11 @@ the `std/atomics` default. Weak must be spelled out explicitly.
 | clang          | Yes           | DWCAS via `__atomic_compare_exchange_n` on `__int128`. Inlines `cmpxchg16b` on x86_64 under `-mcx16`; inlines `caspal` on aarch64 under default LSE (Apple Silicon native, Linux ARM requires `-march=armv8.1-a+lse`). |
 | llvm_gcc       | Yes           | Treated as clang-shape (`__atomic_*` path)                                 |
 | nintendoswitch | Accepted      | Treated as clang-shape (`__atomic_*` path)                                 |
-| MSVC           | **No**        | Build fails at module import                                               |
+| vcc (MSVC)     | Yes           | Full `Atomic[T]` surface via `_Interlocked*` intrinsics family (`<intrin.h>`); DWCAS via `_InterlockedCompareExchange128`. No `-m`-style flags required — MSVC always emits `cmpxchg16b` on x86_64 / `casp`+LL/SC on ARM64. Memory orders honored as compile barriers only (instructions are seq_cst at hardware level on both archs). |
 
 ### Supported architectures (for DWCAS)
 
-Dispatch is by **compiler**, not architecture. Both arms cover both x86_64
+Dispatch is by **compiler**, not architecture. Three arms cover both x86_64
 and aarch64:
 
 - **GCC (any arch)**: `__sync_val_compare_and_swap` on `__int128`. Required
@@ -261,11 +264,20 @@ and aarch64:
 - **Clang / llvm_gcc / nintendoswitch (any arch)**: `__atomic_compare_exchange_n`
   on `__int128`. Clang's `__atomic_*` family inlines correctly under `-mcx16`
   (x86_64) or default LSE (aarch64).
+- **vcc (MSVC) (x86_64 or ARM64)**: `_InterlockedCompareExchange128` from
+  `<intrin.h>`. The intrinsic is guaranteed lock-free on every Windows-on-AMD64
+  target (cmpxchg16b is mandatory in the platform ABI since Windows Vista) and
+  Windows-on-ARM64 target (MSVC emits `casp` under FEAT_LSE or LL/SC otherwise).
+  load/store/exchange synthesize from `_InterlockedCompareExchange128` (no native
+  128-bit load/store/exchange on MSVC). The 1/2/4/8-byte surface uses the
+  `_Interlocked*` family directly (`_InterlockedExchange*` / `_InterlockedCompareExchange*`
+  / `_InterlockedExchangeAdd*` / `_InterlockedAnd|Or|Xor*`); see Phase B in
+  `src/debra/atomics.nim` for the full importc binding table.
 
 | Arch                 | Supported     | Required compiler flag                                                                                          |
 | -------------------- | ------------- | --------------------------------------------------------------------------------------------------------------- |
-| x86_64 (amd64)       | Yes           | `-mcx16` (both gcc and clang). Without it, gcc's `__sync_*` and clang's `__atomic_*` both reject `__int128` CAS. |
-| arm64 (aarch64)      | Yes           | `-march=armv8.1-a+lse -mno-outline-atomics` (gcc); default LSE on Apple Silicon, `-march=armv8.1-a+lse` on Linux ARM (clang). |
+| x86_64 (amd64)       | Yes           | `-mcx16` (both gcc and clang). MSVC: no flag required (`_InterlockedCompareExchange128` is unconditional). Without `-mcx16` on gcc/clang, both `__sync_*` and `__atomic_*` reject `__int128` CAS. |
+| arm64 (aarch64)      | Yes           | `-march=armv8.1-a+lse -mno-outline-atomics` (gcc); default LSE on Apple Silicon, `-march=armv8.1-a+lse` on Linux ARM (clang). MSVC: no flag required (`_InterlockedCompareExchange128` emits `casp`/LL+SC as appropriate). |
 | 32-bit (i386, armv7) | **No**        | Gate 1 (`sizeof(pointer) == 8`) fails at compile time                                                           |
 
 ### CI cell coverage
@@ -277,6 +289,7 @@ and aarch64:
 | ubuntu-24.04-arm + gcc + arm64 (native)   | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
 | ubuntu-24.04-arm + clang + arm64 (native) | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
 | macos-15 + clang + arm64                  | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
+| windows-2022 + MSVC + x86_64              | Yes            | Full test suite under `--cc:vcc`; macro probe + objdump steps skipped (MSVC has no `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` and dumpbin output differs from objdump). The vcc DWCAS path is exercised end-to-end by the test suite. |
 | ubuntu-24.04 + TSAN                       | Yes            | Contention tests under thread sanitizer              |
 | macOS x86_64                              | **Not in CI**  | macos-13 retired 2025-12-08; macOS coverage = arm64 only |
 
