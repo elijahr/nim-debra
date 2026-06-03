@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   body — `_InterlockedCompareExchange128` is unconditionally available
   on every Windows-on-AMD64 (cmpxchg16b mandatory since Vista) and
   Windows-on-ARM64 target, with no preprocessor predicate to gate on.
+- `nim.cfg`: `@if windows: cc = "vcc" @end` directive so every `nim c`
+  invocation on a Windows host defaults to the MSVC backend (rather
+  than the MinGW gcc that ships with `setup-nim-action`). This is what
+  routes the test matrix's windows-2022 cells through the new vcc arms
+  in `src/debra/atomics.nim`. Users who explicitly want the MinGW path
+  can pass `--cc:gcc` to override.
 - **windows-2022 cell in the CI test matrix** exercising the new vcc
   arms end-to-end under all 4 memory managers and both `c` / `cpp`
   backends (8 new cells; matrix grows from 24 to 32 cells). The Run

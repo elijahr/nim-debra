@@ -130,16 +130,13 @@ jobs:
               return 1
             fi
           }
-          # On windows-2022 we explicitly select the vcc (MSVC) backend; the
-          # default Nim install via setup-nim-action ships with both MinGW
-          # gcc and the ability to drive MSVC via --cc:vcc. The vcc arms in
-          # src/debra/atomics.nim are only exercised when the active C
-          # compiler is MSVC.
-          EXTRA_FLAGS=""
-          if [[ "${{ matrix.runs-on }}" == windows-* ]]; then
-            EXTRA_FLAGS="--passNim:--cc:vcc"
-          fi
-          nimble_run nimble test --passNim:--mm:${{ matrix.mm }} --passNim:--backend:${{ matrix.backend }} $EXTRA_FLAGS
+          # Note: vcc selection on windows-2022 is handled by `nim.cfg`'s
+          # `@if windows: cc = "vcc" @end` directive rather than a
+          # `--passNim:--cc:vcc` plumbed through this matrix step. Nimble's
+          # `test` task does its own `exec "nim c -r ..."` loop internally,
+          # and `--passNim` flags do not propagate into those nested `exec`
+          # invocations — only nim.cfg does.
+          nimble_run nimble test --passNim:--mm:${{ matrix.mm }} --passNim:--backend:${{ matrix.backend }}
 
       - name: objdump regex verification
         # Only run once per runner (not per mm/backend axis) — the emit
@@ -236,8 +233,4 @@ jobs:
               return 1
             fi
           }
-          EXTRA_FLAGS=""
-          if [[ "${{ matrix.runs-on }}" == windows-* ]]; then
-            EXTRA_FLAGS="--passNim:--cc:vcc"
-          fi
-          nimble_run nimble testExamples $EXTRA_FLAGS
+          nimble_run nimble testExamples
