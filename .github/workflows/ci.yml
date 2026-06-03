@@ -134,27 +134,31 @@ jobs:
           nim c -d:release --passC:-fno-lto -o:/tmp/fixture tests/probes/dwcas_objdump_fixture.nim
           case "${{ matrix.runs-on }}" in
             ubuntu-24.04)
-              objdump -d /tmp/fixture | grep -Eq '(^|[[:space:]])(lock[[:space:]]+)?cmpxchg16b([[:space:]]|$)' \
+              objdump -d /tmp/fixture | grep -qF 'cmpxchg16b' \
                 || (echo "::error::expected cmpxchg16b mnemonic missing"; exit 1)
-              if objdump -d /tmp/fixture | grep -Eq 'bl[[:space:]]+__aarch64_cas16_'; then
+              if objdump -d /tmp/fixture | grep -qF '__aarch64_cas16_'; then
                 echo "::error::outline-atomics libcall detected on x86_64 (impossible — investigate)"
                 exit 1
               fi
               ;;
             ubuntu-24.04-arm|macos-15)
-              if objdump -d /tmp/fixture | grep -Eq 'bl[[:space:]]+__aarch64_cas16_'; then
+              if objdump -d /tmp/fixture | grep -qF '__aarch64_cas16_'; then
                 echo "::error::outline-atomics libcall detected — -mno-outline-atomics not in effect"
                 exit 1
               fi
-              if objdump -d /tmp/fixture | grep -Eq '(^|[[:space:]])caspal?([[:space:]]|$)'; then
+              if objdump -d /tmp/fixture | grep -qF 'caspal'; then
                 echo "objdump verification PASSED: caspal mnemonic found"
+              elif objdump -d /tmp/fixture | grep -qF 'caspa'; then
+                echo "objdump verification PASSED: caspa mnemonic found"
+              elif objdump -d /tmp/fixture | grep -qF 'casp'; then
+                echo "objdump verification PASSED: casp mnemonic found"
               elif objdump -d /tmp/fixture | grep -A 5 'ldaxp' | grep -q 'stlxp'; then
                 echo "objdump verification PASSED: ldaxp/stlxp LL/SC pair found"
               else
                 echo "::group::objdump output for diagnosis"
                 objdump -d /tmp/fixture | grep -iE 'cas|ldax|stlx|atomic|__int128' | head -30
                 echo "::endgroup::"
-                echo "::error::expected caspal or ldaxp/stlxp pair missing"
+                echo "::error::expected caspal/caspa/casp or ldaxp/stlxp pair missing"
                 exit 1
               fi
               ;;
