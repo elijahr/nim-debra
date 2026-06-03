@@ -112,10 +112,16 @@ proc isAarch64Llsc(): bool =
 
 proc main() =
   # Initialize cells with distinct values so each thread observes a real
-  # pre-state instead of all-zero.
+  # pre-state instead of all-zero. With every cell starting at (0, 0), the
+  # first CAS per cell exits the loop trivially and most workers never
+  # exercise the genuine read-modify-write path; distinct per-cell starting
+  # values force a meaningful contention pattern from the first iteration.
   for i in 0 ..< NumCells:
     dwcasOrderRelaxedCAS:
-      cells[i].store(Pair[uint64, uint64](first: 0'u64, second: 0'u64), moRelaxed)
+      cells[i].store(
+        Pair[uint64, uint64](first: uint64(i + 1), second: 0xC0FFEE'u64 xor uint64(i)),
+        moRelaxed,
+      )
   totalAttempts.store(0'u64, moRelaxed)
   totalFailures.store(0'u64, moRelaxed)
   totalSpurious.store(0'u64, moRelaxed)
