@@ -83,18 +83,19 @@ when defined(windows):
     ## `GetThreadId(handle)` instead of an inline field.
     ##
     ## The duplicated handle remains valid until `CloseHandle` is called
-    ## on it. KNOWN_GAP (v0.10.0): the library does not currently close
-    ## per-thread handles eagerly. An earlier fix (898c160) closed them
-    ## on `unregisterThread` and on scanner exit, but the unregister-side
-    ## close introduced a use-after-close race against concurrent
-    ## `scanAndSignal` callers (the scanner had already loaded the handle
-    ## into a local before the unregister ran). Both sites were reverted
-    ## in cycle-22. The leak is bounded for typical workloads (~one
-    ## handle per `currentThreadId()` call, capped by the Windows 16K
-    ## per-process quota for the test surface). A future revision
-    ## (v0.11.0) will reintroduce closing via a deferred-close mechanism
-    ## that drains handles only after no scanner can hold a reference —
-    ## e.g. a per-manager close queue flushed at end-of-scan-epoch.
+    ## on it. Per-thread handles are allocated at `registerThread` time
+    ## and closed at `unregisterThread` time — bounded allocation, one
+    ## handle per registered worker. The hot-path scanner self-skip uses
+    ## `isCurrent(tid)` (no allocation) rather than `tid ==
+    ## currentThreadId()` to avoid per-scan handle churn that would
+    ## otherwise dominate the kernel-object accounting under
+    ## heavy reclamation cycles. An earlier fix (898c160) attempted to
+    ## close per-thread handles on `unregisterThread` and on scanner
+    ## exit, but the unregister-side close introduced a use-after-close
+    ## race against concurrent `scanAndSignal` callers (the scanner had
+    ## already loaded the handle into a local before the unregister
+    ## ran) and was reverted; the deferred-close redesign is tracked
+    ## as a v0.11.0 candidate.
     handle*: Handle
 
   let InvalidThreadId* = ThreadId(handle: Handle(0))
@@ -102,6 +103,28 @@ when defined(windows):
     ## for thread handles on Windows; the `==` operator special-cases
     ## the zero handle to avoid calling `GetThreadId(0)` (which would
     ## return 0 but emit a Win32 error).
+
+  proc getCurrentThreadId(): uint32 {.
+    stdcall, dynlib: "kernel32", importc: "GetCurrentThreadId", sideEffect
+  .}
+    ## Win32 `GetCurrentThreadId` — returns the OS-level DWORD identifier
+    ## of the calling thread without allocating a handle. Used by
+    ## `isCurrent` to compare against a stored handle without burning
+    ## a fresh `DuplicateHandle`.
+
+  proc isCurrent*(tid: ThreadId): bool {.inline, raises: [].} =
+    ## Non-allocating identity check: returns true iff `tid` refers to
+    ## the calling thread. Reads the stable DWORD thread ID via
+    ## `GetThreadId(tid.handle)` (no allocation) and compares to the
+    ## caller's own DWORD via `GetCurrentThreadId()` (no allocation).
+    ##
+    ## Preferred over `tid == currentThreadId()` for hot-path self-skip
+    ## checks (e.g. the neutralization scanner): the latter would
+    ## allocate a fresh `DuplicateHandle` on every scan iteration,
+    ## leaking Windows kernel handles until the process exits.
+    if tid.handle == Handle(0):
+      return false
+    getThreadIdFromHandle(tid.handle) == getCurrentThreadId()
 
   proc currentThreadId*(): ThreadId {.raises: [].} =
     ## Get the ThreadId of the current thread.
@@ -116,6 +139,11 @@ when defined(windows):
     ## `doAssert` fires with the Windows error code — better than
     ## silently producing an invalid handle that would later misroute
     ## SuspendThread to nowhere.
+    ##
+    ## **Performance note**: each call allocates a fresh kernel handle.
+    ## For identity-check use cases (e.g. self-skip in a hot scanner
+    ## loop), prefer `isCurrent(tid)` which performs the comparison
+    ## without any allocation.
     var dup: Handle = Handle(0)
     let ok = duplicateHandle(
       getCurrentProcess(),
@@ -205,6 +233,15 @@ else:
   proc currentThreadId*(): ThreadId =
     ## Get the ThreadId of the current thread.
     ThreadId(handle: pthread_self())
+
+  proc isCurrent*(tid: ThreadId): bool {.inline.} =
+    ## Non-allocating identity check: returns true iff `tid` refers to
+    ## the calling thread. Mirrors the Windows arm — on POSIX
+    ## `pthread_self()` is cheap (no kernel call), so the no-alloc
+    ## guarantee is structural rather than a meaningful perf win, but
+    ## the API parity matters for the cross-platform call site in
+    ## `neutralize.scanAndSignal`.
+    pthread_equal(tid.handle, pthread_self()) != 0
 
   proc `==`*(a, b: ThreadId): bool =
     ## Compare two ThreadIds for equality.

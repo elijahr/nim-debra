@@ -158,20 +158,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence-counter helpers) — v0.10.1 candidate per the design doc
   §10. Not required for the v0.10.0 release scope; LCRQ callers can
   bump the generation half manually in the interim.
-- Windows duplicated thread-handle leak — `currentThreadId()` allocates
-  a fresh `DuplicateHandle` on each call; nothing currently closes
-  them. A cycle-final attempt (898c160) added `closeThreadId` on both
-  `unregisterThread` and the scanner's transient handle, but the
-  unregister-side close introduced a use-after-close race against
-  concurrent `scanAndSignal` callers and crashed
-  `examples/reclamation_background` on windows-2022 orc/c +
-  atomicArc/c (CI cycle-22). Both call sites were reverted to keep
-  v0.10.0 ship-shape. The leak is bounded for typical workloads (one
-  handle per `currentThreadId` invocation, capped by the Windows 16K
-  per-process quota for the test surface) but is unbounded for
-  production callers with heavy thread churn. v0.10.1+ candidate: a
-  deferred-close mechanism (per-manager pending-close queue drained
-  only after no scanner can hold a reference, e.g. at end-of-scan-epoch).
+- Windows scanner per-iteration thread-handle leak — FIXED in v0.10.0
+  via the `isCurrent(tid)` helper: the neutralization scanner's
+  self-skip check now uses `GetThreadId(tid.handle) ==
+  GetCurrentThreadId()` instead of allocating a fresh
+  `DuplicateHandle` per scan via `tid == currentThreadId()`. Per-thread
+  registration still calls `currentThreadId()` once at
+  `registerThread` time, so allocation is bounded to one handle per
+  worker thread (not per scan cycle). An earlier attempt (898c160) to
+  also close those bounded handles on `unregisterThread` introduced a
+  use-after-close race against concurrent `scanAndSignal` callers and
+  was reverted; the registration-time handles persist until process
+  exit. v0.11.0+ candidate: a deferred-close mechanism (per-manager
+  pending-close queue drained only after no scanner can hold a
+  reference, e.g. at end-of-scan-epoch).
 - Windows orc/c shutdown SIGSEGV in `examples/reclamation_background` —
   the example prints "Background reclamation example completed
   successfully" and then crashes during process teardown inside Nim's

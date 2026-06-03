@@ -88,17 +88,12 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
   ## Returns count of signals sent.
   var ctx = NeutralizeContext[MaxThreads, CC](s)
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
-  let currentTid = currentThreadId()
-  # KNOWN_GAP (Windows): on Windows `currentThreadId()` allocates a fresh
-  # duplicated handle via `DuplicateHandle`; the handle leaks per scan
-  # iteration. An earlier `defer closeThreadId(currentTid)` was reverted
-  # alongside the unregister-side close (898c160 -> v0.10.0 cycle-22)
-  # because the paired unregister-side close introduced a Windows
-  # use-after-close crash in `examples/reclamation_background`. The
-  # scanner-side close on its own is safe (the handle is scanner-local),
-  # but is reverted in tandem so the documented leak is uniform until
-  # v0.11.0 introduces a deferred-close mechanism. On POSIX this is a
-  # non-issue: `ThreadId` is a `pthread_t`, no kernel resource attached.
+  # Self-skip uses `isCurrent(tid)` rather than `tid == currentThreadId()`
+  # to avoid allocating a fresh `DuplicateHandle` per scan iteration on
+  # Windows. `isCurrent` compares OS-level thread IDs via
+  # `GetThreadId(tid.handle) == GetCurrentThreadId()` (POSIX uses
+  # `pthread_equal(tid, pthread_self())`), both of which are
+  # non-allocating. Closes the v0.10.0 documented handle-leak gap.
 
   for i in 0 ..< MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:
@@ -109,7 +104,7 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
         if threadEpoch < ctx.threshold:
           # Thread is stalled - send signal
           let tid = ctx.manager.threads[i].threadId.load(moAcquire)
-          if tid.isValid and tid != currentTid:
+          if tid.isValid and not isCurrent(tid):
             # Don't signal ourselves or unset threads.
             # `neutralizeRemoteSlot` abstracts the platform difference:
             # POSIX delivers SIGUSR1 (handler reads target's
