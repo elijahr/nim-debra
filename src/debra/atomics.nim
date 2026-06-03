@@ -184,11 +184,15 @@ when defined(vcc):
   proc msvcReadWriteBarrier() {.importc: "_ReadWriteBarrier", header: "<intrin.h>".}
 
   # ---- full hardware memory fence for moSequentiallyConsistent
-  # thread fences. `MemoryBarrier` is a macro in <intrin.h>; we wrap it
-  # in a no-arg importc with the macro name. Per Microsoft Learn it
-  # expands to `__faststorefence` on x86_64 (or `__dmb(_ARM64_BARRIER_SY)`
-  # on aarch64), both of which are full hardware fences. ----
-  proc msvcMemoryBarrier() {.importc: "MemoryBarrier", header: "<intrin.h>".}
+  # thread fences. `MemoryBarrier` is a macro in `<winnt.h>` (reached
+  # via `<windows.h>`), NOT `<intrin.h>` — Nim's importc with the
+  # latter compiles (the identifier is "known" via SAL annotations)
+  # but the macro is not defined, so the C compiler emits an implicit
+  # function declaration that the linker cannot resolve. Per Microsoft
+  # Learn the macro expands to `__faststorefence` on x86_64 (or
+  # `__dmb(_ARM64_BARRIER_SY)` on aarch64), both of which are full
+  # hardware fences. ----
+  proc msvcMemoryBarrier() {.importc: "MemoryBarrier", header: "<windows.h>".}
 
   # ---- 16-byte DWCAS: _InterlockedCompareExchange128.
   # MSVC signature: unsigned char _InterlockedCompareExchange128(
@@ -293,28 +297,18 @@ template assertLockFree(T: typedesc) =
       # out the 32-bit split-lock pathology that __atomic_always_lock_free
       # catches on GCC for `Atomic[uint64]` on i386 — vcc only targets 64-bit
       # Windows so sizeof(T) <= 8 with natural alignment is sufficient.
-      # We emit a C-level static_assert on sizeof(T) <= 8 (the surface
-      # boundary; DWCAS handles size 16 separately).
-      when defined(cpp):
-        {.
-          emit: [
-            "static_assert(sizeof(",
-            T,
-            ") <= 8, \"Atomic[" & astToStr(T) & "] vcc backend supports only " &
-              "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
-              "-d:debraAllowNonLockFreeAtomics to override\");",
-          ]
-        .}
-      else:
-        {.
-          emit: [
-            "_Static_assert(sizeof(",
-            T,
-            ") <= 8, \"Atomic[" & astToStr(T) & "] vcc backend supports only " &
-              "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
-              "-d:debraAllowNonLockFreeAtomics to override\");",
-          ]
-        .}
+      # The check runs at Nim compile time via `static:` rather than as
+      # an emitted C `_Static_assert`, because MSVC's C frontend in
+      # default mode does not expose the `_Static_assert` keyword (it
+      # parses as an implicit-int function declaration and fails at
+      # link). The Nim-level check is equivalent — `sizeof(T)` is a
+      # compile-time constant on both paths — and avoids needing to
+      # toggle `/std:c11` for the C backend.
+      static:
+        assert sizeof(T) <= 8,
+          "Atomic[" & astToStr(T) & "] vcc backend supports only " &
+            "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
+            "-d:debraAllowNonLockFreeAtomics to override"
     elif defined(cpp):
       {.
         emit: [
