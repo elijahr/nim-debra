@@ -64,8 +64,13 @@ proc worker(arg: WorkerArg) {.thread.} =
   dwcasOrderRelaxedCAS:
     for _ in 0 ..< ItersPerThread:
       let cellIdx = rng.rand(NumCells - 1)
-      var expected = cells[cellIdx].load(moRelaxed)
-      let desired = Pair[uint64, uint64](first: expected.first + 1'u64, second: arg.tid)
+      let observed = cells[cellIdx].load(moRelaxed)
+      # `expected` is a var parameter and will be mutated by
+      # compareExchangeWeak to the current cell value on failure. Keep
+      # `observed` as the pre-CAS snapshot so the post-fail comparison
+      # uses the original expected value, not the post-CAS-mutated one.
+      var expected = observed
+      let desired = Pair[uint64, uint64](first: observed.first + 1'u64, second: arg.tid)
       inc attempts
       let ok =
         cells[cellIdx].compareExchangeWeak(expected, desired, moRelease, moRelaxed)
@@ -76,9 +81,10 @@ proc worker(arg: WorkerArg) {.thread.} =
         # any visible change in `loc`. This over-counts in the presence
         # of ABA (loc changed and was changed back between CAS-fail and
         # re-read), but the upper bound is sufficient for the 5%
-        # threshold.
+        # threshold. Compare against `observed` (the saved pre-CAS
+        # snapshot), NOT `expected` (which CAS mutated on failure).
         let postFail = cells[cellIdx].load(moRelaxed)
-        if postFail.first == expected.first and postFail.second == expected.second:
+        if postFail.first == observed.first and postFail.second == observed.second:
           inc spurious
   discard totalAttempts.fetchAdd(attempts, moRelaxed)
   discard totalFailures.fetchAdd(failures, moRelaxed)
