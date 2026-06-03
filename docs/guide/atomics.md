@@ -248,7 +248,7 @@ the `std/atomics` default. Weak must be spelled out explicitly.
 | clang          | Yes           | DWCAS via `__atomic_compare_exchange_n` on `__int128`. Inlines `cmpxchg16b` on x86_64 under `-mcx16`; inlines `caspal` on aarch64 under default LSE (Apple Silicon native, Linux ARM requires `-march=armv8.1-a+lse`). |
 | llvm_gcc       | Yes           | Treated as clang-shape (`__atomic_*` path)                                 |
 | nintendoswitch | Accepted      | Treated as clang-shape (`__atomic_*` path)                                 |
-| vcc (MSVC)     | Yes           | Full `Atomic[T]` surface via `_Interlocked*` intrinsics family (`<intrin.h>`); DWCAS via `_InterlockedCompareExchange128`. No `-m`-style flags required — MSVC always emits `cmpxchg16b` on x86_64 / `casp`+LL/SC on ARM64. Memory orders honored as compile barriers only (instructions are seq_cst at hardware level on both archs). |
+| vcc (MSVC)     | Yes (x64 seq_cst; ARM64 release-acquire) | Full `Atomic[T]` surface via `_Interlocked*` intrinsics family (`<intrin.h>`); DWCAS via `_InterlockedCompareExchange128`. No `-m`-style flags required — MSVC always emits `cmpxchg16b` on x86_64 / `casp`+LL/SC on ARM64. The DWCAS comparand array is declared `__declspec(align(16)) __int64 _cmp[2]` (load-bearing: MSDN requires 16-byte alignment for `_InterlockedCompareExchange128`'s `ComparandResult` parameter). x64 DWCAS sites wrap the intrinsic with `_mm_mfence()` before and after to upgrade MSVC's default release-acquire to seq_cst. **ARM64 Windows caveat:** `_mm_mfence` is x86-only; the v0.10.0 ARM64 Windows path emits the intrinsic without an explicit barrier, giving release-acquire (NOT seq_cst). v0.10.1 will add `__dmb(_ARM64_BARRIER_SY)` for the ARM64 arm. ARM64 Windows is not in the v0.10.0 CI matrix (windows-2022 x64 only). |
 
 ### Supported architectures (for DWCAS)
 
@@ -273,6 +273,30 @@ and aarch64:
   `_Interlocked*` family directly (`_InterlockedExchange*` / `_InterlockedCompareExchange*`
   / `_InterlockedExchangeAdd*` / `_InterlockedAnd|Or|Xor*`); see Phase B in
   `src/debra/atomics.nim` for the full importc binding table.
+  - **Comparand alignment (load-bearing).** MSDN requires the
+    `ComparandResult` parameter of `_InterlockedCompareExchange128` to be
+    16-byte aligned. Each of the 5 DWCAS emit sites declares the local
+    comparand array as `__declspec(align(16)) __int64 _cmp[2]`; dropping
+    that pragma is undefined behavior per MSDN and would silently
+    miscompare on platforms that enforce alignment (ARM64 in particular).
+  - **`_mm_mfence()` wrap for seq_cst on x64.** MSVC's `_Interlocked*`
+    intrinsics document only release-acquire semantics by default
+    (x86 hardware happens to give seq_cst for `lock cmpxchg16b`, but
+    the *intrinsic's contract* is release-acquire). To match
+    `std/atomics` Sequentially Consistent semantics, x64 DWCAS sites
+    bracket the intrinsic with `_mm_mfence()` calls (from `<emmintrin.h>`)
+    on both sides of the CAS. `_mm_mfence` lowers to `mfence` on x86
+    and gives full StoreLoad ordering, lifting the intrinsic from
+    release-acquire to seq_cst.
+  - **ARM64 Windows status (v0.10.0).** `_mm_mfence` is x86-only. The
+    ARM64 Windows path in v0.10.0 emits `_InterlockedCompareExchange128`
+    without an explicit barrier, so ARM64 Windows users (Snapdragon X+,
+    Windows-on-ARM) get **release-acquire**, NOT seq_cst, on DWCAS. ARM64
+    Windows is not in the v0.10.0 CI matrix (windows-2022 x64 only).
+    v0.10.1 will add `__dmb(_ARM64_BARRIER_SY)` (from `<arm64intr.h>`) on
+    the ARM64 arm to lift it to seq_cst. Users on ARM64 Windows who
+    require strict seq_cst on DWCAS in the v0.10.0 release should either
+    manually issue a fence at call sites or wait for v0.10.1.
 
 | Arch                 | Supported     | Required compiler flag                                                                                          |
 | -------------------- | ------------- | --------------------------------------------------------------------------------------------------------------- |

@@ -25,7 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dwcasCasWeak`) routing to `_InterlockedCompareExchange128`. Memory
   orders are accepted at the surface for API parity but honored only
   as compile barriers (the underlying `_Interlocked*` intrinsics are
-  always seq_cst at the hardware level on x86_64 and ARM64). MSVC has
+  always seq_cst at the hardware level on x86_64; see the ARM64 caveat
+  in `### Known Gaps` below). On x64, each of the 5 DWCAS emit sites
+  wraps `_InterlockedCompareExchange128` with `_mm_mfence()` (from
+  `<emmintrin.h>`) before and after the intrinsic to upgrade MSVC's
+  documented release-acquire contract to seq_cst. The DWCAS comparand
+  array is declared `__declspec(align(16)) __int64 _cmp[2]` per MSDN's
+  16-byte alignment requirement for `_InterlockedCompareExchange128`'s
+  `ComparandResult` parameter (load-bearing; dropping the pragma is UB).
+  MSVC has
   no `__atomic_always_lock_free` equivalent; the `assertLockFree`
   template's vcc arm emits `_Static_assert(sizeof(T) <= 8, ...)`,
   which is the actual lock-free invariant of the MSVC surface (DWCAS
@@ -154,6 +162,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known Gaps (deferred to v0.10.1+)
 
+- **MSVC ARM64 Windows seq_cst memory order on DWCAS** — cycle-27
+  added `_mm_mfence()` around the 5 DWCAS MSVC emit sites
+  (`dwcasLoad`, `dwcasStore`, `dwcasExchange`, `dwcasCasStrong`,
+  `dwcasCasWeak`) to lift `_InterlockedCompareExchange128` from its
+  documented release-acquire contract up to seq_cst. `_mm_mfence` is
+  x86-only. ARM64 Windows users (Snapdragon X+, Windows-on-ARM)
+  currently get **release-acquire** memory order on DWCAS, NOT seq_cst.
+  v0.10.1 will add the ARM64 equivalent via `__dmb(_ARM64_BARRIER_SY)`
+  from `<arm64intr.h>`. Until then, ARM64 Windows users requiring
+  strict seq_cst on DWCAS should either manually issue a fence at call
+  sites or upgrade to v0.10.1 when available. The v0.10.0 CI matrix is
+  windows-2022 x64 only; ARM64 Windows is not tested in v0.10.0. See
+  the in-code comment at the `_mm_mfence` call sites in
+  `src/debra/atomics.nim` for the v0.10.1 followup pointer.
 - Pair generation / ABA helper procs (e.g. `bumpGen`, monotonic
   sequence-counter helpers) — v0.10.1 candidate per the design doc
   §10. Not required for the v0.10.0 release scope; LCRQ callers can
