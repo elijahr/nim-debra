@@ -59,7 +59,7 @@ while IFS= read -r line; do
   def_lines+=("$line")
 done < <(
   awk -v start="$dwcas_start" '
-    NR >= start && /^[[:space:]]*(proc|template) [a-zA-Z]+\*/ { print NR }
+    NR >= start && /^[[:space:]]*(proc|template) [a-zA-Z_][a-zA-Z0-9_]*\*/ { print NR }
   ' "$SRC"
 )
 
