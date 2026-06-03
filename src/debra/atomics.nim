@@ -821,7 +821,11 @@ when sizeof(pointer) == 8:
     let desiredPtr = addr desiredLocal
     # Backend dispatch (Option B): see `dwcasLoad` for rationale. Two arms
     # (gcc → __sync_*, clang/llvm_gcc → __atomic_*) cover both x86_64 and
-    # aarch64 without library-call fallbacks.
+    # aarch64 without library-call fallbacks. CPU pause hint inside the
+    # gcc retry loop (cycle-12 perf): `pause` on x86, `yield` on aarch64
+    # reduces cache-line bouncing under contention; zero cost when
+    # uncontended. Inserted via #if cascade since this arm covers both
+    # ISAs.
     when defined(gcc) and not defined(clang):
       # Initial atomic load via cas-with-self (__sync_val_compare_and_swap
       # with expected=desired=0): returns the current 128-bit value
@@ -839,7 +843,10 @@ when sizeof(pointer) == 8:
           ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", 0, 0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1); }",
+          ", _prev, _new); if (_ret == _prev) break; _prev = _ret;",
+          "\n#if defined(__x86_64__)\n", "__builtin_ia32_pause();\n",
+          "#elif defined(__aarch64__)\n",
+          "__asm__ volatile(\"yield\" ::: \"memory\");\n", "#endif\n", " } while (1); }",
         ]
       .}
     elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
@@ -891,7 +898,8 @@ when sizeof(pointer) == 8:
     let resultPtr = addr result
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
-    # Backend dispatch (Option B): see `dwcasLoad` for rationale.
+    # Backend dispatch (Option B): see `dwcasLoad` for rationale. CPU pause
+    # hint inside gcc retry loop matches `dwcasStore`.
     when defined(gcc) and not defined(clang):
       # Same _prev reuse pattern as dwcasStore. Initial atomic load via
       # cas-with-self (__sync_val_compare_and_swap with expected=desired=0):
@@ -906,7 +914,10 @@ when sizeof(pointer) == 8:
           ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", 0, 0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1);",
+          ", _prev, _new); if (_ret == _prev) break; _prev = _ret;",
+          "\n#if defined(__x86_64__)\n", "__builtin_ia32_pause();\n",
+          "#elif defined(__aarch64__)\n",
+          "__asm__ volatile(\"yield\" ::: \"memory\");\n", "#endif\n", " } while (1);",
           " __builtin_memcpy(", resultPtr, ", &_prev, 16); }",
         ]
       .}
