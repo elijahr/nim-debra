@@ -1226,9 +1226,12 @@ when sizeof(pointer) == 8:
       # {0,0} over {0,0} is a no-op iff *Dest is already zero, and is
       # not performed otherwise (CAS fails). Either way, ComparandResult
       # ends up holding the atomically-observed prior value of *Dest.
+      # MSDN: ComparandResult must be 16-byte aligned. `__declspec(align(16))`
+      # on the stack array satisfies the requirement; misalignment raises a
+      # GP fault on x64 and unaligned-access trap on ARM64.
       {.
         emit: [
-          "{ __int64 _cmp[2] = {0, 0};",
+          "{ __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);", " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
@@ -1331,10 +1334,15 @@ when sizeof(pointer) == 8:
       # both reduce cache-line bouncing under contention with zero cost
       # when uncontended. Dispatched via the MSVC predefines `_M_X64` /
       # `_M_ARM64`.
+      # MSDN: ComparandResult must be 16-byte aligned. `__declspec(align(16))`
+      # on the stack array satisfies the requirement; misalignment raises a
+      # GP fault on x64 and unaligned-access trap on ARM64. (`_new` is only
+      # decomposed into scalar ExchangeHigh/ExchangeLow args, so it does not
+      # need alignment.)
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); __int64 _cmp[2] = {0, 0};",
+          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
@@ -1421,10 +1429,12 @@ when sizeof(pointer) == 8:
       # mirroring the gcc arm. Same pause-hint dispatch as dwcasStore.
       # `_cmp` holds the prior value seen each iteration; on CAS success
       # it carries the value that was atomically replaced (returned).
+      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
+      # alignment rationale; `_new` does not need it.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); __int64 _cmp[2] = {0, 0};",
+          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
@@ -1511,9 +1521,11 @@ when sizeof(pointer) == 8:
       # (-> result bool). Always-strong (no spurious failure on either
       # x86_64 or ARM64 — MSVC implements both natively and there's no
       # weak variant).
+      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
+      # alignment rationale; `_new` does not need it.
       {.
         emit: [
-          "{ __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
+          "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
           ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16); ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp) != 0);", " memcpy(", expectedPtr, ", _cmp, 16); }",
@@ -1652,9 +1664,11 @@ when sizeof(pointer) == 8:
       # casp under FEAT_LSE or ldxp/stxp + retry under LL/SC, both
       # presented to the caller as always-strong). Weak ≡ Strong; emit
       # the same body as dwcasCasStrong.
+      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
+      # alignment rationale; `_new` does not need it.
       {.
         emit: [
-          "{ __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
+          "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
           ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16); ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp) != 0);", " memcpy(", expectedPtr, ", _cmp, 16); }",
