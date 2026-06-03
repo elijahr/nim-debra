@@ -142,8 +142,30 @@ Don't reach for this module just because nim-debra uses it. Concrete
 | `store`                                | `moRelaxed`, `moRelease`, `moSequentiallyConsistent`                    |
 | `exchange`                             | Any                                                                     |
 | `compareExchange*` (success)           | Any                                                                     |
-| `compareExchange*` (failure)           | Must be a load-class order, must not be stronger than success           |
+| `compareExchange*` (failure)           | Must be a load-class order, must not be stronger than success; when `success == moRelease`, `failure` MUST be `moRelaxed` (see below) |
 | Any DWCAS op (16-byte) at the instruction level | Always `moSequentiallyConsistent` regardless of what you pass |
+
+### C11-strict failure-order validity
+
+Per C11 §7.17.7.4, the failure order of a `compareExchange` is the load
+order taken on the failed CAS path. It must satisfy:
+
+- `failure != moRelease` (failure is a pure load; loads cannot release).
+- `failure != moAcquireRelease` (same reason).
+- `failure` cannot be stronger than the load component of `success`.
+
+The third rule is *stricter* than the naive `ord(failure) <= ord(success)`
+comparison. In particular, when `success == moRelease`, `failure` MUST be
+`moRelaxed`. `moRelease` has no load-acquire on the success path, so the
+failure path (which is a pure load) cannot acquire either —
+`success=moRelease, failure=moAcquire` is invalid even though
+`ord(moAcquire) <= ord(moRelease)` numerically.
+
+nim-debra v0.10.0 enforces this at compile time via `validCasFailureOrder`
+(`src/debra/atomics.nim`). The LCRQ producer publish (the canonical
+release/relaxed use case) passes `moRelease`/`moRelaxed` and is accepted;
+mixing `moRelease`/`moAcquire` is rejected with a compile-time
+`assert` that names the offending pair.
 
 ### The DWCAS seq_cst upgrade
 
@@ -189,7 +211,12 @@ two are equivalent in both cost and behaviour:
   Both lower to `caspal` (single-instruction CAS). The `weak` flag is a
   no-op. Verified by `objdump` of a release-mode probe on Apple Silicon:
   both procs emit identical `caspal` instructions, no `ldaxp` / `stlxp`
-  pairs are emitted on either path.
+  pairs are emitted on either path. Empirical measurement under pure
+  contention on Apple Silicon (cycle-13 CI run): the
+  `compareExchangeWeak` failure rate matches `compareExchangeStrong`
+  exactly (13.86% real contention loss on the measured workload, 0%
+  spurious-failure delta). The Strong/Weak distinction collapses on
+  this microarchitecture.
 - **arm64 ARMv8.0 (LL/SC fallback, e.g. Raspberry Pi 3, Cortex-A53).**
   Weak uses `ldaxp` / `stlxp` and is permitted to fail spuriously;
   Strong wraps the LL/SC pair in a retry loop.
@@ -212,21 +239,34 @@ the `std/atomics` default. Weak must be spelled out explicitly.
 
 ### Supported compilers
 
-| Compiler       | Supported     | Notes                                              |
-| -------------- | ------------- | -------------------------------------------------- |
-| gcc            | Yes           | Requires `-mcx16` on x86_64 (shipped via nim.cfg)  |
-| clang          | Yes           | x86_64 emit uses `__atomic_*`; arm64 uses LSE      |
-| llvm_gcc       | Yes           | Treated as gcc-shape                               |
-| nintendoswitch | Accepted      | (GCC __atomic family present)                      |
-| MSVC           | **No**        | Build fails at module import                       |
+| Compiler       | Supported     | Notes                                                                      |
+| -------------- | ------------- | -------------------------------------------------------------------------- |
+| gcc            | Yes           | DWCAS via `__sync_val_compare_and_swap` on `__int128`. Requires `-mcx16` on x86_64 (shipped via nim.cfg); requires `-march=armv8.1-a+lse -mno-outline-atomics` on aarch64. |
+| clang          | Yes           | DWCAS via `__atomic_compare_exchange_n` on `__int128`. Inlines `cmpxchg16b` on x86_64 under `-mcx16`; inlines `caspal` on aarch64 under default LSE (Apple Silicon native, Linux ARM requires `-march=armv8.1-a+lse`). |
+| llvm_gcc       | Yes           | Treated as clang-shape (`__atomic_*` path)                                 |
+| nintendoswitch | Accepted      | Treated as clang-shape (`__atomic_*` path)                                 |
+| MSVC           | **No**        | Build fails at module import                                               |
 
 ### Supported architectures (for DWCAS)
 
-| Arch                 | Supported     | Required compiler flag                                              |
-| -------------------- | ------------- | ------------------------------------------------------------------- |
-| x86_64 (amd64)       | Yes           | `-mcx16` (gcc); none needed for clang (uses `__atomic_*` directly)  |
-| arm64 (aarch64)      | Yes           | `-march=armv8.1-a+lse -mno-outline-atomics` (gcc); LSE required     |
-| 32-bit (i386, armv7) | **No**        | Gate 1 (`sizeof(pointer) == 8`) fails at compile time               |
+Dispatch is by **compiler**, not architecture. Both arms cover both x86_64
+and aarch64:
+
+- **GCC (any arch)**: `__sync_val_compare_and_swap` on `__int128`. Required
+  because GCC's `__atomic_*_n` family at 16 bytes silently falls back to
+  `libatomic` (`__atomic_load_16`, `__atomic_compare_exchange_16`, etc.) on
+  BOTH x86_64 (regardless of `-mcx16`) AND aarch64 (regardless of LSE flags) —
+  only the legacy `__sync_*` builtins reliably inline to `cmpxchg16b` /
+  `casp` under GCC.
+- **Clang / llvm_gcc / nintendoswitch (any arch)**: `__atomic_compare_exchange_n`
+  on `__int128`. Clang's `__atomic_*` family inlines correctly under `-mcx16`
+  (x86_64) or default LSE (aarch64).
+
+| Arch                 | Supported     | Required compiler flag                                                                                          |
+| -------------------- | ------------- | --------------------------------------------------------------------------------------------------------------- |
+| x86_64 (amd64)       | Yes           | `-mcx16` (both gcc and clang). Without it, gcc's `__sync_*` and clang's `__atomic_*` both reject `__int128` CAS. |
+| arm64 (aarch64)      | Yes           | `-march=armv8.1-a+lse -mno-outline-atomics` (gcc); default LSE on Apple Silicon, `-march=armv8.1-a+lse` on Linux ARM (clang). |
+| 32-bit (i386, armv7) | **No**        | Gate 1 (`sizeof(pointer) == 8`) fails at compile time                                                           |
 
 ### CI cell coverage
 
@@ -234,7 +274,8 @@ the `std/atomics` default. Weak must be spelled out explicitly.
 | ----------------------------------------- | -------------- | ---------------------------------------------------- |
 | ubuntu-24.04 + gcc + x86_64               | Yes            | Macro probe + objdump verify `cmpxchg16b`            |
 | ubuntu-24.04 + clang + x86_64             | Yes            | Macro probe + objdump verify `cmpxchg16b`            |
-| ubuntu-24.04 + gcc + arm64 (cross / QEMU) | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
+| ubuntu-24.04-arm + gcc + arm64 (native)   | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
+| ubuntu-24.04-arm + clang + arm64 (native) | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
 | macos-15 + clang + arm64                  | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
 | ubuntu-24.04 + TSAN                       | Yes            | Contention tests under thread sanitizer              |
 | macOS x86_64                              | **Not in CI**  | macos-13 retired 2025-12-08; macOS coverage = arm64 only |

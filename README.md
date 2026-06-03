@@ -41,8 +41,10 @@ nimble install debra
 ```
 
 Requires Nim 2.2.0 or newer and a GCC, Clang, LLVM-GCC, or Nintendo Switch
-toolchain. The atomics module wraps the `__atomic_*` builtins and does not
-support MSVC.
+toolchain. The atomics module wraps the compiler's lock-free intrinsics
+(`__sync_*` on GCC for 16-byte CAS, `__atomic_*` elsewhere and on Clang)
+and does not support MSVC. See [`docs/guide/atomics.md`](docs/guide/atomics.md)
+for the full compiler / arch dispatch table.
 
 ## Quick start
 
