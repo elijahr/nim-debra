@@ -928,9 +928,8 @@ when sizeof(pointer) == 8:
     when defined(gcc) and not defined(clang) and defined(amd64):
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)", expectedPtr,
-          "; __int128 _d = *(__int128*)&", desired,
-          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          "{ __int128 _e = *(__int128*)", expectedPtr, "; __int128 _d = *(__int128*)&",
+          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _e, _d);", " *(__int128*)", expectedPtr, " = _prev;", " ", result,
           " = (_prev == _e); }",
         ]
@@ -1062,9 +1061,8 @@ when sizeof(pointer) == 8:
       # arm (design §4.5.1 documents this fallthrough).
       {.
         emit: [
-          "{ __int128 _e = *(__int128*)", expectedPtr,
-          "; __int128 _d = *(__int128*)&", desired,
-          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          "{ __int128 _e = *(__int128*)", expectedPtr, "; __int128 _d = *(__int128*)&",
+          desired, "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _e, _d);", " *(__int128*)", expectedPtr, " = _prev;", " ", result,
           " = (_prev == _e); }",
         ]
