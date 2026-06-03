@@ -173,13 +173,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ ! -f tests/t_atomics_concurrent.nim ]]; then
-            echo "::warning::tests/t_atomics_concurrent.nim not yet present (Task 14); skipping TSAN cell"
+          if [[ ! -f tests/test_dwcas_contention.nim ]]; then
+            echo "::warning::tests/test_dwcas_contention.nim not yet present (Task 14); skipping TSAN cell"
             exit 0
           fi
           nim c --threads:on -d:useMalloc \
             --passC:-fsanitize=thread --passL:-fsanitize=thread \
-            -r tests/t_atomics_concurrent.nim
+            -r tests/test_dwcas_contention.nim
 
       - name: Test examples
         shell: bash
