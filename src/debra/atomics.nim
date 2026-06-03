@@ -192,6 +192,11 @@ template enforceDwcasConstraints*(A, B: typedesc) =
   ## requires both halves live (cmpxchg16b / casp compares all 128 bits), so
   ## the payload sum is the real safety invariant.
   static:
+    assert sizeof(pointer) == 8,
+      "DWCAS / 128-bit atomics require a 64-bit target " &
+        "(sizeof(pointer) must be 8). nim-debra's Atomic[Pair[A, B]] / 16-byte " &
+        "atomic ops are unavailable on 32-bit ABIs. The 1-, 2-, 4-, and 8-byte " &
+        "Atomic[T] surface in debra/atomics remains available on 32-bit."
     assert sizeof(A) <= 8,
       "Pair half-type sizeof(" & $A & ") = " & $sizeof(A) &
         " must be <= 8 bytes (DWCAS pairs two 64-bit registers)"
@@ -217,28 +222,24 @@ template enforceDwcasConstraints*(A, B: typedesc) =
   # `expr(nkBracketExpr, tyGenericBody)` internal compiler error.
 
 # ---------------------------------------------------------------------------
-# Gate 1: 64-bit-only specialization wrapper
+# Gate 1: 64-bit-only constraint
 # ---------------------------------------------------------------------------
 #
 # DWCAS / 128-bit atomics require a 64-bit ABI (cmpxchg16b on x86_64,
-# casp on aarch64; both pair two 64-bit registers). Wrap the size-16
-# specialization block (helper templates + Atomic[Pair[...]] ops, landing
-# in subsequent tasks) in `when sizeof(pointer) == 8:` so 32-bit targets
-# get an actionable compile-time error rather than a non-lock-free
-# fallback.
+# casp on aarch64; both pair two 64-bit registers). The 64-bit constraint
+# is enforced per-instantiation inside `enforceDwcasConstraints*` above,
+# so a 32-bit target compiles `debra/atomics` cleanly (preserving the
+# 1-, 2-, 4-, and 8-byte `Atomic[T]` surface) and fails only when a user
+# actually instantiates `Atomic[Pair[A, B]]`.
 #
-# Block body is currently empty; tasks 7-11 fill in dwcasLoad / dwcasStore /
-# dwcasCompareExchange / Atomic[Pair[A, B]] op specializations (in a
-# secondary `when sizeof(pointer) == 8:` block placed after `Atomic[T]`,
-# which the DWCAS ops parameterize).
-when sizeof(pointer) == 8:
-  discard
-else:
-  {.
-    error:
-      "DWCAS requires a 64-bit target. nim-debra v0.10.0 does not " &
-      "support 32-bit or 16-bit pointers. sizeof(pointer) = " & $sizeof(pointer) & "."
-  .}
+# The size-16 op specializations themselves (`dwcasLoad`, `dwcasStore`,
+# `dwcasCasStrong`, `dwcasCasWeak`, and their `Atomic[Pair[A, B]]` op
+# wrappers) sit inside a `when sizeof(pointer) == 8:` block lower in this
+# file so they don't appear at all on 32-bit (where the `__int128` /
+# `cmpxchg16b` references inside their emit bodies would not compile).
+# The `Pair[A, B]` type itself is defined at module level (it's a harmless
+# struct on 32-bit) so it remains spellable; only `Atomic[Pair[A, B]]` ops
+# are gated.
 
 # ---------------------------------------------------------------------------
 # Atomic[T]
