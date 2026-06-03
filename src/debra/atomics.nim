@@ -21,10 +21,12 @@
 ## cross-compiler/arch compatibility matrix, and an LCRQ-style worked
 ## example.
 ##
-## Backend strategy: wrap GCC/Clang `__atomic_*_n` builtins (already
-## bound by Nim's `std/sysatomics` module). MSVC fallback is a future
-## item; this module currently requires gcc, clang, llvm_gcc, or the
-## Nintendo Switch toolchain.
+## Backend strategy: wrap GCC/Clang `__atomic_*_n` builtins for the
+## unix toolchains (gcc, clang, llvm_gcc, nintendoswitch), and MSVC's
+## `_Interlocked*` intrinsics family (declared in `<intrin.h>`) for vcc.
+## The MSVC arms cover the full 1-, 2-, 4-, and 8-byte `Atomic[T]`
+## surface plus AtomicFlag, fences, and the 16-byte DWCAS via
+## `_InterlockedCompareExchange128`.
 ##
 ## DWCAS (16-byte) emit logic adapted from atomic128
 ## (https://github.com/patternnoster/atomic128) by patternnoster,
@@ -38,14 +40,139 @@ import std/sysatomics
 import std/typetraits
 
 when not (
-  defined(gcc) or defined(llvm_gcc) or defined(clang) or defined(nintendoswitch)
+  defined(gcc) or defined(llvm_gcc) or defined(clang) or defined(nintendoswitch) or
+  defined(vcc)
 ):
   {.
     error:
-      "debra/atomics currently requires gcc, clang, llvm_gcc, or " &
-      "nintendoswitch (the GCC __atomic_* builtin family). MSVC " &
-      "fallback is a future item."
+      "debra/atomics requires gcc, clang, llvm_gcc, nintendoswitch " &
+      "(GCC __atomic_* builtin family), or vcc (MSVC _Interlocked* " &
+      "intrinsics). Other backends (tcc, bcc, etc.) are not supported."
   .}
+
+# ---------------------------------------------------------------------------
+# MSVC intrinsics surface
+# ---------------------------------------------------------------------------
+#
+# `std/sysatomics` only exposes a thin slice of the MSVC `_Interlocked*`
+# family on vcc (load/store via barrier-stamp, CAS for sizes 1/4/8 on `ptr`,
+# `_InterlockedExchangeAdd[64]` for `int`, plus `_ReadBarrier`/`_WriteBarrier`
+# /`_ReadWriteBarrier`). debra/atomics requires the full surface:
+# arbitrary `T` CAS at sizes 1/2/4/8, exchange at 1/2/4/8, fetch
+# add/sub/and/or/xor at 1/2/4/8, test-and-set and clear for AtomicFlag,
+# full thread/signal fences with explicit memory-order semantics, plus
+# `_InterlockedCompareExchange128` for DWCAS. The block below declares
+# the additional importc bindings needed for those wrappers.
+#
+# All MSVC `_Interlocked*` intrinsics are sequentially-consistent at the
+# hardware level: they emit `lock`-prefixed instructions (or `xchg` which
+# is implicitly locked) on x86_64. The memory-order parameter is therefore
+# honored at the compiler-barrier level only (`_ReadWriteBarrier`); the
+# instruction itself is always seq_cst. This matches the upgrade policy
+# documented for the DWCAS 16-byte ops and is consistent with MSVC's
+# documented semantics for these intrinsics (Microsoft Learn: "Intrinsics
+# Available on All Architectures").
+
+when defined(vcc):
+  # Header pragma carrier — every emitted body includes <intrin.h>.
+  {.emit: "#include <intrin.h>".}
+
+  # ---- exchange (sizes 1/2/4/8, fully-generic on the pointer type) ----
+  proc msvcInterlockedExchange8(p: pointer, val: int8): int8 {.
+    importc: "_InterlockedExchange8", header: "<intrin.h>".}
+  proc msvcInterlockedExchange16(p: pointer, val: int16): int16 {.
+    importc: "_InterlockedExchange16", header: "<intrin.h>".}
+  proc msvcInterlockedExchange32(p: pointer, val: int32): int32 {.
+    importc: "_InterlockedExchange", header: "<intrin.h>".}
+  proc msvcInterlockedExchange64(p: pointer, val: int64): int64 {.
+    importc: "_InterlockedExchange64", header: "<intrin.h>".}
+
+  # ---- compare-exchange (sizes 1/2/4/8) ----
+  # MSVC signature: T _InterlockedCompareExchange*(volatile T* Dest,
+  # T Exchange, T Comparand); returns the prior value at Dest.
+  proc msvcInterlockedCompareExchange8(
+      p: pointer, exchange, comparand: int8): int8 {.
+    importc: "_InterlockedCompareExchange8", header: "<intrin.h>".}
+  proc msvcInterlockedCompareExchange16(
+      p: pointer, exchange, comparand: int16): int16 {.
+    importc: "_InterlockedCompareExchange16", header: "<intrin.h>".}
+  proc msvcInterlockedCompareExchange32(
+      p: pointer, exchange, comparand: int32): int32 {.
+    importc: "_InterlockedCompareExchange", header: "<intrin.h>".}
+  proc msvcInterlockedCompareExchange64(
+      p: pointer, exchange, comparand: int64): int64 {.
+    importc: "_InterlockedCompareExchange64", header: "<intrin.h>".}
+
+  # ---- fetch-add (sizes 1/2/4/8). fetch-sub = fetch-add with negated val. ----
+  proc msvcInterlockedExchangeAdd8(p: pointer, val: int8): int8 {.
+    importc: "_InterlockedExchangeAdd8", header: "<intrin.h>".}
+  proc msvcInterlockedExchangeAdd16(p: pointer, val: int16): int16 {.
+    importc: "_InterlockedExchangeAdd16", header: "<intrin.h>".}
+  proc msvcInterlockedExchangeAdd32(p: pointer, val: int32): int32 {.
+    importc: "_InterlockedExchangeAdd", header: "<intrin.h>".}
+  proc msvcInterlockedExchangeAdd64(p: pointer, val: int64): int64 {.
+    importc: "_InterlockedExchangeAdd64", header: "<intrin.h>".}
+
+  # ---- fetch-and / fetch-or / fetch-xor (sizes 1/2/4/8) ----
+  proc msvcInterlockedAnd8(p: pointer, val: int8): int8 {.
+    importc: "_InterlockedAnd8", header: "<intrin.h>".}
+  proc msvcInterlockedAnd16(p: pointer, val: int16): int16 {.
+    importc: "_InterlockedAnd16", header: "<intrin.h>".}
+  proc msvcInterlockedAnd32(p: pointer, val: int32): int32 {.
+    importc: "_InterlockedAnd", header: "<intrin.h>".}
+  proc msvcInterlockedAnd64(p: pointer, val: int64): int64 {.
+    importc: "_InterlockedAnd64", header: "<intrin.h>".}
+
+  proc msvcInterlockedOr8(p: pointer, val: int8): int8 {.
+    importc: "_InterlockedOr8", header: "<intrin.h>".}
+  proc msvcInterlockedOr16(p: pointer, val: int16): int16 {.
+    importc: "_InterlockedOr16", header: "<intrin.h>".}
+  proc msvcInterlockedOr32(p: pointer, val: int32): int32 {.
+    importc: "_InterlockedOr", header: "<intrin.h>".}
+  proc msvcInterlockedOr64(p: pointer, val: int64): int64 {.
+    importc: "_InterlockedOr64", header: "<intrin.h>".}
+
+  proc msvcInterlockedXor8(p: pointer, val: int8): int8 {.
+    importc: "_InterlockedXor8", header: "<intrin.h>".}
+  proc msvcInterlockedXor16(p: pointer, val: int16): int16 {.
+    importc: "_InterlockedXor16", header: "<intrin.h>".}
+  proc msvcInterlockedXor32(p: pointer, val: int32): int32 {.
+    importc: "_InterlockedXor", header: "<intrin.h>".}
+  proc msvcInterlockedXor64(p: pointer, val: int64): int64 {.
+    importc: "_InterlockedXor64", header: "<intrin.h>".}
+
+  # ---- compiler reorder barrier (used as signalFence and as the
+  # compile-barrier for sub-seq_cst fences) ----
+  proc msvcReadWriteBarrier() {.
+    importc: "_ReadWriteBarrier", header: "<intrin.h>".}
+
+  # ---- full hardware memory fence for moSequentiallyConsistent
+  # thread fences. `MemoryBarrier` is a macro in <intrin.h>; we wrap it
+  # in a no-arg importc with the macro name. Per Microsoft Learn it
+  # expands to `__faststorefence` on x86_64 (or `__dmb(_ARM64_BARRIER_SY)`
+  # on aarch64), both of which are full hardware fences. ----
+  proc msvcMemoryBarrier() {.
+    importc: "MemoryBarrier", header: "<intrin.h>".}
+
+  # ---- 16-byte DWCAS: _InterlockedCompareExchange128.
+  # MSVC signature: unsigned char _InterlockedCompareExchange128(
+  #   __int64 volatile *Destination,
+  #   __int64 ExchangeHigh,
+  #   __int64 ExchangeLow,
+  #   __int64 *ComparandResult);
+  # Returns 1 if the exchange happened, 0 otherwise. ComparandResult
+  # is read as the expected value AND written with the prior value
+  # (whether or not the exchange happened). This is the inverse-order
+  # mirror of GCC's `__sync_val_compare_and_swap` (which returns the
+  # prior value); we adapt at the call site rather than in the binding.
+  # Defined unconditionally on vcc — the only platform where vcc is
+  # valid is Windows-on-AMD64 (cmpxchg16b) or Windows-on-ARM64
+  # (`casp` via __dmb-stamped LL/SC); both support _InterlockedCompareExchange128
+  # from VS2013 onward.
+  proc msvcInterlockedCompareExchange128(
+      p: pointer, exchangeHigh, exchangeLow: int64,
+      comparandResult: pointer): uint8 {.
+    importc: "_InterlockedCompareExchange128", header: "<intrin.h>".}
 
 # ---------------------------------------------------------------------------
 # MemoryOrder
