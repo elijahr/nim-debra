@@ -785,15 +785,21 @@ when sizeof(pointer) == 8:
     # directly inside the emit body.
     let locPtr = addr loc
     when defined(gcc) and not defined(clang) and defined(amd64):
-      # Initial volatile load once; on CAS failure, __sync_val_compare_and_swap
-      # returns the atomically-observed prior value, which we reuse as _prev
-      # for the next iteration. Avoids a non-atomic volatile re-read per retry
-      # (which can read torn values under contention and inflates cache-line
-      # pressure).
+      # Initial atomic load via cas-with-self (__sync_val_compare_and_swap
+      # with expected=desired=0): returns the current 128-bit value
+      # atomically without modifying loc (the swap is a no-op unless loc
+      # actually holds 0, in which case writing 0 over 0 is also a no-op).
+      # Standard idiom for atomic 16-byte load when only __sync_* builtins
+      # are available. A plain `*(volatile __int128*)` read is NOT atomic on
+      # x86_64 (the CPU may split it into two 64-bit loads, causing torn
+      # reads under concurrent writes). On CAS failure, the retry loop
+      # reuses __sync_val_compare_and_swap's atomically-observed prior value
+      # as _prev for the next iteration.
       {.
         emit: [
           "{ __int128 _new = *(__int128*)&", desired,
-          "; __int128 _prev = *(volatile __int128*)", locPtr, "; __int128 _ret;",
+          "; __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
+          ", 0, 0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret; } while (1); }",
         ]
