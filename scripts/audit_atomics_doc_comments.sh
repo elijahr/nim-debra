@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
 # Doc-comment audit for src/debra/atomics.nim public DWCAS surface.
 #
-# Fails the build if any public `proc` or `template` whose name suggests
-# DWCAS coverage (or which lives inside the `when sizeof(pointer) == 8:`
-# DWCAS specialization block) lacks an immediately-following `##`
-# doc-comment line.
+# Fails the build if any public `proc`, `func`, `template`, `macro`, or
+# `iterator` whose name suggests DWCAS coverage (or which lives inside
+# the `when sizeof(pointer) == 8:` DWCAS specialization block) lacks an
+# immediately-following `##` doc-comment line.
 #
 # Heuristic: scan src/debra/atomics.nim, find every line matching
-# `^[[:space:]]*(proc|template) [a-zA-Z]+\*` (i.e. an exported public
-# definition), then look at the next ~6 lines for a `##` line. The
-# 6-line window accommodates multi-line signatures with one-arg-per-line
-# formatting that nph produces.
+# `^[[:space:]]*(proc|func|template|macro|iterator) [a-zA-Z_][a-zA-Z0-9_]*\*`
+# (i.e. an exported public definition), then look at the next ~6 lines
+# for a `##` line. The 6-line window accommodates multi-line signatures
+# with one-arg-per-line formatting that nph produces.
 #
-# Exit 0 if every public proc/template has at least one `##` line in
-# its signature/body. Exit 1 with a list of undocumented symbols
-# otherwise.
+# Exit 0 if every public definition has at least one `##` line in its
+# signature/body. Exit 1 with a list of undocumented symbols otherwise.
 #
 # Release-blocking: run from .github/workflows/docs.yml before the
 # mkdocs build step.
@@ -48,8 +47,8 @@ if [[ -z "$dwcas_start" ]]; then
   exit 2
 fi
 
-# Extract line numbers of all exported procs/templates inside the DWCAS
-# specialization block (lines >= dwcas_start).
+# Extract line numbers of all exported procs/funcs/templates/macros/iterators
+# inside the DWCAS specialization block (lines >= dwcas_start).
 #
 # Uses a portable `while read` loop instead of `mapfile -t` because macOS
 # ships Bash 3.2 (GPLv3-licensing constraints) which predates `mapfile`
@@ -59,7 +58,7 @@ while IFS= read -r line; do
   def_lines+=("$line")
 done < <(
   awk -v start="$dwcas_start" '
-    NR >= start && /^[[:space:]]*(proc|template) [a-zA-Z_][a-zA-Z0-9_]*\*/ { print NR }
+    NR >= start && /^[[:space:]]*(proc|func|template|macro|iterator) [a-zA-Z_][a-zA-Z0-9_]*\*/ { print NR }
   ' "$SRC"
 )
 
@@ -77,10 +76,10 @@ for ln in "${def_lines[@]}"; do
 done
 
 if (( ${#missing[@]} > 0 )); then
-  echo "audit: ${#missing[@]} public proc/template(s) in $SRC lack a doc-comment:" >&2
+  echo "audit: ${#missing[@]} public definition(s) in $SRC lack a doc-comment:" >&2
   printf '  %s\n' "${missing[@]}" >&2
   exit 1
 fi
 
 count=${#def_lines[@]}
-echo "audit: $count public proc/template(s) in $SRC all carry doc-comments. OK."
+echo "audit: $count public definition(s) in $SRC all carry doc-comments. OK."
