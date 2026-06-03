@@ -146,6 +146,30 @@ jobs:
         # `caspal`, `ldaxp`/`stlxp`) are backend-specific. The vcc DWCAS
         # path is exercised end-to-end by the test suite itself, which is
         # sufficient at this width.
+        #
+        # ---- libatomic-fallback regression gate ----
+        # Beyond positive mnemonic checks, this step is a release-blocking
+        # gate that fails the build if any compiled binary contains a call
+        # (bl) or tail-call (b) to a libatomic symbol from the family:
+        #   __atomic_load_16, __atomic_store_16, __atomic_exchange_16,
+        #   __atomic_compare_exchange_16, __aarch64_cas16_*
+        #
+        # Why: GCC's generic `__atomic_*_n` builtins at width 16 silently
+        # lower to libatomic libcalls instead of inlining the appropriate
+        # DWCAS instruction (cmpxchg16b / caspal / ldaxp+stlxp). Our codebase
+        # uses the legacy `__sync_*` builtins on GCC paths specifically to
+        # avoid this footgun — see atomic128 reference and PR #14 cycle-12
+        # history (linker error when __atomic_*_n libcalls landed). Empirical
+        # probe in PR #14 (commit ac4e24f) confirmed gcc-aarch64 emits
+        # `b __atomic_load_16` (TAIL call), so the regex must catch both
+        # `bl <sym>` (call) and `b <sym>` (tail call) forms.
+        #
+        # Both /tmp/fixture (the DWCAS objdump probe) AND a real test binary
+        # built from tests/test_dwcas_roundtrip.nim are checked, so any
+        # accidental __atomic_*_n use anywhere in the DWCAS surface — not
+        # just the fixture — is caught.
+        #
+        # DO NOT bypass this gate without operator approval.
         if: matrix.mm == 'arc' && matrix.backend == 'c' && matrix.runs-on != 'windows-2022'
         shell: bash
         run: |
@@ -154,23 +178,36 @@ jobs:
           # Materialize objdump output to a file to avoid SIGPIPE pipefail
           # interaction with `grep -q` (which exits early on first match).
           objdump -d /tmp/fixture > /tmp/fixture.disasm
+
+          # Shared libatomic-fallback guard: catches both `bl <sym>` (call)
+          # and `b <sym>` (tail call) to any of the __atomic_*_16 or
+          # __aarch64_cas16_* libcalls. Applied to every disasm we generate.
+          libatomic_regex='(^|[[:space:]])b[l]?[[:space:]]+(<)?(__atomic_(load|store|exchange|compare_exchange)_16|__aarch64_cas16_)'
+          check_libatomic() {
+            local disasm="$1"
+            local label="$2"
+            if grep -qE "$libatomic_regex" "$disasm"; then
+              echo "::error::libatomic-fallback symbol detected in $label — DWCAS dispatched to libatomic instead of inlining"
+              echo "::error::See atomic128 reference; PR #14 cycle-12 history; KEEP __sync_* on GCC paths"
+              echo "::group::Offending symbols ($label)"
+              grep -E '__atomic_(load|store|exchange|compare_exchange)_16|__aarch64_cas16_' "$disasm" | head -20
+              echo "::endgroup::"
+              return 1
+            fi
+            return 0
+          }
+
           case "${{ matrix.runs-on }}" in
             ubuntu-24.04)
               if ! grep -qF 'cmpxchg16b' /tmp/fixture.disasm; then
                 echo "::error::expected cmpxchg16b mnemonic missing"
                 exit 1
               fi
-              if grep -qF '__aarch64_cas16_' /tmp/fixture.disasm; then
-                echo "::error::outline-atomics libcall detected on x86_64 (impossible — investigate)"
-                exit 1
-              fi
+              check_libatomic /tmp/fixture.disasm "fixture (x86_64)" || exit 1
               echo "objdump verification PASSED: cmpxchg16b mnemonic found"
               ;;
             ubuntu-24.04-arm|macos-15)
-              if grep -qF '__aarch64_cas16_' /tmp/fixture.disasm; then
-                echo "::error::outline-atomics libcall detected — -mno-outline-atomics not in effect"
-                exit 1
-              fi
+              check_libatomic /tmp/fixture.disasm "fixture (aarch64)" || exit 1
               if grep -qF 'caspal' /tmp/fixture.disasm; then
                 echo "objdump verification PASSED: caspal mnemonic found"
               elif grep -qF 'casp' /tmp/fixture.disasm; then
@@ -186,6 +223,15 @@ jobs:
               fi
               ;;
           esac
+
+          # Real-test-binary regression check: build the most surface-covering
+          # DWCAS test (exercises load/store/exchange/CAS at 16 bytes) and run
+          # the same libatomic-fallback guard. This catches any accidental
+          # __atomic_*_n introduction outside the fixture itself.
+          nim c -d:release --passC:-fno-lto -o:/tmp/test_dwcas_bin --path:src tests/test_dwcas_roundtrip.nim
+          objdump -d /tmp/test_dwcas_bin > /tmp/test_dwcas_bin.disasm
+          check_libatomic /tmp/test_dwcas_bin.disasm "test_dwcas_roundtrip binary" || exit 1
+          echo "libatomic-fallback regression check PASSED (fixture + test binary clean)"
           # Counter-test: same fixture compiled with -mno-cx16 MUST fail compile
           # (gate 3's _Static_assert fires under -mno-cx16). Only meaningful on
           # x86_64 — -mno-cx16 is a noop on aarch64.

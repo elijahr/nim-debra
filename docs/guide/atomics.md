@@ -299,6 +299,25 @@ underlying capability. It is intentionally redundant with the per-op
 `_Static_assert` inside the emit body — the probe runs once per CI
 cell, the static asserts run at every call site.
 
+### Regression test: libatomic-fallback detection
+
+CI's objdump verification step is a release-blocking gate that fails the
+build if any `__atomic_*_16` libatomic symbol — or `__aarch64_cas16_*`
+outline-atomics symbol — appears as a call target (either `bl <symbol>`
+or `b <symbol>` tail-call) in either the DWCAS objdump fixture or the
+`tests/test_dwcas_roundtrip.nim` test binary.
+
+This catches accidental reintroduction of the GCC `__atomic_*_n` libcall
+footgun: at width 16, GCC's generic `__atomic_*_n` builtins silently
+lower to libatomic libcalls instead of inlining the appropriate DWCAS
+instruction. The codebase uses the legacy `__sync_*` builtins on GCC
+paths specifically to dodge this — see the atomic128 reference and
+PR #14 cycle 12 for the historical incident.
+
+Applied to: `ubuntu-24.04` (gcc x86_64), `ubuntu-24.04-arm` (gcc
+aarch64), `macos-15` (Apple Clang arm64). Skipped on `windows-2022`
+(MSVC uses the `_Interlocked*` family, not libatomic).
+
 ## 7. Worked example: LCRQ-style cell
 
 The driving use case for DWCAS in v0.10.0 is the LCRQ cell, where a
