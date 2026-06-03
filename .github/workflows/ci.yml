@@ -95,6 +95,31 @@ jobs:
           fi
           diff -u "$EXPECTED" /tmp/dwcas-probe/actual.txt
 
+      - name: Probe — does __atomic_load_n/store_n inline at 16 bytes (aarch64+gcc)?
+        if: matrix.runs-on == 'ubuntu-24.04-arm'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gcc -O2 -march=armv8.1-a+lse -mno-outline-atomics \
+              -c tests/probes/dwcas_atomic_load_probe.c \
+              -o /tmp/atomic_load_probe.o
+          objdump -d /tmp/atomic_load_probe.o > /tmp/atomic_load_probe.disasm
+          echo "::group::__atomic_load_n disasm"
+          grep -A 20 'probe_load' /tmp/atomic_load_probe.disasm || true
+          echo "::endgroup::"
+          echo "::group::__atomic_store_n disasm"
+          grep -A 20 'probe_store' /tmp/atomic_load_probe.disasm || true
+          echo "::endgroup::"
+          # Diagnose: count inline atomic instructions vs libcalls
+          inline_count=$(grep -cE '(casp|caspal|ldp|ldaxp|stlxp|ldxr|stxr)' /tmp/atomic_load_probe.disasm || true)
+          libcall_count=$(grep -cE 'bl[[:space:]]+.*(__atomic|__aarch64_)' /tmp/atomic_load_probe.disasm || true)
+          echo "probe summary: inline_atomic_insns=$inline_count libcall_branches=$libcall_count"
+          if [ "$libcall_count" -gt 0 ]; then
+            echo "FINDING: gcc-aarch64+LSE __atomic_load_n/store_n EMITS LIBCALL"
+          else
+            echo "FINDING: gcc-aarch64+LSE __atomic_load_n/store_n INLINES NATIVELY"
+          fi
+
       - name: Install dependencies
         run: nimble install -y
 
