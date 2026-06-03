@@ -147,7 +147,7 @@ jobs:
                 exit 1
               fi
               objdump -d /tmp/fixture | grep -Eq '(^|\s)caspal?\s' \
-                || objdump -d /tmp/fixture | grep -Pzo '(?s)ldaxp.*\n.*stlxp' \
+                || (objdump -d /tmp/fixture | grep -A 5 'ldaxp' | grep -q 'stlxp') \
                 || (echo "::error::expected caspal or ldaxp/stlxp pair missing"; exit 1)
               ;;
           esac
