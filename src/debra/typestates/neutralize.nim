@@ -11,6 +11,7 @@ import typestates
 import ../types
 import ../constants
 import ../thread_id
+import ../signal
 
 type
   NeutralizeContext*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object of RootObj
@@ -99,8 +100,12 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
           # Thread is stalled - send signal
           let tid = ctx.manager.threads[i].threadId.load(moAcquire)
           if tid.isValid and tid != currentTid:
-            # Don't signal ourselves or unset threads
-            discard tid.sendSignal(QuiescentSignal)
+            # Don't signal ourselves or unset threads.
+            # `neutralizeRemoteSlot` abstracts the platform difference:
+            # POSIX delivers SIGUSR1 (handler reads target's
+            # `threadLocalIdx`); Windows suspends the target, flips the
+            # slot using the explicit `i` argument, then resumes.
+            neutralizeRemoteSlot(tid, i)
             inc ctx.signalsSent
 
   result = ScanComplete[MaxThreads, CC](ctx)

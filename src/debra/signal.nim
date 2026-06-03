@@ -1,15 +1,37 @@
 # src/debra/signal.nim
 
-## Signal handler for DEBRA+ thread neutralization.
+## Thread neutralization for DEBRA+.
 ##
-## When a thread is stalled (hasn't advanced its epoch), other threads
-## can send SIGUSR1 to force it to unpin, allowing reclamation to proceed.
+## Two-arm implementation:
+##
+## - **POSIX**: SIGUSR1 handler. Other threads send SIGUSR1; the handler
+##   runs asynchronously in the target's context and flips
+##   `pinned`/`neutralized` in the target's slot via raw pointer
+##   arithmetic (stride captured by `setGlobalManager`).
+##
+## - **Windows**: SuspendThread/ResumeThread. The scanner suspends the
+##   target, walks `manager.threads[]` via the same pointer arithmetic
+##   the POSIX handler uses, flips the slot, then resumes. There is no
+##   asynchronous handler; `installSignalHandler` and
+##   `forceReinstallSignalHandler` are no-ops on this platform.
+##
+## **Deadlock constraint (both arms)**: do not call DEBRA reclamation
+## while holding a lock that other DEBRA-using threads might be blocked
+## on. The constraint is the same on both platforms; the mechanism
+## differs (signal-handler-side acquire on POSIX vs. scanner-side
+## suspend-and-wait on Windows).
+##
+## The cross-platform `neutralizeRemoteSlot` entry point hides the
+## difference from `neutralize.scanAndSignal`.
 
 import ./atomics
-import std/posix
 
 import ./constants
+import ./thread_id
 import ./types
+
+when defined(windows):
+  import std/winlean
 
 var
   signalHandlerInstalled: Atomic[bool]
@@ -21,26 +43,32 @@ var
     ## threads both observe the flag false before either stores true.
     ## That is harmless because `sigaction` is thread-safe and re-arming
     ## the same handler is idempotent at the OS level.
+    ##
+    ## On Windows the flag is set to `true` once on first `installSignalHandler`
+    ## call so `isSignalHandlerInstalled` reports `true` for parity with POSIX.
   globalManagerPtr*: Atomic[pointer]
-    ## Set during manager initialization. Used by signal handler.
-    ## Stored as `Atomic[pointer]` (rather than a plain `pointer`) so the
-    ## publish path in `setGlobalManager` can use `moRelease` and the
-    ## consumer in the signal handler can use `moAcquire`. Without this,
-    ## the stride/header release stores would not synchronize with the
-    ## handler's reads through any defined happens-before edge — a
-    ## handler could observe the new pointer paired with stale stride or
-    ## header values from a previous manager.
+    ## Set during manager initialization. Used by signal handler (POSIX)
+    ## or by `neutralizeRemoteSlot` (Windows). Stored as
+    ## `Atomic[pointer]` (rather than a plain `pointer`) so the publish
+    ## path in `setGlobalManager` can use `moRelease` and the consumer
+    ## can use `moAcquire`. Without this, the stride/header release
+    ## stores would not synchronize with the consumer's reads through
+    ## any defined happens-before edge — a reader could observe the new
+    ## pointer paired with stale stride or header values from a previous
+    ## manager.
 
   # Layout of `DebraManager.threads` captured by `setGlobalManager` so
-  # the SIGUSR1 handler can walk to the right per-thread slot without
-  # knowing `MaxThreads` (the static parameter is not visible inside
-  # the noconv async-signal handler). These are written under release
-  # ordering before `globalManagerPtr` is published; the handler reads
-  # them under acquire ordering after observing a non-nil
-  # `globalManagerPtr`. Initial values are deliberately zero so that a
-  # buggy signal-before-publish path cannot index into the manager:
-  # `threadOffset = 0 + idx * 0 = 0`, which lands on the manager's
-  # globalEpoch field (a harmless non-corruption read of an Atomic).
+  # the SIGUSR1 handler (POSIX) or the scanner-side flipper (Windows)
+  # can walk to the right per-thread slot without knowing `MaxThreads`
+  # (the static parameter is not visible inside the noconv async-signal
+  # handler, and we want a single layout descriptor on both platforms).
+  # These are written under release ordering before `globalManagerPtr`
+  # is published; the consumer reads them under acquire ordering after
+  # observing a non-nil `globalManagerPtr`. Initial values are
+  # deliberately zero so that a buggy signal-before-publish path cannot
+  # index into the manager: `threadOffset = 0 + idx * 0 = 0`, which
+  # lands on the manager's globalEpoch field (a harmless non-corruption
+  # read of an Atomic).
   threadsArrayOffsetBytes: Atomic[int]
   threadStateStrideBytes: Atomic[int]
 
@@ -106,6 +134,12 @@ static:
 # registered-bit; both fields must be consulted before treating
 # `threadLocalIdx` as a real slot index. `registerThread` flips
 # `threadLocalRegistered = true` after assigning a slot.
+#
+# On Windows these threadvars are still used by `unregisterThread` for
+# thread-affinity enforcement. The Windows neutralization arm
+# (`neutralizeRemoteSlot`) does NOT read them from the target thread
+# (impossible without OS-level TLS introspection); instead the scanner
+# passes the slot index explicitly.
 var threadLocalIdx* {.threadvar.}: int
 var threadLocalRegistered* {.threadvar.}: bool
 var threadLocalManager* {.threadvar.}: pointer
@@ -116,98 +150,195 @@ var threadLocalManager* {.threadvar.}: pointer
   ## A would otherwise have its `threadLocalIdx` interpreted against
   ## manager B's slot array.
 
-proc neutralizationHandler(sig: cint) {.noconv.} =
-  ## SIGUSR1 handler - force unpin if pinned, mark neutralized.
-  ##
-  ## This runs asynchronously when the OS delivers the signal.
-  ## We use raw pointer arithmetic because we can't know MaxThreads
-  ## at compile time in the signal handler context. Stride and header
-  ## offset were captured by `setGlobalManager`; in-slot field offsets
-  ## are compile-time constants derived from `offsetOf(ThreadState, ...)`.
-  if not threadLocalRegistered:
-    return
+when not defined(windows):
+  import std/posix
 
-  # Load the manager pointer FIRST under acquire so it pairs with the
-  # release store in `setGlobalManager`. The release/acquire edge
-  # guarantees that stride and header values stored *before* the
-  # pointer are visible *after* the pointer is observed non-nil. If we
-  # loaded stride/header first, a reader could observe a fresh
-  # `globalManagerPtr` paired with stale stride/header from a previous
-  # manager (or vice versa) — exactly the publish-ordering hazard the
-  # surrounding comments claim to prevent.
-  let mgrPtr = globalManagerPtr.load(moAcquire)
-  if mgrPtr != nil:
-    let basePtr = cast[ptr UncheckedArray[byte]](mgrPtr)
-
-    # Acquire-ordered reads here are technically redundant given the
-    # acquire on `mgrPtr` above (the release store on `mgrPtr` happens
-    # after the release stores on stride/header, so observing the
-    # pointer transitively makes the prior stores visible). They are
-    # retained for clarity and as defense-in-depth: if anyone reorders
-    # the publish path in `setGlobalManager`, these acquires keep the
-    # handler correct on its own merits.
-    let headerSize = threadsArrayOffsetBytes.load(moAcquire)
-    let stride = threadStateStrideBytes.load(moAcquire)
-    if stride == 0:
-      # `setGlobalManager` was never called with a typed manager.
-      # Refuse to walk rather than scribble at offset 0.
+  proc neutralizationHandler(sig: cint) {.noconv.} =
+    ## SIGUSR1 handler - force unpin if pinned, mark neutralized.
+    ##
+    ## This runs asynchronously when the OS delivers the signal.
+    ## We use raw pointer arithmetic because we can't know MaxThreads
+    ## at compile time in the signal handler context. Stride and header
+    ## offset were captured by `setGlobalManager`; in-slot field offsets
+    ## are compile-time constants derived from `offsetOf(ThreadState, ...)`.
+    if not threadLocalRegistered:
       return
 
-    let threadOffset = headerSize + threadLocalIdx * stride
+    # Load the manager pointer FIRST under acquire so it pairs with the
+    # release store in `setGlobalManager`. The release/acquire edge
+    # guarantees that stride and header values stored *before* the
+    # pointer are visible *after* the pointer is observed non-nil. If we
+    # loaded stride/header first, a reader could observe a fresh
+    # `globalManagerPtr` paired with stale stride/header from a previous
+    # manager (or vice versa) — exactly the publish-ordering hazard the
+    # surrounding comments claim to prevent.
+    let mgrPtr = globalManagerPtr.load(moAcquire)
+    if mgrPtr != nil:
+      let basePtr = cast[ptr UncheckedArray[byte]](mgrPtr)
 
-    let pinnedPtr =
-      cast[ptr Atomic[bool]](addr basePtr[threadOffset + threadStatePinnedOffset()])
-    let neutralizedPtr = cast[ptr Atomic[bool]](addr basePtr[
-      threadOffset + threadStateNeutralizedOffset()
-    ])
+      # Acquire-ordered reads here are technically redundant given the
+      # acquire on `mgrPtr` above (the release store on `mgrPtr` happens
+      # after the release stores on stride/header, so observing the
+      # pointer transitively makes the prior stores visible). They are
+      # retained for clarity and as defense-in-depth: if anyone reorders
+      # the publish path in `setGlobalManager`, these acquires keep the
+      # handler correct on its own merits.
+      let headerSize = threadsArrayOffsetBytes.load(moAcquire)
+      let stride = threadStateStrideBytes.load(moAcquire)
+      if stride == 0:
+        # `setGlobalManager` was never called with a typed manager.
+        # Refuse to walk rather than scribble at offset 0.
+        return
 
-    if pinnedPtr[].load(moAcquire):
-      pinnedPtr[].store(false, moRelease)
-      neutralizedPtr[].store(true, moRelease)
+      let threadOffset = headerSize + threadLocalIdx * stride
 
-proc installSignalHandler*() =
-  ## Install SIGUSR1 handler for DEBRA+ neutralization.
-  ##
-  ## Safe to call multiple times - subsequent calls are no-ops.
-  ## Called automatically during first DebraManager initialization.
-  ##
-  ## Thread-safety: the `signalHandlerInstalled` flag is `Atomic[bool]`,
-  ## acquire-loaded for the fast-path bail-out and release-stored after
-  ## a successful `sigaction`. Two threads may both observe the flag
-  ## false and both call `sigaction`; that is benign because
-  ## `sigaction` is thread-safe and re-arming the same handler is
-  ## idempotent at the OS level.
-  if signalHandlerInstalled.load(moAcquire):
-    return
+      let pinnedPtr =
+        cast[ptr Atomic[bool]](addr basePtr[threadOffset + threadStatePinnedOffset()])
+      let neutralizedPtr = cast[ptr Atomic[bool]](addr basePtr[
+        threadOffset + threadStateNeutralizedOffset()
+      ])
 
-  var sa: Sigaction
-  sa.sa_handler = neutralizationHandler
-  discard sigemptyset(sa.sa_mask)
-  sa.sa_flags = 0 # No SA_RESTART - we want operations to be interrupted
+      if pinnedPtr[].load(moAcquire):
+        pinnedPtr[].store(false, moRelease)
+        neutralizedPtr[].store(true, moRelease)
 
-  if sigaction(QuiescentSignal, sa, nil) == 0:
+  proc installSignalHandler*() =
+    ## Install SIGUSR1 handler for DEBRA+ neutralization.
+    ##
+    ## Safe to call multiple times - subsequent calls are no-ops.
+    ## Called automatically during first DebraManager initialization.
+    ##
+    ## Thread-safety: the `signalHandlerInstalled` flag is `Atomic[bool]`,
+    ## acquire-loaded for the fast-path bail-out and release-stored after
+    ## a successful `sigaction`. Two threads may both observe the flag
+    ## false and both call `sigaction`; that is benign because
+    ## `sigaction` is thread-safe and re-arming the same handler is
+    ## idempotent at the OS level.
+    if signalHandlerInstalled.load(moAcquire):
+      return
+
+    var sa: Sigaction
+    sa.sa_handler = neutralizationHandler
+    discard sigemptyset(sa.sa_mask)
+    sa.sa_flags = 0 # No SA_RESTART - we want operations to be interrupted
+
+    if sigaction(QuiescentSignal, sa, nil) == 0:
+      signalHandlerInstalled.store(true, moRelease)
+
+  proc isSignalHandlerInstalled*(): bool =
+    ## Check if signal handler has been installed.
+    signalHandlerInstalled.load(moAcquire)
+
+  proc forceReinstallSignalHandler*() =
+    ## Re-install the SIGUSR1 handler unconditionally, bypassing the
+    ## `signalHandlerInstalled` idempotency flag. Intended for test
+    ## isolation: when a sibling test installs a different SIGUSR1
+    ## handler via direct `sigaction` (e.g. the placeholder in
+    ## `typestates/signal_handler`), the OS-level handler is overwritten
+    ## even though `signalHandlerInstalled` remains true. Calling this
+    ## restores the real `neutralizationHandler`. Not part of the
+    ## library's public surface for normal use; prefer
+    ## `installSignalHandler` in production code.
+    var sa: Sigaction
+    sa.sa_handler = neutralizationHandler
+    discard sigemptyset(sa.sa_mask)
+    sa.sa_flags = 0
+    if sigaction(QuiescentSignal, sa, nil) == 0:
+      signalHandlerInstalled.store(true, moRelease)
+
+else:
+  # Windows arm: there is no signal handler to install. The
+  # neutralization mechanism (SuspendThread/ResumeThread) is invoked
+  # synchronously by the scanner via `neutralizeRemoteSlot`. The
+  # install/check stubs retain the POSIX shape so callers
+  # (`registerThread`, tests) compile unchanged.
+
+  proc installSignalHandler*() =
+    ## Windows stub — see module comment. The neutralization arm uses
+    ## SuspendThread/ResumeThread directly; there is no async handler
+    ## to install. Sets `signalHandlerInstalled` to true so
+    ## `isSignalHandlerInstalled` reports `true` for parity with POSIX.
     signalHandlerInstalled.store(true, moRelease)
 
-proc isSignalHandlerInstalled*(): bool =
-  ## Check if signal handler has been installed.
-  signalHandlerInstalled.load(moAcquire)
+  proc isSignalHandlerInstalled*(): bool =
+    ## Check if signal handler has been installed. On Windows this
+    ## reports whether `installSignalHandler` has been called at least
+    ## once; there is no actual handler.
+    signalHandlerInstalled.load(moAcquire)
 
-proc forceReinstallSignalHandler*() =
-  ## Re-install the SIGUSR1 handler unconditionally, bypassing the
-  ## `signalHandlerInstalled` idempotency flag. Intended for test
-  ## isolation: when a sibling test installs a different SIGUSR1
-  ## handler via direct `sigaction` (e.g. the placeholder in
-  ## `typestates/signal_handler`), the OS-level handler is overwritten
-  ## even though `signalHandlerInstalled` remains true. Calling this
-  ## restores the real `neutralizationHandler`. Not part of the
-  ## library's public surface for normal use; prefer
-  ## `installSignalHandler` in production code.
-  var sa: Sigaction
-  sa.sa_handler = neutralizationHandler
-  discard sigemptyset(sa.sa_mask)
-  sa.sa_flags = 0
-  if sigaction(QuiescentSignal, sa, nil) == 0:
+  proc forceReinstallSignalHandler*() =
+    ## Windows stub — see `installSignalHandler`. Provided for API
+    ## parity so tests that exercise handler re-install paths compile.
     signalHandlerInstalled.store(true, moRelease)
+
+proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
+  ## Force-unpin and mark-neutralized a remote thread's slot.
+  ##
+  ## **POSIX arm**: sends `QuiescentSignal` (SIGUSR1) to `tid`. The
+  ## handler installed by `installSignalHandler` runs asynchronously in
+  ## the target's context, reads the target's `threadLocalIdx`, and
+  ## flips the slot. The `slot` argument is unused (kept for API parity).
+  ##
+  ## **Windows arm**: suspends `tid` (which is a duplicated thread
+  ## Handle), walks the published global manager to find slot `slot`,
+  ## flips `pinned` to false and `neutralized` to true under release
+  ## ordering, then resumes the thread. The walk uses the same
+  ## pointer-arithmetic descriptor (`globalManagerPtr` +
+  ## `threadsArrayOffsetBytes` + `threadStateStrideBytes`) that the
+  ## POSIX handler uses, so the layout invariants asserted at the top
+  ## of this file apply identically.
+  ##
+  ## Both arms are no-ops when `tid` is not valid.
+  ##
+  ## **Deadlock note**: see module-level comment. On Windows, the
+  ## scanner blocks inside `SuspendThread` only briefly (kernel
+  ## suspends, returns); the slot-flip is wait-free. The risk is the
+  ## target holding a lock that the scanner needs *after* this call.
+  when defined(windows):
+    if not tid.isValid:
+      return
+
+    # Suspend the target. SuspendThread returns the previous suspend
+    # count, or DWORD(-1) (== 0xFFFFFFFF cast to int32 == -1) on
+    # failure. winlean's suspendThread returns int32. A negative
+    # return means failure (handle invalid or thread already
+    # terminated). Treat failure as no-op (the target is gone).
+    let prevCount = suspendThread(tid.handle)
+    if prevCount < 0:
+      return
+
+    # Walk the global manager descriptor exactly like the POSIX
+    # handler. On Windows the scanner runs this from its own context
+    # (not the target's), so `threadLocalIdx` is the SCANNER's slot
+    # index, not the target's — we use the explicit `slot` argument
+    # instead.
+    let mgrPtr = globalManagerPtr.load(moAcquire)
+    if mgrPtr != nil:
+      let basePtr = cast[ptr UncheckedArray[byte]](mgrPtr)
+      let headerSize = threadsArrayOffsetBytes.load(moAcquire)
+      let stride = threadStateStrideBytes.load(moAcquire)
+      if stride != 0:
+        let threadOffset = headerSize + slot * stride
+        let pinnedPtr =
+          cast[ptr Atomic[bool]](addr basePtr[threadOffset + threadStatePinnedOffset()])
+        let neutralizedPtr = cast[ptr Atomic[bool]](addr basePtr[
+          threadOffset + threadStateNeutralizedOffset()
+        ])
+        if pinnedPtr[].load(moAcquire):
+          pinnedPtr[].store(false, moRelease)
+          neutralizedPtr[].store(true, moRelease)
+
+    # Resume. If this fails the target is permanently suspended,
+    # which would deadlock the whole process. Treat ResumeThread
+    # failure as a hard error: the target was already terminated
+    # (ResumeThread returns -1) or the handle is invalid (we'd have
+    # caught that above). In practice a successful SuspendThread
+    # implies the handle is valid for ResumeThread, so this branch
+    # is defensive.
+    discard resumeThread(tid.handle)
+  else:
+    discard slot # POSIX path ignores the slot — handler reads threadLocalIdx
+    discard tid.sendSignal(QuiescentSignal)
 
 proc setGlobalManager*[
     MaxThreads: static int, CC: static PinScopeCardinality = ccSingle
@@ -236,10 +367,15 @@ proc setGlobalManager*[
   ## atomic with respect to a concurrent reader, and it does not
   ## protect against a reader pairing the *new* pointer with the *old*
   ## stride that was just overwritten.
-  # Capture layout under release so the handler's acquire reads see
+  ##
+  ## On Windows the same descriptor is consumed by
+  ## `neutralizeRemoteSlot` running on the scanner thread, so the race
+  ## constraint is identical (the scanner is the "reader" here, not an
+  ## async handler).
+  # Capture layout under release so the consumer's acquire reads see
   # consistent stride+header before observing globalManagerPtr. The
   # publish order matters: stride/header MUST be stored before the
-  # pointer, so a handler that loads the pointer with acquire and
+  # pointer, so a reader that loads the pointer with acquire and
   # observes the new value is guaranteed to see the matching new
   # stride/header. We compute the threads-array offset by pointer
   # subtraction rather than `offsetOf(DebraManager[MaxThreads],
@@ -249,7 +385,7 @@ proc setGlobalManager*[
   let headerOffset = cast[int](addr manager.threads) - cast[int](manager)
   threadsArrayOffsetBytes.store(headerOffset, moRelease)
   threadStateStrideBytes.store(sizeof(ThreadState[MaxThreads]), moRelease)
-  # Pointer published LAST under release. A handler that observes
+  # Pointer published LAST under release. A consumer that observes
   # this non-nil pointer (under acquire) is guaranteed to see the
   # stride/header writes above.
   globalManagerPtr.store(cast[pointer](manager), moRelease)
@@ -267,7 +403,7 @@ proc setGlobalManager*(manager: pointer) =
   doAssert manager == nil,
     "setGlobalManager(pointer) only supports nil; use the generic overload " &
       "for typed managers so stride/header can be captured"
-  # Clear the pointer FIRST under release so any handler that loads
+  # Clear the pointer FIRST under release so any consumer that loads
   # it under acquire and sees nil bails out before reading stride.
   # Then zero stride/header. This also matches the publish order in
   # the typed overload (pointer is the synchronizing edge).

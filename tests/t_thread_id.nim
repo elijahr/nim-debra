@@ -1,7 +1,8 @@
 # tests/t_thread_id.nim
 
 import unittest2
-import std/posix
+when not defined(windows):
+  import std/posix
 
 import debra/thread_id
 
@@ -44,21 +45,25 @@ suite "ThreadId":
   test "InvalidThreadId has zero handle":
     check InvalidThreadId == unsafeThreadIdFromInt(0)
 
-  test "sendSignal with signal 0 checks thread existence":
-    # Signal 0 is a null signal that just checks if the thread exists
-    # without actually sending a signal
-    let tid = currentThreadId()
-    let rc = tid.sendSignal(0)
-    # Should return 0 (success) for the current thread
-    check rc == 0
+  when not defined(windows):
+    # `sendSignal` is POSIX-only. Windows uses
+    # `neutralizeRemoteSlot` (in `debra/signal`) for the equivalent
+    # cross-thread protocol; that path is exercised by `t_neutralize`.
+    test "sendSignal with signal 0 checks thread existence":
+      # Signal 0 is a null signal that just checks if the thread exists
+      # without actually sending a signal
+      let tid = currentThreadId()
+      let rc = tid.sendSignal(0)
+      # Should return 0 (success) for the current thread
+      check rc == 0
 
-  test "sendSignal to InvalidThreadId returns ESRCH":
-    # InvalidThreadId is the only documented invalid sentinel; sendSignal
-    # short-circuits with ESRCH for it. Passing a fabricated non-zero
-    # handle to pthread_kill is UB per POSIX (Apple validates and returns
-    # ESRCH; glibc segfaults), so we don't test that path.
-    let rc = InvalidThreadId.sendSignal(0)
-    check rc == ESRCH
+    test "sendSignal to InvalidThreadId returns ESRCH":
+      # InvalidThreadId is the only documented invalid sentinel; sendSignal
+      # short-circuits with ESRCH for it. Passing a fabricated non-zero
+      # handle to pthread_kill is UB per POSIX (Apple validates and returns
+      # ESRCH; glibc segfaults), so we don't test that path.
+      let rc = InvalidThreadId.sendSignal(0)
+      check rc == ESRCH
 
   test "unsafeThreadIdFromInt creates ThreadId from integer":
     let tid = unsafeThreadIdFromInt(12345)

@@ -1,11 +1,18 @@
 ## SignalHandler typestate.
 ##
 ## Ensures signal handler is installed before DEBRA operations.
+##
+## On POSIX this installs a real SIGUSR1 handler (placeholder — the
+## production handler lives in `debra/signal.nim`). On Windows the
+## "install" step is a no-op because the neutralization protocol uses
+## SuspendThread/ResumeThread directly; the typestate transition is
+## retained for API parity so callers compile unchanged.
 
-import std/posix
 import typestates
 
-import ../constants
+when not defined(windows):
+  import std/posix
+  import ../constants
 
 type
   SignalHandlerContext* = object of RootObj
@@ -25,9 +32,10 @@ typestate SignalHandlerContext:
   transitions:
     HandlerUninstalled -> HandlerInstalled
 
-proc neutralizationHandler(sig: cint) {.noconv.} =
-  ## SIGUSR1 handler - placeholder, real impl in signal.nim
-  discard
+when not defined(windows):
+  proc neutralizationHandler(sig: cint) {.noconv.} =
+    ## SIGUSR1 handler - placeholder, real impl in signal.nim
+    discard
 
 proc initSignalHandler*(): HandlerUninstalled =
   ## Create uninstalled signal handler context.
@@ -35,11 +43,15 @@ proc initSignalHandler*(): HandlerUninstalled =
 
 proc install*(h: HandlerUninstalled): HandlerInstalled {.transition.} =
   ## Install SIGUSR1 handler for DEBRA+ neutralization.
-  var sa: Sigaction
-  sa.sa_handler = neutralizationHandler
-  discard sigemptyset(sa.sa_mask)
-  sa.sa_flags = 0
-  discard sigaction(QuiescentSignal, sa, nil)
+  ##
+  ## On Windows this is a no-op (no async handler is needed); the
+  ## transition still flips `installed = true` for API parity.
+  when not defined(windows):
+    var sa: Sigaction
+    sa.sa_handler = neutralizationHandler
+    discard sigemptyset(sa.sa_mask)
+    sa.sa_flags = 0
+    discard sigaction(QuiescentSignal, sa, nil)
   result = HandlerInstalled(SignalHandlerContext(installed: true))
 
 func isInstalled*(h: HandlerInstalled): bool {.notATransition.} =
