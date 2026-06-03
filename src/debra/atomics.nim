@@ -1068,6 +1068,16 @@ when sizeof(pointer) == 8:
     ## Gate 3: `_Static_assert` that the C compiler has DWCAS lock-free
     ## support at this target's effective ISA level. C/C++ keyword split
     ## tracks the `assertLockFree` precedent.
+    ##
+    ##
+    ## vcc arm: `_InterlockedCompareExchange128` is guaranteed lock-free
+    ## on every x86_64 Windows target (cmpxchg16b is mandatory in the
+    ## platform ABI since Windows Vista, 2007) and on every ARM64 Windows
+    ## target (casp under FEAT_LSE on ARMv8.1+, or LL/SC ldxp/stxp on
+    ## ARMv8.0; both are MSVC-implemented internally). There is no
+    ## equivalent of `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` to gate on; the
+    ## intrinsic is always present in <intrin.h>, so the vcc gate is
+    ## vacuously satisfied at compile time and we elide the emit body.
     # Preprocessor directives (#if/#elif/#endif) embedded inside a
     # _Static_assert / static_assert argument list are undefined behavior
     # in standard C/C++ and may reject under strict compilers/static
@@ -1082,7 +1092,18 @@ when sizeof(pointer) == 8:
     # assertion expression itself would yield an "undeclared identifier"
     # compile error rather than the intended diagnostic. Preprocessor `#if`
     # treats undefined macros as 0, so the cascade below is safe.
-    when defined(cpp):
+    when defined(vcc):
+      # vcc: _InterlockedCompareExchange128 is unconditionally available
+      # in <intrin.h> on every Windows-on-AMD64 / Windows-on-ARM64 toolchain
+      # we ship. No preprocessor predicate to gate on. (Distinction from
+      # the GCC/Clang arm: `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` is set
+      # only when the active -m flags enable the underlying ISA; MSVC has
+      # no equivalent because the intrinsic is always present and the
+      # compiler emits the correct sequence (cmpxchg16b on x86_64, casp
+      # /ldxp+stxp on ARM64) based on the active target without requiring
+      # a -m flag.) Gate vacuously satisfied.
+      discard
+    elif defined(cpp):
       {.
         emit: [
           "\n#if defined(__aarch64__)\n",
@@ -1152,6 +1173,23 @@ when sizeof(pointer) == 8:
         emit: [
           "{ __int128 _v = __atomic_load_n((__int128*)", locPtr, ", __ATOMIC_SEQ_CST);",
           " __builtin_memcpy(", resultPtr, ", &_v, 16); }",
+        ]
+      .}
+    elif defined(vcc):
+      # MSVC has no native 128-bit atomic load; canonical idiom is
+      # `_InterlockedCompareExchange128(Dest, 0, 0, &Comparand)` with
+      # Comparand initialized to zero. The function writes the current
+      # *Dest into Comparand regardless of whether the swap succeeded
+      # (per MS Learn, ComparandResult is always updated). The swap of
+      # {0,0} over {0,0} is a no-op iff *Dest is already zero, and is
+      # not performed otherwise (CAS fails). Either way, ComparandResult
+      # ends up holding the atomically-observed prior value of *Dest.
+      {.
+        emit: [
+          "{ __int64 _cmp[2] = {0, 0};",
+          " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", 0, 0, _cmp);",
+          " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1240,6 +1278,31 @@ when sizeof(pointer) == 8:
           ", 16); __atomic_store_n((__int128*)", locPtr, ", _d, __ATOMIC_SEQ_CST); }",
         ]
       .}
+    elif defined(vcc):
+      # MSVC has no native 128-bit atomic store; emit a CAS loop using
+      # `_InterlockedCompareExchange128`. ComparandResult holds the prior
+      # value seen each iteration; on failure MSVC writes the actual
+      # current value back into ComparandResult, so the next iteration
+      # retries with the freshest observation (mirroring the gcc arm's
+      # `_prev = _ret` reuse). Loop terminates when CAS succeeds (return
+      # value 1). CPU pause hint inside the retry loop: `_mm_pause` on
+      # x86_64 (declared in <intrin.h>), `__yield` on ARM64 (also <intrin.h>);
+      # both reduce cache-line bouncing under contention with zero cost
+      # when uncontended. Dispatched via the MSVC predefines `_M_X64` /
+      # `_M_ARM64`.
+      {.
+        emit: [
+          "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
+          ", 16); __int64 _cmp[2] = {0, 0};",
+          " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", 0, 0, _cmp);",
+          " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", _new[1], _new[0], _cmp)) {\n",
+          "#if defined(_M_X64)\n", "_mm_pause();\n",
+          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n",
+          " } }",
+        ]
+      .}
     else:
       {.error: "DWCAS unsupported backend / arch combo".}
 
@@ -1314,6 +1377,25 @@ when sizeof(pointer) == 8:
           ", &_prev, 16); }",
         ]
       .}
+    elif defined(vcc):
+      # MSVC has no native 128-bit atomic exchange; emit a CAS loop
+      # mirroring the gcc arm. Same pause-hint dispatch as dwcasStore.
+      # `_cmp` holds the prior value seen each iteration; on CAS success
+      # it carries the value that was atomically replaced (returned).
+      {.
+        emit: [
+          "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
+          ", 16); __int64 _cmp[2] = {0, 0};",
+          " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", 0, 0, _cmp);",
+          " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", _new[1], _new[0], _cmp)) {\n",
+          "#if defined(_M_X64)\n", "_mm_pause();\n",
+          "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n",
+          " }",
+          " memcpy(", resultPtr, ", _cmp, 16); }",
+        ]
+      .}
     else:
       {.error: "DWCAS unsupported backend / arch combo".}
     result
@@ -1380,6 +1462,26 @@ when sizeof(pointer) == 8:
           "{ __int128 _d; __builtin_memcpy(&_d, ", desiredPtr, ", 16); ", result,
           " = __atomic_compare_exchange_n((__int128*)", locPtr, ", (__int128*)",
           expectedPtr, ", _d, 0 /* strong */, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); }",
+        ]
+      .}
+    elif defined(vcc):
+      # MSVC `_InterlockedCompareExchange128` is a true CAS: ComparandResult
+      # is read as the expected value, the CAS is attempted, and on either
+      # success or failure ComparandResult is overwritten with the current
+      # *Dest. This matches the `__atomic_compare_exchange_n` contract on
+      # the expected side: on failure the caller's `expected` is updated
+      # with the observed value. Return value is 1 on success, 0 on failure
+      # (-> result bool). Always-strong (no spurious failure on either
+      # x86_64 or ARM64 — MSVC implements both natively and there's no
+      # weak variant).
+      {.
+        emit: [
+          "{ __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
+          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr,
+          ", 16); ", result,
+          " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", _new[1], _new[0], _cmp) != 0);",
+          " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1507,6 +1609,22 @@ when sizeof(pointer) == 8:
           ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _e, _d);", " __builtin_memcpy(", expectedPtr, ", &_prev, 16);", " ",
           result, " = (_prev == _e); }",
+        ]
+      .}
+    elif defined(vcc):
+      # MSVC `_InterlockedCompareExchange128` has no weak variant —
+      # always-strong on both x86_64 (cmpxchg16b) and ARM64 (MSVC emits
+      # casp under FEAT_LSE or ldxp/stxp + retry under LL/SC, both
+      # presented to the caller as always-strong). Weak ≡ Strong; emit
+      # the same body as dwcasCasStrong.
+      {.
+        emit: [
+          "{ __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
+          ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr,
+          ", 16); ", result,
+          " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
+          ", _new[1], _new[0], _cmp) != 0);",
+          " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
