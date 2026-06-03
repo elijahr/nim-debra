@@ -107,13 +107,13 @@ proc auditDwcasPtrProc*() =
   var y = 2
   var a: Atomic[PP]
   a.store(Pair[uint64, ptr int](first: 1'u64, second: addr x))
-  let _ = a.load()
-  let _ = a.exchange(Pair[uint64, ptr int](first: 2'u64, second: addr y))
+  discard a.load()
+  discard a.exchange(Pair[uint64, ptr int](first: 2'u64, second: addr y))
   var expected = a.load()
-  let _ = a.compareExchangeStrong(
+  discard a.compareExchangeStrong(
     expected, Pair[uint64, ptr int](first: 3'u64, second: addr x)
   )
   var expected2 = a.load()
-  let _ = a.compareExchangeWeak(
+  discard a.compareExchangeWeak(
     expected2, Pair[uint64, ptr int](first: 4'u64, second: addr y)
   )
