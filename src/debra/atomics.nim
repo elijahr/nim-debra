@@ -1303,11 +1303,14 @@ when sizeof(pointer) == 8:
       # under concurrent writes). On CAS failure, the retry loop reuses
       # __sync_val_compare_and_swap's atomically-observed prior value as
       # _prev for the next iteration.
+      # Explicit `(__int128)0` casts: bare `0` literal is `int` in C and
+      # GCC may emit a sign-conversion warning (or implicit narrow) when
+      # passed where `__int128` is expected by the typed builtin.
       {.
         emit: [
           "{ __int128 _new; __builtin_memcpy(&_new, ", desiredPtr,
           ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", 0, 0); __int128 _ret;",
+          ", (__int128)0, (__int128)0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret;",
           "\n#if defined(__x86_64__)\n", "__builtin_ia32_pause();\n",
@@ -1402,11 +1405,12 @@ when sizeof(pointer) == 8:
       # two 64-bit loads). On CAS failure, __sync_val_compare_and_swap
       # returns the atomically-observed prior value, reused as _prev for
       # the next iteration.
+      # Explicit `(__int128)0` casts: see dwcasStore for rationale.
       {.
         emit: [
           "{ __int128 _new; __builtin_memcpy(&_new, ", desiredPtr,
           ", 16); __int128 _prev = __sync_val_compare_and_swap((__int128*)", locPtr,
-          ", 0, 0); __int128 _ret;",
+          ", (__int128)0, (__int128)0); __int128 _ret;",
           " do { _ret = __sync_val_compare_and_swap((__int128*)", locPtr,
           ", _prev, _new); if (_ret == _prev) break; _prev = _ret;",
           "\n#if defined(__x86_64__)\n", "__builtin_ia32_pause();\n",
