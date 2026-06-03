@@ -137,7 +137,17 @@ proc unregisterThread*[
   # Step 1: clear the signal-delivery hint BEFORE releasing the mask bit.
   # Inverse order would expose a window where the mask says "free" but the
   # threadId still points at the (now-departing) thread.
-  manager.threads[handle.idx].threadId.store(InvalidThreadId, moRelease)
+  #
+  # On Windows the slot's ThreadId carries a duplicated thread handle
+  # allocated by `currentThreadId()` at `registerThread` time. Exchange
+  # for `InvalidThreadId` (instead of a plain store) so we recover the
+  # outgoing handle and can release it via `closeThreadId`. Without
+  # this, every register/unregister cycle leaks one handle. On POSIX
+  # `closeThreadId` is a no-op (the `Pthread` value owns no resource),
+  # so the exchange is semantically identical to a release-store there.
+  let prevTid =
+    manager.threads[handle.idx].threadId.exchange(InvalidThreadId, moAcquireRelease)
+  closeThreadId(prevTid)
 
   # Step 2: clear the mask bit via CAS-with-retry, mirroring the
   # claim-side pattern in `register` (registration.nim:82-90).

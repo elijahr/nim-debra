@@ -89,6 +89,13 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
   var ctx = NeutralizeContext[MaxThreads, CC](s)
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
   let currentTid = currentThreadId()
+  # On Windows `currentThreadId()` allocates a fresh duplicated handle
+  # via `DuplicateHandle` (the pseudo-handle from `GetCurrentThread` is
+  # not cross-thread-usable). Without an explicit close, every scan
+  # leaks a handle for the process lifetime. `defer` releases it on
+  # all return paths; on POSIX `closeThreadId` is a no-op.
+  defer:
+    closeThreadId(currentTid)
 
   for i in 0 ..< MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:
