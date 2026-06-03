@@ -146,9 +146,17 @@ jobs:
                 echo "::error::outline-atomics libcall detected — -mno-outline-atomics not in effect"
                 exit 1
               fi
-              objdump -d /tmp/fixture | grep -Eq '(^|[[:space:]])caspal?([[:space:]]|$)' \
-                || (objdump -d /tmp/fixture | grep -A 5 'ldaxp' | grep -q 'stlxp') \
-                || (echo "::error::expected caspal or ldaxp/stlxp pair missing"; exit 1)
+              if objdump -d /tmp/fixture | grep -Eq '(^|[[:space:]])caspal?([[:space:]]|$)'; then
+                echo "objdump verification PASSED: caspal mnemonic found"
+              elif objdump -d /tmp/fixture | grep -A 5 'ldaxp' | grep -q 'stlxp'; then
+                echo "objdump verification PASSED: ldaxp/stlxp LL/SC pair found"
+              else
+                echo "::group::objdump output for diagnosis"
+                objdump -d /tmp/fixture | grep -iE 'cas|ldax|stlx|atomic|__int128' | head -30
+                echo "::endgroup::"
+                echo "::error::expected caspal or ldaxp/stlxp pair missing"
+                exit 1
+              fi
               ;;
           esac
           # Counter-test: same fixture compiled with -mno-cx16 MUST fail compile
