@@ -1,6 +1,9 @@
 # Neutralization
 
-Understanding the signal-based neutralization protocol.
+Understanding the thread-neutralization protocol. The protocol is
+platform-specific (POSIX uses signal delivery; Windows uses
+SuspendThread/ResumeThread), but the API is identical on both
+platforms.
 
 ## State Machine
 
@@ -10,7 +13,7 @@ Understanding the signal-based neutralization protocol.
 
 Neutralization solves the stalled thread problem: what happens when a thread stays pinned for a long time? Without intervention, it blocks reclamation and memory accumulates unboundedly.
 
-DEBRA+ uses POSIX signals to neutralize stalled threads, allowing epoch advancement and bounded memory.
+DEBRA+ uses POSIX signals (or, on Windows, SuspendThread/ResumeThread) to neutralize stalled threads, allowing epoch advancement and bounded memory.
 
 ## The Stalled Thread Problem
 
@@ -22,12 +25,33 @@ If a thread stays pinned at an old epoch:
 
 ## How Neutralization Works
 
+### POSIX (Linux, macOS, BSD)
+
 1. **Detection**: Reclamation detects thread pinned at old epoch
-2. **Signal**: Send SIGUSR1 to stalled thread
-3. **Handler**: Signal handler sets neutralization flag
-4. **Check**: Thread checks flag when it unpins
+2. **Signal**: Send SIGUSR1 to stalled thread (`pthread_kill`)
+3. **Handler**: Signal handler runs asynchronously in the target's
+   context and flips `pinned=false`, `neutralized=true` for the
+   target's slot
+4. **Check**: Thread observes the flag on next pin attempt
 5. **Acknowledge**: Thread acknowledges neutralization
 6. **Advance**: Safe epoch can now advance past stalled thread
+
+### Windows
+
+1. **Detection**: Reclamation detects thread pinned at old epoch
+2. **Suspend**: Scanner calls `SuspendThread` on the target's
+   duplicated handle
+3. **Flip**: Scanner directly walks the manager's `threads[]` array
+   and flips `pinned=false`, `neutralized=true` for the target's slot
+4. **Resume**: Scanner calls `ResumeThread`
+5. **Check**: Thread observes the flag on next pin attempt
+6. **Advance**: Safe epoch can now advance past stalled thread
+
+The Windows arm is semantically equivalent to the POSIX arm — both
+result in the target slot being flipped. The difference is that the
+flip happens synchronously on the scanner side (Windows) rather than
+asynchronously in the target's context (POSIX). The same byte-stride
+descriptor is used for the slot walk on both platforms.
 
 ## Triggering Neutralization
 
@@ -97,17 +121,43 @@ Lower threshold = more aggressive neutralization, better memory bounds, more int
 
 Higher threshold = more lenient on long operations, higher memory usage, fewer interruptions.
 
-### Signal Choice
+### Signal Choice (POSIX only)
 
-DEBRA+ uses SIGUSR1 by default. Requirements:
+DEBRA+ uses SIGUSR1 by default on POSIX. Requirements:
 
 - Must not be used by application
 - Must not have default handler
 - Must be available on platform
 
+On Windows there is no signal involved; neutralization uses
+`SuspendThread` / `ResumeThread` and no signal number is consumed.
+
 ## Platform Considerations
 
-Neutralization works on POSIX systems (Linux, macOS, BSD). Windows does not support pthread_kill and would require alternative approaches.
+Neutralization is supported on:
+
+- **POSIX** (Linux, macOS, BSD): via `pthread_kill` + SIGUSR1 async
+  handler.
+- **Windows**: via `SuspendThread` / `ResumeThread` invoked
+  synchronously by the scanner. Added in v0.10.0.
+
+The API surface is identical on both platforms; the implementation
+detail is hidden behind `debra/signal.neutralizeRemoteSlot`.
+
+### Deadlock Constraint (Both Platforms)
+
+Do NOT invoke DEBRA reclamation while holding a lock that other
+DEBRA-using threads might be blocked on. The constraint exists on
+both platforms but the mechanism differs:
+
+- **POSIX**: the SIGUSR1 handler runs in the target's context and
+  may need to acquire shared state.
+- **Windows**: the scanner blocks briefly inside `SuspendThread`
+  (kernel call), then walks the manager directly. The risk is the
+  target holding a lock that the scanner needs *after* this call.
+
+Either way, the safe pattern is to keep DEBRA reclamation and
+application-level locks disjoint.
 
 ## Best Practices
 

@@ -51,6 +51,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` on MSVC; `dumpbin /disasm` has
   a different format from objdump and the gcc/clang mnemonic checks
   are backend-specific).
+- **Windows safe-memory-reclamation (SMR) arm** in `src/debra/thread_id.nim`
+  and `src/debra/signal.nim`. The DEBRA+ thread-neutralization
+  protocol now compiles and runs on Windows. The POSIX path
+  (`pthread_kill` + SIGUSR1 async handler) does not have a portable
+  Windows equivalent, so the Windows arm uses `SuspendThread` /
+  `ResumeThread` invoked synchronously by the scanner: the scanner
+  suspends the target thread, walks the manager's `threads[]` array
+  via the same byte-stride descriptor the POSIX handler uses, flips
+  `pinned`/`neutralized` for the target slot, then resumes. There is
+  no async handler on Windows — `installSignalHandler` is a no-op,
+  `QuiescentSignal` is a compile-time stub. The shared call site in
+  `neutralize.scanAndSignal` routes through a new platform-neutral
+  `neutralizeRemoteSlot(tid, slot)` entry point. `ThreadId` on
+  Windows wraps a `Handle` duplicated from `GetCurrentThread()`'s
+  pseudo-handle via `DuplicateHandle(DUPLICATE_SAME_ACCESS)`. The
+  deadlock constraint that exists on POSIX (do not invoke DEBRA
+  reclamation while holding a lock other DEBRA-using threads may be
+  blocked on) applies identically on Windows (same hazard, different
+  mechanism). See `docs/guide/neutralization.md` for the full
+  protocol description.
 - DWCAS (16-byte / 128-bit atomics) support in `src/debra/atomics.nim`:
   `Atomic[Pair[A, B]]` with full op surface — `load`, `store`,
   `exchange`, `compareExchangeStrong` (3 overloads: (success,failure),
@@ -100,8 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - arm64 + gcc requires `-march=armv8.1-a+lse -mno-outline-atomics`
   (shipped via `nim.cfg`); LSE provides the `casp` / `caspal`
   instruction that the emit inlines to.
-- MSVC and Windows out of scope (pre-existing; nim-debra has never
-  supported MSVC).
+- MSVC and Windows are NOW SUPPORTED as of v0.10.0 (was previously
+  out of scope). See the SMR bullet in the Added section above for
+  the SuspendThread/ResumeThread protocol that replaces the POSIX
+  SIGUSR1 path.
 - macOS x86_64 NOT in the CI matrix (macos-13 retired by GitHub
   2025-12-08; macOS coverage = macos-15 arm64 only). Mitigated by
   linux-x86_64 carrying x86_64 platform coverage and macos-15 carrying
