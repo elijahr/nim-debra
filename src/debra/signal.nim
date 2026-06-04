@@ -31,8 +31,6 @@ import ./thread_id
 import ./types
 
 when defined(windows):
-  import std/winlean
-
   # Cycle-43: `GetExitCodeThread`-based discrimination between
   # "really alive" and "dying" threads was removed because the
   # `STILL_ACTIVE` exit code can be returned for a thread that has
@@ -44,6 +42,7 @@ when defined(windows):
   # critical section we need to neutralize, and a thread we cannot
   # resume is either already gone or in a state we cannot recover
   # from regardless. See `neutralizeRemoteSlot` below.
+  import std/winlean
 
 var
   signalHandlerInstalled: Atomic[bool]

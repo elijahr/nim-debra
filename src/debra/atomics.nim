@@ -668,8 +668,8 @@ proc load*[T](
       # already acquire).
       {.
         emit: [
-          "_ReadWriteBarrier();\n", "#ifdef _M_ARM64\n",
-          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
+          "_ReadWriteBarrier();\n", "#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n",
+          "#endif\n",
         ]
       .}
     raw
@@ -1601,8 +1601,8 @@ when sizeof(pointer) == 8:
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
           ", 16); __declspec(align(16)) __int64 _cmp[2];",
           " _cmp[0] = ((__int64 volatile *)", locPtr, ")[0];",
-          " _cmp[1] = ((__int64 volatile *)", locPtr, ")[1];",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
+          " _cmp[1] = ((__int64 volatile *)", locPtr, ")[1];", "\n#ifdef _M_ARM64\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
@@ -1705,8 +1705,8 @@ when sizeof(pointer) == 8:
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
           ", 16); __declspec(align(16)) __int64 _cmp[2];",
           " _cmp[0] = ((__int64 volatile *)", locPtr, ")[0];",
-          " _cmp[1] = ((__int64 volatile *)", locPtr, ")[1];",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
+          " _cmp[1] = ((__int64 volatile *)", locPtr, ")[1];", "\n#ifdef _M_ARM64\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
