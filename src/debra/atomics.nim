@@ -1582,13 +1582,27 @@ when sizeof(pointer) == 8:
       # (Intel SDM Vol. 3A §8.2.5), so explicit `_mm_mfence` adds
       # latency without strengthening ordering — emit fences on ARM64
       # only.
+      # Cycle-43 MEDIUM: initial value seed for the CAS loop is now a
+      # non-atomic 16-byte read instead of a dummy
+      # `_InterlockedCompareExchange128(loc, 0, 0, &_cmp)`. The dummy
+      # CAS is a LOCKED instruction (~20-30 cycles, cache-line
+      # invalidation on peer cores) used purely to obtain the current
+      # value of `*loc`. A non-atomic copy may produce a torn read
+      # under concurrent writers, but that is harmless here: the very
+      # next CAS in the loop atomically verifies the seed, and MSVC's
+      # `_InterlockedCompareExchange128` writes the actual current
+      # value back into `_cmp` on failure — so the second iteration
+      # retries with the freshest atomically-observed value. Net
+      # effect: hot uncontended path drops one locked instruction; hot
+      # contended path is unchanged (the same number of CAS retries
+      # converges to the correct value).
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          ", 16); __declspec(align(16)) __int64 _cmp[2];",
+          " _cmp[0] = ((__int64 volatile *)", locPtr, ")[0];",
+          " _cmp[1] = ((__int64 volatile *)", locPtr, ")[1];",
           "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
-          " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
@@ -1682,13 +1696,17 @@ when sizeof(pointer) == 8:
       # SDM Vol. 3A §8.2.5), so explicit `_mm_mfence` would only add
       # latency without strengthening ordering — emit fences on ARM64
       # only.
+      # Cycle-43 MEDIUM: see dwcasStore — initial value seed is now a
+      # non-atomic 16-byte read instead of a dummy
+      # `_InterlockedCompareExchange128(loc, 0, 0, &_cmp)`. Same
+      # rationale: a torn seed is corrected on the next CAS retry.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          ", 16); __declspec(align(16)) __int64 _cmp[2];",
+          " _cmp[0] = ((__int64 volatile *)", locPtr, ")[0];",
+          " _cmp[1] = ((__int64 volatile *)", locPtr, ")[1];",
           "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
-          " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
