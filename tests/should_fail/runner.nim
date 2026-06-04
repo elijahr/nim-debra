@@ -134,14 +134,16 @@ proc detectHostArch(): string =
     "unknown"
 
 proc detectIsRealGcc(): bool =
-  ## True only if `cc --version` reports GNU GCC (not Apple Clang or
-  ## llvm-clang). Apple Clang's banner starts with "Apple clang"; real
-  ## GCC's banner contains "gcc (GCC)" or "Free Software Foundation".
-  let (banner, rc) = execCmdEx("cc --version")
-  if rc != 0:
-    return false
-  let s = banner.toLowerAscii()
-  result = ("gcc" in s) and ("clang" notin s)
+  ## True only when the Nim C backend in use is real GNU GCC (not Apple
+  ## Clang, not LLVM clang). Discriminates via Nim's compile-time
+  ## `defined(gcc)` / `defined(clang)` predicates rather than spawning
+  ## `cc --version`, which is both slow and unreliable on CI runners
+  ## where `cc` may be a wrapper script. `defined(gcc)` reflects the
+  ## actual `--cc:` setting (or its default), which is what the
+  ## should-fail test cases will use when invoked. Apple's clang sets
+  ## `clang` but not `gcc`; real GCC sets `gcc` and not `clang`
+  ## (gemini cycle-34).
+  when defined(gcc) and not defined(clang): true else: false
 
 proc shouldSkip(c: Case): bool =
   case c.archGate
