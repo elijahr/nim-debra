@@ -626,14 +626,28 @@ proc load*[T](
     # `__iso_volatile_loadN` is a single, side-effect-free machine load
     # that the optimizer cannot reorder around. On x86_64 a width-≤8
     # naturally-aligned mov is atomic by the Intel SDM; on ARM64 the
-    # corresponding `ldr` is atomic at single-copy granularity. We add
-    # `_ReadWriteBarrier()` (compile barrier) after the load to prevent
-    # the compiler from sinking subsequent ops above the load, and on
-    # ARM64 a `__dmb(_ARM64_BARRIER_SY)` to upgrade the acquire-by-default
-    # x86 semantics to seq_cst across the weaker ARM64 model. On x64,
-    # the naked mov is already acquire under TSO; sub-seq_cst orders
-    # are honored as compile barriers, matching the documented surface.
-    {.emit: ["\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n"].}
+    # corresponding `ldr` is atomic at single-copy granularity. On x64
+    # the naked mov is already acquire under TSO; ordering for all
+    # supported load orders reduces to compile barriers around the load.
+    #
+    # On ARM64 the memory model is weak, so per-order barrier dispatch
+    # is required (gemini cycle-43 HIGH). Previously this proc emitted
+    # `__dmb(_ARM64_BARRIER_SY)` both BEFORE and AFTER every load
+    # unconditionally, paying full-seq_cst cost even for moRelaxed and
+    # moAcquire callers:
+    #
+    #   * moRelaxed: no hardware barrier needed. `_ReadWriteBarrier()`
+    #     alone is sufficient to prevent compiler reordering.
+    #   * moAcquire / moConsume: barrier AFTER the load only. This is
+    #     standard acquire semantics — subsequent ops cannot be
+    #     reordered before the load, but prior ops may move into the
+    #     post-load region.
+    #   * moSeqCst: barrier BEFORE and AFTER the load. The pre-load
+    #     `__dmb sy` drains the prior store buffer (matching the
+    #     architectural seq_cst load sequence MSVC emits via
+    #     `_Interlocked*`).
+    when order == moSequentiallyConsistent:
+      {.emit: ["\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n"].}
     let raw =
       when sizeof(T) == 1:
         cast[T](msvcIsoVolatileLoad8(cast[ptr cchar](addr loc.value)))
@@ -645,12 +659,19 @@ proc load*[T](
         cast[T](msvcIsoVolatileLoad64(cast[ptr clonglong](addr loc.value)))
       else:
         {.error: "Atomic[T] vcc load supports only 1/2/4/8 byte T".}
-    {.
-      emit: [
-        "_ReadWriteBarrier();\n", "#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n",
-        "#endif\n",
-      ]
-    .}
+    when order == moRelaxed:
+      # Compile-barrier only — no hardware fence on either ISA.
+      {.emit: ["_ReadWriteBarrier();\n"].}
+    else:
+      # moAcquire / moConsume / moSeqCst: post-load `__dmb sy` on
+      # ARM64 (acquire fence); compile barrier on x64 (TSO load is
+      # already acquire).
+      {.
+        emit: [
+          "_ReadWriteBarrier();\n", "#ifdef _M_ARM64\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
+        ]
+      .}
     raw
   else:
     cast[T](atomicLoadN(
