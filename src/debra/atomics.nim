@@ -1273,7 +1273,7 @@ when sizeof(pointer) == 8:
     # inside an emit body would take the address of the POINTER parameter
     # (`Atomic_Pair**`), not the atomic object itself. Bind `addr loc` to a
     # local `ptr` so the emit references the atomic object directly.
-    let locPtr = addr loc
+    let locPtr = addr loc.value
     let resultPtr = addr result
     # Backend dispatch (Option B, v0.10.0 cycle-12 CRITICAL fix): split by
     # COMPILER, not architecture. GCC's `__atomic_*_n` family at 16 bytes
@@ -1374,7 +1374,7 @@ when sizeof(pointer) == 8:
     # directly inside the emit body. Bind `desired` to a `let` local first so
     # taking its address is safe even when callers pass an rvalue
     # (e.g., `dwcasStore(a, makePair(...))`).
-    let locPtr = addr loc
+    let locPtr = addr loc.value
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
     # Backend dispatch (Option B): see `dwcasLoad` for rationale. Two arms
@@ -1492,7 +1492,7 @@ when sizeof(pointer) == 8:
     # rather than the address of the C pointer parameter. Bind `desired` to a
     # `let` local first so taking its address is safe even when callers pass
     # an rvalue (e.g., `dwcasExchange(a, makePair(...))`).
-    let locPtr = addr loc
+    let locPtr = addr loc.value
     let resultPtr = addr result
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
@@ -1600,7 +1600,7 @@ when sizeof(pointer) == 8:
     # parameters that compile to C pointers, so bind their addresses to local
     # `ptr` variables before the emit body. Bind `desired` to a `let` local
     # first so taking its address is safe even when callers pass an rvalue.
-    let locPtr = addr loc
+    let locPtr = addr loc.value
     let expectedPtr = addr expected
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
@@ -1756,7 +1756,7 @@ when sizeof(pointer) == 8:
     # parameters that compile to C pointers, so bind their addresses to local
     # `ptr` variables before the emit body. Bind `desired` to a `let` local
     # first so taking its address is safe even when callers pass an rvalue.
-    let locPtr = addr loc
+    let locPtr = addr loc.value
     let expectedPtr = addr expected
     let desiredLocal = desired
     let desiredPtr = addr desiredLocal
