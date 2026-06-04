@@ -335,16 +335,17 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # `-1`. A successful SuspendThread above implies the handle is
     # valid for ResumeThread, so reaching this failure branch means
     # the target was terminated between the two calls (or some
-    # other unrecoverable kernel-level fault). Raise rather than
-    # silently leaving the target permanently suspended — silent
-    # success here would deadlock any subsequent join/wait on the
-    # target and corrupt the neutralization protocol invariants.
-    let resumeResult = resumeThread(tid.handle)
-    if resumeResult < 0:
-      raise newException(
-        OSError,
+    # other unrecoverable kernel-level fault). Fail loudly via
+    # `raiseAssert` (Defect — not tracked by `raises:` effect
+    # lists, so callers under `{.transition.}` / `{.raises: [].}`
+    # compile unchanged) rather than silently leaving the target
+    # permanently suspended. Silent success here would deadlock any
+    # subsequent join/wait on the target and corrupt the
+    # neutralization protocol invariants.
+    if resumeThread(tid.handle) < 0:
+      raiseAssert(
         "ResumeThread failed after SuspendThread succeeded; target " &
-          "thread is permanently suspended. This is unrecoverable.",
+          "thread is permanently suspended. This is unrecoverable."
       )
   else:
     discard slot # POSIX path ignores the slot — handler reads threadLocalIdx
