@@ -140,19 +140,29 @@ proc unregisterThread*[
   #
   # KNOWN_GAP (Windows): the slot's `ThreadId` carries a duplicated thread
   # handle allocated by `currentThreadId()` at `registerThread` time.
-  # We do NOT close it here. An earlier attempt (898c160) used
+  # We do NOT close it here directly. An earlier attempt (898c160) used
   # `exchange + closeThreadId` to recover and release the outgoing
   # handle, but that introduced a use-after-close race window: a
   # concurrent `scanAndSignal` could have already loaded the handle into
   # a local variable before this `unregisterThread` ran, and would then
-  # call `SuspendThread` on the freed handle. Bounding the leak safely
-  # requires either (a) deferring the close until no scanner can hold a
-  # reference (per-manager pending-close queue drained inside scan epoch)
-  # or (b) reclaiming on next slot reuse / manager `=destroy`. v0.11.0
-  # will pick one; v0.10.0 keeps the previously-documented leak (~3200
-  # handles per stress run, bounded for the test surface but unbounded
-  # for production callers with heavy thread churn) rather than ship a
-  # crash regression on Windows. See PR #14 cycle-22 for the CI trace.
+  # call `SuspendThread` on the freed handle.
+  #
+  # Resolution (gemini cycle-37, option C): capture the outgoing handle
+  # into `manager.handlesPendingClose[idx]` BEFORE clearing the slot's
+  # threadId. The deferred close happens in `=destroy`, after the
+  # `boundClients == 0` assertion and the "workers must have joined"
+  # precondition together guarantee no scanner can hold a stale
+  # reference. The slot stays visible-to-scanners-as-invalid the moment
+  # `threadId.store(InvalidThreadId, ...)` lands; the kernel object is
+  # retained in the queue until teardown. Bounded at 1 stored handle
+  # per slot (overwrite on slot reuse is safe — re-registration on a
+  # slot whose queue entry is still populated would mean the manager
+  # is being reused without teardown, which is a no-op for handle
+  # accounting since the entry will be drained on the eventual
+  # destroy).
+  when defined(windows):
+    manager.handlesPendingClose[handle.idx] =
+      manager.threads[handle.idx].threadId.load(moAcquire)
   manager.threads[handle.idx].threadId.store(InvalidThreadId, moRelease)
 
   # Step 2: clear the mask bit via CAS-with-retry, mirroring the

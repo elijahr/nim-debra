@@ -89,6 +89,23 @@ proc register*[MaxThreads: static int, CC: static PinScopeCardinality](
         expected, desired, moAcquireRelease, moAcquire
       ):
         # Successfully claimed slot i
+        when defined(windows):
+          # If this slot was previously unregistered, its outgoing
+          # handle is stashed in `handlesPendingClose[i]` awaiting the
+          # manager `=destroy` drain. Re-claiming the slot would
+          # overwrite that entry on the next `unregisterThread`,
+          # silently leaking the previous handle. Drain on claim
+          # instead: by this point the prior owner has already
+          # cleared its `threadId` (release-store visible via the
+          # mask-bit acquire above) and any scanner that loaded the
+          # old handle has already either used it or skipped it; no
+          # subsequent scanner can see it (the mask bit was clear).
+          # Closing here bounds the queue at one entry per live slot
+          # (gemini cycle-37).
+          var pending = mgr.handlesPendingClose[i]
+          if pending.isValid():
+            pending.closeThreadId()
+            mgr.handlesPendingClose[i] = InvalidThreadId
         # Store thread ID for signaling
         mgr.threads[i].threadId.store(currentThreadId(), moRelease)
         # Set thread-local index for signal handler. Both `threadLocalIdx`

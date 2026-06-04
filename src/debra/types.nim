@@ -82,6 +82,22 @@ type
       ## across the per-thread slots (each slot is owned by a different
       ## thread, so adjacent slots sharing a cache line would cause
       ## false-sharing on every atomic write).
+    when defined(windows):
+      handlesPendingClose*: array[MaxThreads, ThreadId]
+        ## Windows-only deferred-close queue for per-thread handles
+        ## duplicated at `registerThread` time. `unregisterThread`
+        ## captures the slot's handle into this slot BEFORE clearing
+        ## the per-thread `threadId` (so the visible-to-scanners
+        ## handle becomes `InvalidThreadId` atomically, while the
+        ## kernel object is retained for later release). The manager
+        ## `=destroy` drains the queue and closes each entry once all
+        ## clients have unbound and all workers have joined (the
+        ## documented destroy precondition guarantees no scanner is
+        ## in flight). Without the queue, the cleanup in `=destroy`
+        ## that walks `threads[].threadId.isValid()` is dead code:
+        ## `unregisterThread` has already reset every slot's
+        ## `threadId` to `InvalidThreadId` by the time `=destroy`
+        ## runs (gemini cycle-37).
 
   ThreadHandle*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object
     ## Handle for a registered thread. Required for pin/unpin.
@@ -145,6 +161,9 @@ proc initDebraManager*[
     result.threads[i].currentBag = nil
     result.threads[i].limboBagTail = nil
     result.threads[i].advanceCounter = 0'u64
+  when defined(windows):
+    for i in 0 ..< MaxThreads:
+      result.handlesPendingClose[i] = InvalidThreadId
 
 proc `=destroy`*[MaxThreads: static int, CC: static PinScopeCardinality](
     manager: var DebraManager[MaxThreads, CC]
@@ -179,17 +198,24 @@ proc `=destroy`*[MaxThreads: static int, CC: static PinScopeCardinality](
       bag = nextBag
     manager.threads[i].currentBag = nil
     manager.threads[i].limboBagTail = nil
-    when defined(windows):
-      # Release per-thread handles allocated at `registerThread` time.
-      # Per-slot `unregisterThread` cannot safely close the handle
-      # (concurrent scanner may have already loaded it — see KNOWN_GAP
-      # in `unregisterThread`). Manager-teardown is the safe close
-      # point: the `boundClients == 0` assertion above plus the
-      # documented "workers must have joined before destroy"
-      # precondition guarantee no scanner is in flight. Closing here
-      # bounds the per-process handle accounting at 1 close per
-      # registered worker (gemini cycle-34).
-      var tid = manager.threads[i].threadId.load(moAcquire)
+  when defined(windows):
+    # Drain the deferred-close queue populated by `unregisterThread`.
+    # Per-slot `unregisterThread` cannot safely call `closeThreadId`
+    # itself (concurrent scanner may have already loaded the handle —
+    # see KNOWN_GAP in `unregisterThread`); instead it stashes the
+    # outgoing handle into `handlesPendingClose[slot]` BEFORE clearing
+    # the slot's `threadId`. Manager-teardown is the safe close point:
+    # the `boundClients == 0` assertion above plus the documented
+    # "workers must have joined before destroy" precondition guarantee
+    # no scanner is in flight. Closing here bounds the per-process
+    # handle accounting at 1 close per registered worker.
+    #
+    # Reading `threads[].threadId.isValid()` here is dead code by
+    # contract: every `unregisterThread` call has already reset the
+    # slot to `InvalidThreadId`, so the queue is the only place a
+    # still-valid handle survives (gemini cycle-37).
+    for i in 0 ..< MaxThreads:
+      var tid = manager.handlesPendingClose[i]
       if tid.isValid():
         tid.closeThreadId()
-        manager.threads[i].threadId.store(InvalidThreadId, moRelease)
+        manager.handlesPendingClose[i] = InvalidThreadId
