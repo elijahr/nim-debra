@@ -330,16 +330,15 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # Suspend the target. SuspendThread returns the previous suspend
     # count, or `DWORD(-1)` (== `0xFFFFFFFF`) on failure. winlean's
     # `suspendThread` currently returns `int32`, so the failure
-    # sentinel arrives as `-1`. We compare against the bit pattern
-    # explicitly via `cast[int32](0xFFFFFFFF'u32)` so the check
-    # remains correct if winlean ever changes the return type to an
-    # unsigned `DWORD`/`uint32` — under which `< 0` would always be
-    # false and failure would become silent (gemini cycle-29). Failure
-    # here means the handle is invalid or the thread already
-    # terminated; treat as no-op (the target is gone).
-    const SuspendThreadFailed = cast[int32](0xFFFFFFFF'u32)
-    let prevCount = suspendThread(tid.handle)
-    if prevCount == SuspendThreadFailed:
+    # sentinel arrives as `-1`. We `cast[int32]` the return value
+    # explicitly and compare against `-1'i32` so the check survives
+    # any future winlean signature change (e.g., to an unsigned
+    # `DWORD`/`uint32`) — under such a change a bare `< 0` would
+    # always be false and failure would become silent (gemini
+    # cycle-29/34). Failure here means the handle is invalid or the
+    # thread already terminated; treat as no-op (the target is gone).
+    let prevCount = cast[int32](suspendThread(tid.handle))
+    if prevCount == -1'i32:
       return
 
     # Walk the global manager descriptor exactly like the POSIX
@@ -367,10 +366,10 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # which would deadlock the whole process. winlean's
     # `resumeThread` returns `int32`; on failure the Win32 API
     # returns `DWORD(-1)` (== `0xFFFFFFFF`), which arrives here as
-    # `-1`. As with the `SuspendThread` check above, compare against
-    # the explicit bit-pattern sentinel rather than `< 0` so the
-    # check survives any future winlean signature change to an
-    # unsigned `DWORD`/`uint32` return (gemini cycle-29). A
+    # `-1`. As with the `SuspendThread` check above, `cast[int32]` the
+    # return value explicitly and compare against `-1'i32` rather than
+    # `< 0` so the check survives any future winlean signature change
+    # to an unsigned `DWORD`/`uint32` return (gemini cycle-29/34). A
     # successful SuspendThread above implies the handle is valid for
     # ResumeThread, so reaching this failure branch means the target
     # was terminated between the two calls (or some other
@@ -381,8 +380,7 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # suspended. Silent success here would deadlock any subsequent
     # join/wait on the target and corrupt the neutralization
     # protocol invariants.
-    const ResumeThreadFailed = cast[int32](0xFFFFFFFF'u32)
-    if resumeThread(tid.handle) == ResumeThreadFailed:
+    if cast[int32](resumeThread(tid.handle)) == -1'i32:
       raiseAssert(
         "ResumeThread failed after SuspendThread succeeded; target " &
           "thread is permanently suspended. This is unrecoverable."
