@@ -248,7 +248,7 @@ the `std/atomics` default. Weak must be spelled out explicitly.
 | clang          | Yes           | DWCAS via `__atomic_compare_exchange_n` on `__int128`. Inlines `cmpxchg16b` on x86_64 under `-mcx16`; inlines `caspal` on aarch64 under default LSE (Apple Silicon native, Linux ARM requires `-march=armv8.1-a+lse`). |
 | llvm_gcc       | Yes           | Treated as clang-shape (`__atomic_*` path)                                 |
 | nintendoswitch | Accepted      | Treated as clang-shape (`__atomic_*` path)                                 |
-| vcc (MSVC)     | Yes (x64 seq_cst; ARM64 release-acquire) | Full `Atomic[T]` surface via `_Interlocked*` intrinsics family (`<intrin.h>`); DWCAS via `_InterlockedCompareExchange128`. No `-m`-style flags required — MSVC always emits `cmpxchg16b` on x86_64 / `casp`+LL/SC on ARM64. The DWCAS comparand array is declared `__declspec(align(16)) __int64 _cmp[2]` (load-bearing: MSDN requires 16-byte alignment for `_InterlockedCompareExchange128`'s `ComparandResult` parameter). x64 DWCAS sites wrap the intrinsic with `_mm_mfence()` before and after to upgrade MSVC's default release-acquire to seq_cst. **ARM64 Windows caveat:** `_mm_mfence` is x86-only; the v0.10.0 ARM64 Windows path emits the intrinsic without an explicit barrier, giving release-acquire (NOT seq_cst). v0.10.1 will add `__dmb(_ARM64_BARRIER_SY)` for the ARM64 arm. ARM64 Windows is not in the v0.10.0 CI matrix (windows-2022 x64 only). |
+| vcc (MSVC)     | Yes (x64 and ARM64 seq_cst) | Full `Atomic[T]` surface via `_Interlocked*` intrinsics family (`<intrin.h>`); DWCAS via `_InterlockedCompareExchange128`. No `-m`-style flags required — MSVC always emits `cmpxchg16b` on x86_64 / `casp`+LL/SC on ARM64. The DWCAS comparand array is declared `__declspec(align(16)) __int64 _cmp[2]` (load-bearing: MSDN requires 16-byte alignment for `_InterlockedCompareExchange128`'s `ComparandResult` parameter). DWCAS sites wrap the intrinsic with a full hardware fence before and after to upgrade MSVC's default release-acquire to seq_cst: `_mm_mfence()` on x64, `__dmb(_ARM64_BARRIER_SY)` on ARM64. ARM64 Windows is not in the v0.10.0 CI matrix (windows-2022 x64 only) but the dispatch is symmetric. |
 
 ### Supported architectures (for DWCAS)
 
@@ -279,24 +279,23 @@ and aarch64:
     comparand array as `__declspec(align(16)) __int64 _cmp[2]`; dropping
     that pragma is undefined behavior per MSDN and would silently
     miscompare on platforms that enforce alignment (ARM64 in particular).
-  - **`_mm_mfence()` wrap for seq_cst on x64.** MSVC's `_Interlocked*`
+  - **Full hardware fence wrap for seq_cst.** MSVC's `_Interlocked*`
     intrinsics document only release-acquire semantics by default
     (x86 hardware happens to give seq_cst for `lock cmpxchg16b`, but
     the *intrinsic's contract* is release-acquire). To match
-    `std/atomics` Sequentially Consistent semantics, x64 DWCAS sites
-    bracket the intrinsic with `_mm_mfence()` calls (from `<emmintrin.h>`)
-    on both sides of the CAS. `_mm_mfence` lowers to `mfence` on x86
-    and gives full StoreLoad ordering, lifting the intrinsic from
-    release-acquire to seq_cst.
-  - **ARM64 Windows status (v0.10.0).** `_mm_mfence` is x86-only. The
-    ARM64 Windows path in v0.10.0 emits `_InterlockedCompareExchange128`
-    without an explicit barrier, so ARM64 Windows users (Snapdragon X+,
-    Windows-on-ARM) get **release-acquire**, NOT seq_cst, on DWCAS. ARM64
-    Windows is not in the v0.10.0 CI matrix (windows-2022 x64 only).
-    v0.10.1 will add `__dmb(_ARM64_BARRIER_SY)` (from `<arm64intr.h>`) on
-    the ARM64 arm to lift it to seq_cst. Users on ARM64 Windows who
-    require strict seq_cst on DWCAS in the v0.10.0 release should either
-    manually issue a fence at call sites or wait for v0.10.1.
+    `std/atomics` Sequentially Consistent semantics, DWCAS sites
+    bracket the intrinsic with a full hardware fence on both sides
+    of the CAS: `_mm_mfence()` (from `<intrin.h>`) on x64,
+    `__dmb(_ARM64_BARRIER_SY)` on ARM64 Windows. Dispatch is by the
+    MSVC predefine `_M_ARM64` via a `#ifdef` inside the emit body.
+    `_mm_mfence` lowers to `mfence` on x86; `__dmb _SY` lowers to
+    `dmb sy` on ARM64. Both give full system-domain ordering, lifting
+    the intrinsic from release-acquire to seq_cst on both architectures.
+  - **ARM64 Windows CI coverage.** ARM64 Windows (Snapdragon X+,
+    Windows-on-ARM) is not in the v0.10.0 CI matrix (windows-2022 x64
+    only). The emit dispatch is symmetric (`#ifdef _M_ARM64` selects
+    `__dmb`); the surface is identical to x64 from a callsite
+    perspective. PR welcome on regressions.
 
 | Arch                 | Supported     | Required compiler flag                                                                                          |
 | -------------------- | ------------- | --------------------------------------------------------------------------------------------------------------- |

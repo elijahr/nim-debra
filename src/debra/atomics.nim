@@ -1236,16 +1236,20 @@ when sizeof(pointer) == 8:
       # `<intrin.h>`, already included above) before and after to upgrade
       # to full seq_cst on x64. On x64 `_mm_mfence` lowers to `mfence` and
       # is effectively a no-op alongside the implicit `lock` of the CAS.
-      # NOTE: `_mm_mfence` is x86-only; ARM64 Windows is not in the v0.10.0
-      # CI matrix. ARM64 path (using `__dmb(_ARM64_BARRIER_SY)` from
-      # `<intrin.h>`) is a v0.10.1 followup. The `MemoryBarrier()` macro
-      # from `<windows.h>` would handle both, but pulling in `<windows.h>`
-      # globally on vcc inflates every compilation unit and was rejected.
+      # `_mm_mfence` is x86-only; on ARM64 Windows we emit
+      # `__dmb(_ARM64_BARRIER_SY)` from `<intrin.h>` instead. Both lower
+      # to a full system-domain fence (`mfence` on x64, `dmb sy` on
+      # aarch64). The `MemoryBarrier()` macro from `<windows.h>` would
+      # handle both, but pulling in `<windows.h>` globally on vcc
+      # inflates every compilation unit and was rejected.
       {.
         emit: [
-          "{ __declspec(align(16)) __int64 _cmp[2] = {0, 0};", " _mm_mfence();",
+          "{ __declspec(align(16)) __int64 _cmp[2] = {0, 0};", "\n#ifdef _M_ARM64\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#else\n", "_mm_mfence();\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", 0, 0, _cmp);", " _mm_mfence();", " memcpy(", resultPtr, ", _cmp, 16); }",
+          ", 0, 0, _cmp);", "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n",
+          "#else\n", "_mm_mfence();\n", "#endif\n", " memcpy(", resultPtr,
+          ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1355,19 +1359,23 @@ when sizeof(pointer) == 8:
       # decomposed into scalar ExchangeHigh/ExchangeLow args, so it does not
       # need alignment.)
       #
-      # `_mm_mfence()` before and after the CAS loop is the x64 lowering
-      # of `MemoryBarrier`; see dwcasLoad comment for the ARM64 followup
-      # rationale. No-op alongside the implicit `lock` of the CAS on x64.
+      # Full hardware fence before and after the CAS loop upgrades the
+      # `_InterlockedCompareExchange128` release-acquire contract to
+      # seq_cst: `_mm_mfence()` on x64, `__dmb(_ARM64_BARRIER_SY)` on
+      # ARM64. No-op alongside the implicit `lock` of the CAS on x64.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};", " _mm_mfence();",
+          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "_mm_mfence();\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
-          " _mm_mfence(); }",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "_mm_mfence();\n", "#endif\n", " }",
         ]
       .}
     else:
@@ -1450,19 +1458,24 @@ when sizeof(pointer) == 8:
       # mirroring the gcc arm. Same pause-hint dispatch as dwcasStore.
       # `_cmp` holds the prior value seen each iteration; on CAS success
       # it carries the value that was atomically replaced (returned).
-      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
-      # alignment rationale; `_new` does not need it. `_mm_mfence()`
-      # before/after is the x64 lowering of `MemoryBarrier` (ARM64 followup).
+      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for
+      # the alignment rationale; `_new` does not need it. Full hardware
+      # fence before/after the CAS loop upgrades MSVC's documented
+      # release-acquire to seq_cst: `_mm_mfence()` on x64,
+      # `__dmb(_ARM64_BARRIER_SY)` on ARM64.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
-          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};", " _mm_mfence();",
+          ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "_mm_mfence();\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
-          " _mm_mfence();", " memcpy(", resultPtr, ", _cmp, 16); }",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "_mm_mfence();\n", "#endif\n", " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1543,17 +1556,21 @@ when sizeof(pointer) == 8:
       # (-> result bool). Always-strong (no spurious failure on either
       # x86_64 or ARM64 — MSVC implements both natively and there's no
       # weak variant).
-      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
-      # alignment rationale; `_new` does not need it. `_mm_mfence()`
-      # before/after is the x64 lowering of `MemoryBarrier` (ARM64 followup).
+      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for
+      # the alignment rationale; `_new` does not need it. Full hardware
+      # fence before/after the CAS upgrades MSVC's documented
+      # release-acquire to seq_cst: `_mm_mfence()` on x64,
+      # `__dmb(_ARM64_BARRIER_SY)` on ARM64.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
           ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16);",
-          " _mm_mfence(); ", result,
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "_mm_mfence();\n", "#endif\n", " ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp) != 0);", " _mm_mfence();", " memcpy(", expectedPtr,
-          ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp) != 0);", "\n#ifdef _M_ARM64\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#else\n", "_mm_mfence();\n", "#endif\n",
+          " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1689,17 +1706,21 @@ when sizeof(pointer) == 8:
       # casp under FEAT_LSE or ldxp/stxp + retry under LL/SC, both
       # presented to the caller as always-strong). Weak ≡ Strong; emit
       # the same body as dwcasCasStrong.
-      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for the
-      # alignment rationale; `_new` does not need it. `_mm_mfence()`
-      # before/after is the x64 lowering of `MemoryBarrier` (ARM64 followup).
+      # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for
+      # the alignment rationale; `_new` does not need it. Full hardware
+      # fence before/after the CAS upgrades MSVC's documented
+      # release-acquire to seq_cst: `_mm_mfence()` on x64,
+      # `__dmb(_ARM64_BARRIER_SY)` on ARM64.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
           ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16);",
-          " _mm_mfence(); ", result,
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "_mm_mfence();\n", "#endif\n", " ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
-          ", _new[1], _new[0], _cmp) != 0);", " _mm_mfence();", " memcpy(", expectedPtr,
-          ", _cmp, 16); }",
+          ", _new[1], _new[0], _cmp) != 0);", "\n#ifdef _M_ARM64\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#else\n", "_mm_mfence();\n", "#endif\n",
+          " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
     elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
