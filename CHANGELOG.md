@@ -137,6 +137,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - DWCAS requires a 64-bit target (gate 1: `sizeof(pointer) == 8`).
   32-bit ABIs fail at compile time with an actionable error message.
+  Verified end-to-end by the new `t_dwcas_gate1_32bit` compile-fail
+  case in `tests/should_fail/runner.nim`, which invokes
+  `nim check --cpu:i386 --os:linux` on a fixture that instantiates
+  `enforceDwcasConstraints(uint64, uint64)` and asserts the
+  diagnostic substring "require a 64-bit target". `nim check` (vs
+  `nim c`) means the case runs on any CI host without needing a
+  32-bit cross-compile toolchain.
 - gcc + x86_64 requires `-mcx16` (shipped via `nim.cfg`); without it,
   the per-op `_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)`
   fails at compile time and names the missing flag.

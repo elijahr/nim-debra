@@ -39,6 +39,12 @@ type
     outcome: ExpectedOutcome
     substring: string
     archGate: ArchGate
+    extraFlags: string
+      ## Extra flags passed to `nim c` / `nim check` for this case
+      ## (e.g., `--cpu:i386 --os:linux` for the 32-bit gate cross-check).
+      ## Empty default keeps the case host-arch-bound. When non-empty,
+      ## the runner uses `nim check` (no codegen) so the case runs on
+      ## any host without needing 32-bit cross-compile toolchains.
 
 const cases = @[
   Case(
@@ -104,6 +110,15 @@ const cases = @[
     substring: "nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16",
     archGate: agAmd64Gcc,
   ),
+  Case(
+    name:
+      "DWCAS gate 1: 32-bit target rejected " &
+      "(must fail-with-substring; runs on any host via nim check --cpu:i386)",
+    file: "tests/should_fail/t_dwcas_gate1_32bit.nim",
+    outcome: eoCompileFails,
+    substring: "require a 64-bit target",
+    extraFlags: "--cpu:i386 --os:linux",
+  ),
 ]
 
 proc detectHostArch(): string =
@@ -137,9 +152,17 @@ proc shouldSkip(c: Case): bool =
     not (arch == "amd64" and gcc)
 
 proc runCase(c: Case): bool =
-  let cmd =
-    &"nim c --threads:on --hints:off --warnings:off --path:src --compileOnly {c.file}"
-  let (output, exitCode) = execCmdEx(cmd)
+  # When `extraFlags` is set (e.g., `--cpu:i386 --os:linux` for the 32-bit
+  # gate cross-check), use `nim check` instead of `nim c --compileOnly`.
+  # `nim check` runs the semantic phase only — no C codegen — so it works
+  # on any host without needing a cross-compile toolchain. The compile-time
+  # `static: assert` we want to catch fires in the semantic phase.
+  let baseCmd =
+    if c.extraFlags.len > 0:
+      &"nim check --threads:on --hints:off --warnings:off --path:src {c.extraFlags} {c.file}"
+    else:
+      &"nim c --threads:on --hints:off --warnings:off --path:src --compileOnly {c.file}"
+  let (output, exitCode) = execCmdEx(baseCmd)
   case c.outcome
   of eoCompiles:
     if exitCode != 0:
