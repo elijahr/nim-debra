@@ -333,13 +333,13 @@ template assertLockFree(T: typedesc) =
           # on 32-bit x86 do *not* guarantee atomicity of the full
           # 8-byte word — torn reads are possible (gemini cycle-34).
           # Reject 8-byte T on 32-bit MSVC.
-          assert sizeof(T) <= 4,
+          doAssert sizeof(T) <= 4,
             "Atomic[" & $T & "] on 32-bit MSVC supports only 1/2/4 " &
               "byte T (8-byte atomics are not lock-free without " &
               "additional CAS scaffolding); pass " &
               "-d:debraAllowNonLockFreeAtomics to override"
         else:
-          assert sizeof(T) <= 8,
+          doAssert sizeof(T) <= 8,
             "Atomic[" & $T & "] vcc backend supports only " &
               "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
               "-d:debraAllowNonLockFreeAtomics to override"
@@ -414,28 +414,28 @@ template enforceDwcasConstraints*(A, B: typedesc) =
   ## requires both halves live (cmpxchg16b / casp compares all 128 bits), so
   ## the payload sum is the real safety invariant.
   static:
-    assert sizeof(pointer) == 8,
+    doAssert sizeof(pointer) == 8,
       "DWCAS / 128-bit atomics require a 64-bit target " &
         "(sizeof(pointer) must be 8). nim-debra's Atomic[Pair[A, B]] / 16-byte " &
         "atomic ops are unavailable on 32-bit ABIs. The 1-, 2-, 4-, and 8-byte " &
         "Atomic[T] surface in debra/atomics remains available on 32-bit."
-    assert sizeof(A) <= 8,
+    doAssert sizeof(A) <= 8,
       "Pair half-type sizeof(" & $A & ") = " & $sizeof(A) &
         " must be <= 8 bytes (DWCAS pairs two 64-bit registers)"
-    assert sizeof(B) <= 8,
+    doAssert sizeof(B) <= 8,
       "Pair half-type sizeof(" & $B & ") = " & $sizeof(B) &
         " must be <= 8 bytes (DWCAS pairs two 64-bit registers)"
-    assert sizeof(A) + sizeof(B) == 16,
+    doAssert sizeof(A) + sizeof(B) == 16,
       "Pair[" & $A & ", " & $B & "] must be exactly 16 bytes; got " &
         $(sizeof(A) + sizeof(B)) & " (sizeof(" & $A & ")=" & $sizeof(A) & ", sizeof(" &
         $B & ")=" & $sizeof(B) & ")"
-    assert alignof(Pair[A, B]) == 16,
+    doAssert alignof(Pair[A, B]) == 16,
       "Pair[" & $A & ", " & $B & "] must be 16-byte aligned; got " & $alignof(
         Pair[A, B]
       )
-    assert supportsCopyMem(A),
+    doAssert supportsCopyMem(A),
       "Pair half-type must be supportsCopyMem; " & $A & " is not"
-    assert supportsCopyMem(B),
+    doAssert supportsCopyMem(B),
       "Pair half-type must be supportsCopyMem; " & $B & " is not"
   # Gate 4 (lock-free) is enforced inside the concrete dwcas* op
   # specializations (tasks 7-11) via the `_Static_assert` /
@@ -502,7 +502,7 @@ template enforceAtomicConstraints(T: typedesc) =
   assertLockFree(T)
   when not defined(debraAllowNonLockFreeAtomics):
     static:
-      assert alignof(Atomic[T]) >= sizeof(T),
+      doAssert alignof(Atomic[T]) >= sizeof(T),
         "alignment guard for Atomic[" & $T & "] failed " & "(alignof=" &
           $alignof(Atomic[T]) & ", sizeof=" & $sizeof(T) & ")"
 
@@ -516,20 +516,20 @@ template validLoadOrder(order: static MemoryOrder) =
   # memory order is a programmer error, not a runtime condition.
   # (gemini cycle-41 MEDIUM)
   static:
-    assert order != moRelease and order != moAcquireRelease,
+    doAssert order != moRelease and order != moAcquireRelease,
       "moRelease / moAcquireRelease is not a valid memory order " &
         "for load; use moRelaxed, moConsume, moAcquire, or " & "moSequentiallyConsistent"
 
 template validStoreOrder(order: static MemoryOrder) =
   static:
-    assert order != moAcquire and order != moAcquireRelease and order != moConsume,
+    doAssert order != moAcquire and order != moAcquireRelease and order != moConsume,
       "moAcquire / moAcquireRelease / moConsume is not a valid " &
         "memory order for store; use moRelaxed, moRelease, or " &
         "moSequentiallyConsistent"
 
 template validCasFailureOrder(success, failure: static MemoryOrder) =
   static:
-    assert failure != moRelease and failure != moAcquireRelease,
+    doAssert failure != moRelease and failure != moAcquireRelease,
       "compareExchange failure order moRelease / moAcquireRelease " &
         "is invalid; failure must be moRelaxed, moConsume, " &
         "moAcquire, or moSequentiallyConsistent"
@@ -540,13 +540,13 @@ template validCasFailureOrder(success, failure: static MemoryOrder) =
     # `ord(moAcquire) <= ord(moRelease)`. Other success orders use the
     # ordinal comparison correctly for the lattice.
     when success == moRelease:
-      assert failure == moRelaxed,
+      doAssert failure == moRelaxed,
         "compareExchange failure with success=moRelease requires " &
           "failure=moRelaxed (moRelease has no load-acquire component " &
           "for the failure path; use moAcquireRelease as success if you " &
           "need acquire-on-failure)"
     else:
-      assert ord(failure) <= ord(success),
+      doAssert ord(failure) <= ord(success),
         "compareExchange failure order is stronger than success " &
           "order; failure must be <= success"
 

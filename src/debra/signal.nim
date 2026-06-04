@@ -136,18 +136,18 @@ template threadStateNeutralizedOffset(): int =
 # without knowledge of `MaxThreads`, so any layout drift across
 # instantiations would corrupt the walk).
 static:
-  assert threadStatePinnedOffset() == 8,
+  doAssert threadStatePinnedOffset() == 8,
     "ThreadState.pinned must be at byte offset 8 (got " & $threadStatePinnedOffset() &
       "); the signal handler depends on this absolute offset. " &
       "If you intentionally changed the layout, update this assert " &
       "and the matching one for `neutralized`."
-  assert threadStateNeutralizedOffset() == 16,
+  doAssert threadStateNeutralizedOffset() == 16,
     "ThreadState.neutralized must be at byte offset 16 (got " &
       $threadStateNeutralizedOffset() &
       "); the signal handler depends on this absolute offset. " &
       "If you intentionally changed the layout, update this assert " &
       "and the matching one for `pinned`."
-  assert sizeof(ThreadState[DefaultMaxThreads]) mod CacheLineBytes == 0,
+  doAssert sizeof(ThreadState[DefaultMaxThreads]) mod CacheLineBytes == 0,
     "ThreadState size (" & $sizeof(ThreadState[DefaultMaxThreads]) &
       ") must be a multiple of CacheLineBytes (" & $CacheLineBytes &
       ") -- adjust the `cacheLinePad` field in types.nim"
@@ -155,9 +155,9 @@ static:
   # asserts above, verify the offsets do not drift between
   # instantiations (e.g., if a future generic field were added that
   # depended on MaxThreads).
-  assert offsetOf(ThreadState[4], pinned) == threadStatePinnedOffset(),
+  doAssert offsetOf(ThreadState[4], pinned) == threadStatePinnedOffset(),
     "ThreadState.pinned offset must not depend on MaxThreads"
-  assert offsetOf(ThreadState[4], neutralized) == threadStateNeutralizedOffset(),
+  doAssert offsetOf(ThreadState[4], neutralized) == threadStateNeutralizedOffset(),
     "ThreadState.neutralized offset must not depend on MaxThreads"
 
 # Thread-local storage for thread index. Nim threadvars are

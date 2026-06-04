@@ -103,13 +103,13 @@ type
 # in one type but not the other, the drift trips a clear compile error
 # instead of silently producing the wrong padding size.
 static:
-  assert sizeof(ThreadState[DefaultMaxThreads]) mod CacheLineBytes == 0,
+  doAssert sizeof(ThreadState[DefaultMaxThreads]) mod CacheLineBytes == 0,
     "ThreadState size (" & $sizeof(ThreadState[DefaultMaxThreads]) &
       ") must be a multiple of CacheLineBytes (" & $CacheLineBytes &
       ") to prevent false sharing across DebraManager.threads slots"
   # Drift check: ThreadStateLive must contain the SAME fields as ThreadState
   # minus cacheLinePad. If you add a field to one, add it to the other.
-  assert sizeof(ThreadState[DefaultMaxThreads]) -
+  doAssert sizeof(ThreadState[DefaultMaxThreads]) -
     sizeof(ThreadState[DefaultMaxThreads].cacheLinePad) ==
     sizeof(ThreadStateLive[DefaultMaxThreads]),
     "ThreadStateLive (" & $sizeof(ThreadStateLive[DefaultMaxThreads]) &
