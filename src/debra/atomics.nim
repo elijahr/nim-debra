@@ -187,6 +187,29 @@ when defined(vcc):
     p: ptr clonglong, val: clonglong
   ): clonglong {.importc: "_InterlockedXor64", header: "<intrin.h>".}
 
+  # ---- iso-volatile load (sizes 1/2/4/8): pure load primitive.
+  # `__iso_volatile_loadN` is a side-effect-free machine load; unlike
+  # `_InterlockedCompareExchangeN(p, 0, 0)` it does NOT acquire the
+  # cache line in Exclusive/Modified state, so true read-only loads
+  # over common-zero values stay in Shared. The compile-barrier and
+  # (on ARM64) `__dmb` for ordering are issued at the call site, since
+  # `__iso_volatile_load*` is documented as a pure load with no fence.
+  proc msvcIsoVolatileLoad8(
+    p: ptr cchar
+  ): cchar {.importc: "__iso_volatile_load8", header: "<intrin.h>".}
+
+  proc msvcIsoVolatileLoad16(
+    p: ptr cshort
+  ): cshort {.importc: "__iso_volatile_load16", header: "<intrin.h>".}
+
+  proc msvcIsoVolatileLoad32(
+    p: ptr cint
+  ): cint {.importc: "__iso_volatile_load32", header: "<intrin.h>".}
+
+  proc msvcIsoVolatileLoad64(
+    p: ptr clonglong
+  ): clonglong {.importc: "__iso_volatile_load64", header: "<intrin.h>".}
+
   # ---- compiler reorder barrier (used as signalFence and as the
   # compile-barrier for sub-seq_cst fences) ----
   proc msvcReadWriteBarrier() {.importc: "_ReadWriteBarrier", header: "<intrin.h>".}
@@ -542,29 +565,52 @@ proc load*[T](
   enforceAtomicConstraints(T)
   validLoadOrder(order)
   when defined(vcc):
-    # MSVC `_InterlockedCompareExchange*(p, 0, 0)` is the standard atomic
-    # load idiom: returns the prior value, performs a no-op swap (0 over
-    # 0 if equal, no write otherwise). Always seq_cst at the hardware
-    # level — sub-seq_cst orders honored only as compile barriers, which
-    # the lock-prefixed instruction implies.
-    when sizeof(T) == 1:
-      cast[T](msvcInterlockedCompareExchange8(
-        cast[ptr cchar](addr loc.value), cchar(0), cchar(0)
-      ))
-    elif sizeof(T) == 2:
-      cast[T](msvcInterlockedCompareExchange16(
-        cast[ptr cshort](addr loc.value), cshort(0), cshort(0)
-      ))
-    elif sizeof(T) == 4:
-      cast[T](msvcInterlockedCompareExchange32(
-        cast[ptr clong](addr loc.value), clong(0), clong(0)
-      ))
-    elif sizeof(T) == 8:
-      cast[T](msvcInterlockedCompareExchange64(
-        cast[ptr clonglong](addr loc.value), clonglong(0), clonglong(0)
-      ))
-    else:
-      {.error: "Atomic[T] vcc load supports only 1/2/4/8 byte T".}
+    # MSVC pure-load via `__iso_volatile_loadN` (from `<intrin.h>`).
+    # The earlier implementation used `_InterlockedCompareExchange*(p, 0, 0)`,
+    # which performs a CAS — a WRITE-class operation that acquires the
+    # cache line in Exclusive/Modified state even when the swap fails
+    # (the comparand-write is unconditional on x86 microarchitectures).
+    # On hot read paths over a common-zero value that is a severe
+    # footgun: every load steals the line from peer cores, generating
+    # M-state traffic that real loads should never produce.
+    #
+    # `__iso_volatile_loadN` is a single, side-effect-free machine load
+    # that the optimizer cannot reorder around. On x86_64 a width-≤8
+    # naturally-aligned mov is atomic by the Intel SDM; on ARM64 the
+    # corresponding `ldr` is atomic at single-copy granularity. We add
+    # `_ReadWriteBarrier()` (compile barrier) after the load to prevent
+    # the compiler from sinking subsequent ops above the load, and on
+    # ARM64 a `__dmb(_ARM64_BARRIER_SY)` to upgrade the acquire-by-default
+    # x86 semantics to seq_cst across the weaker ARM64 model. On x64,
+    # the naked mov is already acquire under TSO; sub-seq_cst orders
+    # are honored as compile barriers, matching the documented surface.
+    {.
+      emit: [
+        "\n#ifdef _M_ARM64\n",
+        "__dmb(_ARM64_BARRIER_SY);\n",
+        "#endif\n",
+      ]
+    .}
+    let raw =
+      when sizeof(T) == 1:
+        cast[T](msvcIsoVolatileLoad8(cast[ptr cchar](addr loc.value)))
+      elif sizeof(T) == 2:
+        cast[T](msvcIsoVolatileLoad16(cast[ptr cshort](addr loc.value)))
+      elif sizeof(T) == 4:
+        cast[T](msvcIsoVolatileLoad32(cast[ptr cint](addr loc.value)))
+      elif sizeof(T) == 8:
+        cast[T](msvcIsoVolatileLoad64(cast[ptr clonglong](addr loc.value)))
+      else:
+        {.error: "Atomic[T] vcc load supports only 1/2/4/8 byte T".}
+    {.
+      emit: [
+        "_ReadWriteBarrier();\n",
+        "#ifdef _M_ARM64\n",
+        "__dmb(_ARM64_BARRIER_SY);\n",
+        "#endif\n",
+      ]
+    .}
+    raw
   else:
     cast[T](atomicLoadN(
       cast[ptr nonAtomicType(T)](addr loc.value), toAtomMemModel(order)
