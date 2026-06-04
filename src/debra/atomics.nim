@@ -1066,17 +1066,29 @@ proc threadFence*(order: MemoryOrder) {.inline.} =
     case order
     of moSequentiallyConsistent:
       # Full hardware fence: `__faststorefence` on x86_64,
-      # `__dmb(_ARM64_BARRIER_SY)` on aarch64. Both are declared in
-      # `<intrin.h>` (already pulled in for the `_Interlocked*`
-      # intrinsics) and are exactly what the `MemoryBarrier` macro
-      # expands to — emitted directly to avoid `<windows.h>` bloat
-      # and namespace pollution (gemini cycle-29).
-      {.
-        emit: [
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "__faststorefence();\n", "#endif\n",
-        ]
-      .}
+      # `__dmb(_ARM64_BARRIER_SY)` on aarch64, locked-or-on-dummy on
+      # 32-bit x86 (where `__faststorefence` is not declared). All are
+      # declared in `<intrin.h>` (already pulled in for the
+      # `_Interlocked*` intrinsics) and are exactly what the
+      # `MemoryBarrier` macro expands to — emitted directly to avoid
+      # `<windows.h>` bloat and namespace pollution (gemini cycle-29).
+      #
+      # Dispatch is performed at the Nim level via `when` rather than
+      # via C `#ifdef` inside `{.emit:.}`, because `{.emit:.}` does not
+      # reliably place `#ifdef`/`#else`/`#endif` at column 0 inside a
+      # function body — MSVC then rejects them with C2014 (gemini
+      # cycle-34 CI blocker).
+      when defined(arm64) or defined(aarch64):
+        {.emit: ["__dmb(_ARM64_BARRIER_SY);"].}
+      elif defined(i386) or defined(i686):
+        # 32-bit MSVC: `__faststorefence` is x86_64-only. The standard
+        # MSVC `MemoryBarrier` fallback on 32-bit is a `lock`-prefixed
+        # `or` on a dummy stack slot — `_InterlockedOr(&_dummy, 0)`
+        # carries full memory-barrier semantics on x86 by virtue of the
+        # `lock` prefix (Intel SDM Vol. 3A §8.2.5).
+        {.emit: ["{ long _dummy = 0; (void)_InterlockedOr(&_dummy, 0); }"].}
+      else:
+        {.emit: ["__faststorefence();"].}
     else:
       msvcReadWriteBarrier()
   else:
