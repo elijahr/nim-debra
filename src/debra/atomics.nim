@@ -1073,7 +1073,7 @@ proc threadFence*(order: MemoryOrder) {.inline.} =
       # and namespace pollution (gemini cycle-29).
       {.
         emit: [
-          "#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
           "__faststorefence();\n", "#endif\n",
         ]
       .}
