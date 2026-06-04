@@ -178,6 +178,11 @@ when defined(windows):
       true
     elif a.handle == Handle(0) or b.handle == Handle(0):
       false
+    elif a.handle == b.handle:
+      # Same underlying HANDLE -> same OS thread. Skip the
+      # `GetThreadId(...)` syscall round-trip; identical handles cannot
+      # alias different threads (gemini cycle-34).
+      true
     else:
       getThreadIdFromHandle(a.handle) == getThreadIdFromHandle(b.handle)
 
