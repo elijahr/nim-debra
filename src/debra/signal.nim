@@ -33,6 +33,30 @@ import ./types
 when defined(windows):
   import std/winlean
 
+  # winlean (Nim 2.2.x) does not expose GetExitCodeThread, but does
+  # define STILL_ACTIVE (= 0x00000103, == 259). Import GetExitCodeThread
+  # directly so the suspend/resume neutralization path can distinguish
+  # "thread already terminated" (benign) from "live thread, kernel
+  # refused to suspend/resume" (unrecoverable). Without this check,
+  # ResumeThread or SuspendThread failures on a thread that legitimately
+  # exited between OpenThread and Suspend/Resume would raise an
+  # AssertionDefect, which is incorrect: a dead thread cannot be in a
+  # pinned critical section, so neutralization is a no-op.
+  proc getExitCodeThreadWin(
+    hThread: Handle, lpExitCode: ptr int32
+  ): WINBOOL {.stdcall, importc: "GetExitCodeThread", dynlib: "kernel32".}
+
+  proc remoteThreadIsTerminated(h: Handle): bool {.inline.} =
+    ## Returns true iff `GetExitCodeThread` succeeds AND the thread's
+    ## exit code is not STILL_ACTIVE. Returns false if the call itself
+    ## fails (cannot prove termination — treat as live for safety) or
+    ## if the thread is still active. Sentinel STILL_ACTIVE is sourced
+    ## from `winlean` (already `int32`).
+    var exitCode: int32 = 0
+    if getExitCodeThreadWin(h, addr exitCode) == 0:
+      return false
+    exitCode != STILL_ACTIVE
+
 var
   signalHandlerInstalled: Atomic[bool]
     ## Process-wide idempotency flag for the SIGUSR1 handler. Multiple
@@ -357,7 +381,21 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
       # race than the OpenThread-time check above); treat as no-op.
       let prevCount = cast[int32](suspendThread(h))
       if prevCount == -1'i32:
-        return
+        # SuspendThread failed. The overwhelmingly common cause is that
+        # the target thread terminated between `OpenThread` and this
+        # call. Confirm via `GetExitCodeThread`: a dead thread cannot
+        # be in a pinned critical section, so neutralization is a no-op
+        # and we return silently. If the thread is still active, the
+        # kernel refused to suspend a live thread — that is an
+        # unrecoverable bug worth surfacing rather than silently
+        # leaving the neutralization invariant unenforced (gemini
+        # cycle-40 HIGH).
+        if remoteThreadIsTerminated(h):
+          return
+        raiseAssert(
+          "SuspendThread failed on a still-active thread; this is " &
+            "an unrecoverable kernel/OpenThread state error."
+        )
 
       # Walk the global manager descriptor exactly like the POSIX
       # handler. On Windows the scanner runs this from its own context
@@ -400,10 +438,22 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
       # join/wait on the target and corrupt the neutralization
       # protocol invariants.
       if cast[int32](resumeThread(h)) == -1'i32:
-        raiseAssert(
-          "ResumeThread failed after SuspendThread succeeded; target " &
-            "thread is permanently suspended. This is unrecoverable."
-        )
+        # ResumeThread failed. The standard interpretation — "target is
+        # permanently suspended" — is only correct if the target is
+        # still alive. A target that was terminated (TerminateThread or
+        # natural completion) between our SuspendThread and ResumeThread
+        # calls will also fail ResumeThread, and that failure is benign:
+        # there is no thread left to resume. Distinguish via
+        # `GetExitCodeThread`. If the thread is dead, treat the failure
+        # as benign (the neutralization store is already published).
+        # If the thread is still active and resume failed, THAT is the
+        # unrecoverable case — raise loudly (gemini cycle-40 HIGH).
+        if not remoteThreadIsTerminated(h):
+          raiseAssert(
+            "ResumeThread failed on a still-active thread after " &
+              "SuspendThread succeeded; target is permanently " &
+              "suspended. This is unrecoverable."
+          )
     finally:
       # Always close the temporary handle, even on raiseAssert above.
       # Handle lifetime is exactly the duration of this proc body; no
