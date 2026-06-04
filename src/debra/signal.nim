@@ -411,24 +411,13 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
             pinnedPtr[].store(false, moRelease)
             neutralizedPtr[].store(true, moRelease)
 
-      # Resume. If this fails the target is permanently suspended,
-      # which would deadlock the whole process. winlean's
-      # `resumeThread` returns `int32`; on failure the Win32 API
-      # returns `DWORD(-1)` (== `0xFFFFFFFF`), which arrives here as
-      # `-1`. As with the `SuspendThread` check above, `cast[int32]` the
-      # return value explicitly and compare against `-1'i32` rather than
-      # `< 0` so the check survives any future winlean signature change
-      # to an unsigned `DWORD`/`uint32` return (gemini cycle-29/34). A
-      # successful SuspendThread above implies the handle is valid for
-      # ResumeThread, so reaching this failure branch means the target
-      # was terminated between the two calls (or some other
-      # unrecoverable kernel-level fault). Fail loudly via
-      # `raiseAssert` (Defect — not tracked by `raises:` effect lists,
-      # so callers under `{.transition.}` / `{.raises: [].}` compile
-      # unchanged) rather than silently leaving the target permanently
-      # suspended. Silent success here would deadlock any subsequent
-      # join/wait on the target and corrupt the neutralization
-      # protocol invariants.
+      # Resume. winlean's `resumeThread` returns `int32`; on failure
+      # the Win32 API returns `DWORD(-1)` (== `0xFFFFFFFF`), which
+      # arrives here as `-1`. As with the `SuspendThread` check above,
+      # `cast[int32]` the return value explicitly and compare against
+      # `-1'i32` rather than `< 0` so the check survives any future
+      # winlean signature change to an unsigned `DWORD`/`uint32` return
+      # (gemini cycle-29/34).
       if cast[int32](resumeThread(h)) == -1'i32:
         # ResumeThread failed. Common cause: the thread terminated
         # between our SuspendThread and ResumeThread calls (race
@@ -444,9 +433,9 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
         # finally block below regardless (gemini cycle-43 HIGH).
         discard
     finally:
-      # Always close the temporary handle, even on raiseAssert above.
-      # Handle lifetime is exactly the duration of this proc body; no
-      # handle ever escapes into the slot or the manager.
+      # Always close the temporary handle. Handle lifetime is exactly
+      # the duration of this proc body; no handle ever escapes into
+      # the slot or the manager.
       discard closeHandle(h)
   else:
     discard slot # POSIX path ignores the slot — handler reads threadLocalIdx
