@@ -105,6 +105,23 @@ jobs:
       - name: Install dependencies
         run: nimble install -y
 
+      - name: Select MSVC/vcc on Windows (CI-only)
+        # nim.cfg deliberately leaves Windows compiler selection unset so
+        # local MinGW-GCC users on Windows are not forced to install MSVC.
+        # CI exercises the `_InterlockedCompareExchange128` / `_Interlocked*`
+        # arms in debra/atomics by appending `cc = "vcc"` to nim.cfg here,
+        # which is picked up by every `nim c` invocation — including the
+        # `exec "nim c -r ..."` calls inside Nimble's `test` task, where
+        # `--passNim:--cc:vcc` does NOT propagate. Mirrors the cc=vcc
+        # directive that previously lived in the checked-in nim.cfg.
+        if: matrix.runs-on == 'windows-2022'
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '\n@if windows:\n  cc = "vcc"\n@end\n' >> nim.cfg
+          echo "----- nim.cfg after vcc append -----"
+          cat nim.cfg
+
       - name: Clear compilation cache
         shell: bash
         run: rm -rf ~/.cache/nim
@@ -130,12 +147,13 @@ jobs:
               return 1
             fi
           }
-          # Note: vcc selection on windows-2022 is handled by `nim.cfg`'s
-          # `@if windows: cc = "vcc" @end` directive rather than a
-          # `--passNim:--cc:vcc` plumbed through this matrix step. Nimble's
-          # `test` task does its own `exec "nim c -r ..."` loop internally,
-          # and `--passNim` flags do not propagate into those nested `exec`
-          # invocations — only nim.cfg does.
+          # Note: vcc selection on windows-2022 is handled by the
+          # "Select MSVC/vcc on Windows (CI-only)" step above, which
+          # appends `@if windows: cc = "vcc" @end` to nim.cfg at runtime.
+          # We do NOT plumb `--passNim:--cc:vcc` through this matrix step
+          # because Nimble's `test` task does its own `exec "nim c -r ..."`
+          # loop internally, and `--passNim` flags do not propagate into
+          # those nested `exec` invocations — only nim.cfg does.
           nimble_run nimble test --passNim:--mm:${{ matrix.mm }} --passNim:--backend:${{ matrix.backend }}
 
       - name: objdump regex verification
