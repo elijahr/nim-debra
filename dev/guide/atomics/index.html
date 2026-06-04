@@ -1,0 +1,1847 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="DEBRA+ safe memory reclamation for lock-free data structures">
+      
+      
+      
+        <link rel="canonical" href="https://elijahr.github.io/nim-debra/latest/guide/atomics/">
+      
+      
+        <link rel="prev" href="../integration/">
+      
+      
+        <link rel="next" href="../../api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Atomics - nim-debra</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../css/timeago.css">
+    
+      <link rel="stylesheet" href="../../css/custom.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#atomics" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden="">
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="nim-debra" class="md-header__button md-logo" aria-label="nim-debra" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            nim-debra
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Atomics
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="deep-purple" data-md-color-accent="amber" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="deep-purple" data-md-color-accent="amber" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden="">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required="">
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix="">
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/elijahr/nim-debra" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    elijahr/nim-debra
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="nim-debra" class="md-nav__button md-logo" aria-label="nim-debra" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"></path></svg>
+
+    </a>
+    nim-debra
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/elijahr/nim-debra" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    elijahr/nim-debra
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix="">
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked="">
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix="">
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../thread-registration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Thread Registration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pin-unpin/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pin/Unpin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../retiring-objects/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Retiring Objects
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reclamation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reclamation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../epoch-advancement/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Epoch Advancement
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../neutralization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Neutralization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atomics
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atomics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#1-why-a-separate-module-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Why a separate module exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-side-by-side-with-stdatomics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Side-by-side with std/atomics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Side-by-side with std/atomics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concrete-the-silent-spinlock-footgun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concrete: the silent-spinlock footgun
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-you-get-in-v0100-that-stdatomics-doesnt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. What you get in v0.10.0 that std/atomics doesn't
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-when-not-to-use-debraatomics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. When NOT to use debra/atomics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-memory-order-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Memory-order policy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Memory-order policy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#c11-strict-failure-order-validity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C11-strict failure-order validity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-dwcas-seq_cst-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The DWCAS seq_cst upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-strong-vs-weak-compareexchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use Strong vs Weak compareExchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-compatibility-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Compatibility matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Compatibility matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-compilers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported compilers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-architectures-for-dwcas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported architectures (for DWCAS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-cell-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI cell coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regression-test-libatomic-fallback-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regression test: libatomic-fallback detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-worked-example-lcrq-style-cell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Worked example: LCRQ-style cell
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#1-why-a-separate-module-exists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Why a separate module exists
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-side-by-side-with-stdatomics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Side-by-side with std/atomics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Side-by-side with std/atomics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#concrete-the-silent-spinlock-footgun" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concrete: the silent-spinlock footgun
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-what-you-get-in-v0100-that-stdatomics-doesnt" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. What you get in v0.10.0 that std/atomics doesn't
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-when-not-to-use-debraatomics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. When NOT to use debra/atomics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-memory-order-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Memory-order policy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Memory-order policy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#c11-strict-failure-order-validity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C11-strict failure-order validity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-dwcas-seq_cst-upgrade" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The DWCAS seq_cst upgrade
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#when-to-use-strong-vs-weak-compareexchange" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When to use Strong vs Weak compareExchange
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-compatibility-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Compatibility matrix
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Compatibility matrix">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#supported-compilers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported compilers
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#supported-architectures-for-dwcas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported architectures (for DWCAS)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-cell-coverage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI cell coverage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regression-test-libatomic-fallback-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Regression test: libatomic-fallback detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-worked-example-lcrq-style-cell" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Worked example: LCRQ-style cell
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="atomics">Atomics<a class="headerlink" href="#atomics" title="Permanent link">¶</a></h1>
+<p><code>debra/atomics</code> is nim-debra's custom atomics module. It exists alongside —
+and intentionally diverges from — <code>std/atomics</code>. This guide explains <em>why</em>
+the module exists, what it offers over <code>std/atomics</code>, and when you should
+(or shouldn't) reach for it.</p>
+<p>If you only ever need 1/2/4/8-byte atomics with sequentially-consistent
+ordering and you trust your platform, <code>std/atomics</code> is fine. The rest of
+this guide is for callers who need stronger compile-time guarantees,
+DWCAS (16-byte CAS), or LCRQ-style algorithms.</p>
+<h2 id="1-why-a-separate-module-exists">1. Why a separate module exists<a class="headerlink" href="#1-why-a-separate-module-exists" title="Permanent link">¶</a></h2>
+<p><code>debra/atomics</code> is <em>not</em> a thin wrapper around <code>std/atomics</code>. It is a
+parallel implementation that hard-bakes four invariants <code>std/atomics</code>
+either lacks or enforces only at runtime. See the module preamble
+(<code>src/debra/atomics.nim</code> lines 1–25) for the canonical version of this
+list:</p>
+<ol>
+<li><strong>Reject <code>Atomic[ref T]</code> at compile time.</strong> <code>std/atomics</code> silently
+   accepts a GC-managed <code>ref</code> payload and falls back to a non-lock-free
+   spinlock object. <code>debra/atomics</code> refuses to compile in that case and
+   directs you to <code>Atomic[ptr T]</code> plus <code>retain</code> / <code>releaseDestructor</code>
+   from <code>debra/refptr</code>.</li>
+<li><strong>Require <code>Atomic[T]</code> to be lock-free at compile time.</strong> A
+   <code>static assert</code> on <code>__atomic_always_lock_free</code> fails the build on
+   any target where the underlying op would synthesize a lock. No
+   silent downgrade to a spinlock object.</li>
+<li><strong>Validate <code>MemoryOrder</code> per op at compile time.</strong> Passing a
+   release-class order to a pure load (or an acquire-class order to a
+   pure store) is a compile error, not a runtime contract you have to
+   remember.</li>
+<li><strong>Statically assert <code>alignof(Atomic[T]) &gt;= sizeof(T)</code>.</strong> This catches
+   under-aligned types (e.g. <code>uint64</code> on a 32-bit ABI whose natural
+   alignment is 4 bytes) at the build, not on first cache-line straddle
+   in production.</li>
+</ol>
+<p>For the v0.10.0 release, <code>debra/atomics</code> adds a fifth invariant — DWCAS
+(16-byte / 128-bit atomics) as <code>Atomic[Pair[A, B]]</code>. That capability
+does not exist in <code>std/atomics</code> at all, and is the proximate reason
+nim-debra ships its own atomics module rather than re-exporting the
+standard one.</p>
+<h2 id="2-side-by-side-with-stdatomics">2. Side-by-side with <code>std/atomics</code><a class="headerlink" href="#2-side-by-side-with-stdatomics" title="Permanent link">¶</a></h2>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th><code>std/atomics</code></th>
+<th><code>debra/atomics</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Atomic[ref T]</code></td>
+<td>Silently accepted, becomes a spinlock object</td>
+<td><strong>Compile error</strong> with remediation hint</td>
+</tr>
+<tr>
+<td>Non-lock-free <code>Atomic[T]</code></td>
+<td>Allowed, runs as a spinlock object</td>
+<td><strong>Compile error</strong> (gate 2)</td>
+</tr>
+<tr>
+<td>Bad <code>MemoryOrder</code> per op</td>
+<td>Allowed; std accepts release on a load, etc.</td>
+<td><strong>Compile error</strong>: <code>validLoadOrder</code> / <code>validStoreOrder</code> / <code>validCasFailureOrder</code></td>
+</tr>
+<tr>
+<td>Under-aligned <code>Atomic[T]</code></td>
+<td>Allowed; depends on the natural alignment of <code>T</code></td>
+<td><strong>Compile error</strong>: <code>alignof(Atomic[T]) &gt;= sizeof(T)</code> is asserted</td>
+</tr>
+<tr>
+<td>16-byte atomics (DWCAS)</td>
+<td>Not supported</td>
+<td><code>Atomic[Pair[A, B]]</code> with load/store/exchange/compareExchange{Strong,Weak}</td>
+</tr>
+<tr>
+<td>Per-callsite memory-order relaxation</td>
+<td>N/A</td>
+<td><code>dwcasOrderRelaxedCAS:</code> template</td>
+</tr>
+<tr>
+<td>MSVC</td>
+<td>Supported</td>
+<td>Supported (full <code>Atomic[T]</code> surface + DWCAS via <code>_InterlockedCompareExchange128</code>)</td>
+</tr>
+<tr>
+<td>32-bit targets</td>
+<td>Supported</td>
+<td>Supported for ≤8 bytes; <strong>DWCAS rejected</strong> at compile time on 32-bit ABIs</td>
+</tr>
+</tbody>
+</table>
+<h3 id="concrete-the-silent-spinlock-footgun">Concrete: the silent-spinlock footgun<a class="headerlink" href="#concrete-the-silent-spinlock-footgun" title="Permanent link">¶</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="n">std</span><span class="o">/</span><span class="n">atomics</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">type</span><span class="w"> </span><span class="n">Big</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nb">array</span><span class="o">[</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="n">uint64</span><span class="o">]</span><span class="w">   </span><span class="c"># 48 bytes — way too wide to be lock-free</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kd">var</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="n">Atomic</span><span class="o">[</span><span class="n">Big</span><span class="o">]</span><span class="w">   </span><span class="c"># std/atomics: compiles. Becomes a spinlock object.</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">                     </span><span class="c"># No warning, no error. You get a mutex disguised</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">                     </span><span class="c"># as an atomic, with all the latency that implies.</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="n">debra</span><span class="o">/</span><span class="n">atomics</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">type</span><span class="w"> </span><span class="n">Big</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="n">data</span><span class="p">:</span><span class="w"> </span><span class="nb">array</span><span class="o">[</span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="n">uint64</span><span class="o">]</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kd">var</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="n">Atomic</span><span class="o">[</span><span class="n">Big</span><span class="o">]</span><span class="w">   </span><span class="c"># debra/atomics: COMPILE ERROR</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c">#                      "Atomic[Big] is not lock-free on this target..."</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c">#                      "Pass -d:CacheLineBytes=... if your platform..."</span>
+</code></pre></div>
+<p>The <code>debra/atomics</code> form fails the build and tells you what to fix. The
+<code>std/atomics</code> form ships a hidden contention pile.</p>
+<h2 id="3-what-you-get-in-v0100-that-stdatomics-doesnt">3. What you get in v0.10.0 that <code>std/atomics</code> doesn't<a class="headerlink" href="#3-what-you-get-in-v0100-that-stdatomics-doesnt" title="Permanent link">¶</a></h2>
+<p>v0.10.0 adds DWCAS — 16-byte / 128-bit atomic compare-and-swap and the
+load/store/exchange ops that go with it. The surface is:</p>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Pair[A, B]</code></td>
+<td>16-byte-aligned object with fields <code>first: A</code>, <code>second: B</code>. The DWCAS cell type.</td>
+</tr>
+<tr>
+<td><code>Atomic[Pair[A, B]]</code></td>
+<td>Atomic over a 16-byte pair. Requires a 64-bit target and arch-specific compile flags.</td>
+</tr>
+<tr>
+<td><code>load</code> / <code>store</code> / <code>exchange</code></td>
+<td>16-byte ops on <code>Atomic[Pair[A, B]]</code>. Always seq_cst at the instruction level.</td>
+</tr>
+<tr>
+<td><code>compareExchangeStrong</code> (3 overloads)</td>
+<td>Strong 16-byte CAS. <code>(success, failure)</code>, single-order, and default-order forms.</td>
+</tr>
+<tr>
+<td><code>compareExchangeWeak</code> (3 overloads)</td>
+<td>Weak 16-byte CAS. <code>(success, failure)</code>, single-order, and default-order forms. May fail spuriously only on ARMv8.0 LL/SC; equivalent to Strong elsewhere. See §5.</td>
+</tr>
+<tr>
+<td><code>compareExchange</code> aliases (3 overloads)</td>
+<td>Unsuffixed-name aliases routing to <code>compareExchangeStrong</code>, for <code>std/atomics</code>-style spelling.</td>
+</tr>
+<tr>
+<td><code>fetchAdd</code> / <code>fetchSub</code> / <code>fetchAnd</code> / <code>fetchOr</code> / <code>fetchXor</code></td>
+<td>16-byte componentwise atomic RMW on <code>Atomic[Pair[A, B]]</code> where <code>A, B: SomeInteger</code>. Both halves updated as a single 128-bit transaction via a CAS-loop (cmpxchg16b / casp / <code>_InterlockedCompareExchange128</code> is CAS-only — there is no native 128-bit fetch instruction).</td>
+</tr>
+<tr>
+<td><code>dwcasOrderRelaxedCAS:</code></td>
+<td>Template that wraps a single call site to suppress the seq_cst-upgrade warning.</td>
+</tr>
+</tbody>
+</table>
+<p>In addition, v0.10.0 ships CI infrastructure that <code>std/atomics</code> does not
+and cannot reasonably provide on its own:</p>
+<ul>
+<li><strong>Cross-compiler macro probe.</strong> Before any DWCAS test runs, CI verifies
+  that the C compiler defines <code>__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16</code> (or
+  the arch equivalent) on every supported (compiler × OS × arch) cell.</li>
+<li><strong><code>objdump</code> regex check.</strong> After compilation, CI disassembles the
+  binary and confirms the emit really inlined to <code>cmpxchg16b</code> (x86_64)
+  or <code>casp</code> / <code>caspal</code> (arm64). No silent fallback to a library call.</li>
+<li><strong>Compile-time error with exact-flag hint.</strong> When the build is missing
+  <code>-mcx16</code> (gcc x86_64) or <code>-march=armv8.1-a+lse -mno-outline-atomics</code>
+  (gcc arm64), the error message names the missing flag — you don't
+  have to triage a generic "lock-free not available" message.</li>
+</ul>
+<h2 id="4-when-not-to-use-debraatomics">4. When NOT to use <code>debra/atomics</code><a class="headerlink" href="#4-when-not-to-use-debraatomics" title="Permanent link">¶</a></h2>
+<p>Don't reach for this module just because nim-debra uses it. Concrete
+"<code>std/atomics + Lock</code> is the simpler answer" cases:</p>
+<ul>
+<li><strong>You don't need lock-free guarantees.</strong> A single mutex around a
+  shared mutable struct is dramatically easier to reason about than a
+  hand-rolled CAS loop. Reach for <code>Lock</code> first.</li>
+<li><strong>You're on a compiler that isn't gcc / clang / llvm_gcc /
+  nintendoswitch / vcc (MSVC).</strong> <code>debra/atomics</code> errors out at import
+  time on unsupported toolchains. v0.10.0 adds full MSVC support; the
+  vcc arms route to <code>_InterlockedCompareExchange*</code> for 1/2/4/8 byte ops
+  and <code>_InterlockedCompareExchange128</code> for DWCAS. Other backends (tcc,
+  bcc, etc.) remain unsupported.</li>
+<li><strong>You're on a 32-bit ABI and want 16-byte atomics.</strong> DWCAS requires a
+  64-bit target. The 32-bit ABI fails gate 1 (<code>sizeof(pointer) == 8</code>)
+  at compile time.</li>
+<li><strong>You want fetch-and-add on a 16-byte cell where the halves are not
+  integers.</strong> The 16-byte <code>fetchAdd</code> / <code>fetchSub</code> / <code>fetchAnd</code> / <code>fetchOr</code>
+  / <code>fetchXor</code> ops require both halves to be <code>SomeInteger</code>. Floats or
+  pointer halves are not supported (bitwise ops have no meaningful
+  semantics on floats; arithmetic on pointer halves likewise). Use
+  <code>compareExchange*</code> directly for non-integer pair payloads.</li>
+<li><strong>You want a portable <code>std/atomics</code>-shaped surface across all Nim
+  targets.</strong> Use <code>std/atomics</code>. <code>debra/atomics</code> is intentionally narrower.</li>
+</ul>
+<h2 id="5-memory-order-policy">5. Memory-order policy<a class="headerlink" href="#5-memory-order-policy" title="Permanent link">¶</a></h2>
+<p><code>debra/atomics</code> validates memory orders at compile time. The rules:</p>
+<table>
+<thead>
+<tr>
+<th>Op family</th>
+<th>Allowed orders</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>load</code></td>
+<td><code>moRelaxed</code>, <code>moConsume</code>, <code>moAcquire</code>, <code>moSequentiallyConsistent</code></td>
+</tr>
+<tr>
+<td><code>store</code></td>
+<td><code>moRelaxed</code>, <code>moRelease</code>, <code>moSequentiallyConsistent</code></td>
+</tr>
+<tr>
+<td><code>exchange</code></td>
+<td>Any</td>
+</tr>
+<tr>
+<td><code>compareExchange*</code> (success)</td>
+<td>Any</td>
+</tr>
+<tr>
+<td><code>compareExchange*</code> (failure)</td>
+<td>Must be a load-class order, must not be stronger than success; when <code>success == moRelease</code>, <code>failure</code> MUST be <code>moRelaxed</code> (see below)</td>
+</tr>
+<tr>
+<td>Any DWCAS op (16-byte) at the instruction level</td>
+<td>Always <code>moSequentiallyConsistent</code> regardless of what you pass</td>
+</tr>
+</tbody>
+</table>
+<h3 id="c11-strict-failure-order-validity">C11-strict failure-order validity<a class="headerlink" href="#c11-strict-failure-order-validity" title="Permanent link">¶</a></h3>
+<p>Per C11 §7.17.7.4, the failure order of a <code>compareExchange</code> is the load
+order taken on the failed CAS path. It must satisfy:</p>
+<ul>
+<li><code>failure != moRelease</code> (failure is a pure load; loads cannot release).</li>
+<li><code>failure != moAcquireRelease</code> (same reason).</li>
+<li><code>failure</code> cannot be stronger than the load component of <code>success</code>.</li>
+</ul>
+<p>The third rule is <em>stricter</em> than the naive <code>ord(failure) &lt;= ord(success)</code>
+comparison. In particular, when <code>success == moRelease</code>, <code>failure</code> MUST be
+<code>moRelaxed</code>. <code>moRelease</code> has no load-acquire on the success path, so the
+failure path (which is a pure load) cannot acquire either —
+<code>success=moRelease, failure=moAcquire</code> is invalid even though
+<code>ord(moAcquire) &lt;= ord(moRelease)</code> numerically.</p>
+<p>nim-debra v0.10.0 enforces this at compile time via <code>validCasFailureOrder</code>
+(<code>src/debra/atomics.nim</code>). The LCRQ producer publish (the canonical
+release/relaxed use case) passes <code>moRelease</code>/<code>moRelaxed</code> and is accepted;
+mixing <code>moRelease</code>/<code>moAcquire</code> is rejected with a compile-time
+<code>assert</code> that names the offending pair.</p>
+<h3 id="the-dwcas-seq_cst-upgrade">The DWCAS seq_cst upgrade<a class="headerlink" href="#the-dwcas-seq_cst-upgrade" title="Permanent link">¶</a></h3>
+<p>All 16-byte ops emit seq_cst at the C / machine level. This is a
+deliberate choice driven by the gcc-x86_64 <code>__sync_*</code> legacy: those
+builtins do not take a memory-order argument and behave as seq_cst.
+Rather than expose a per-backend asymmetry (clang and arm64 <em>can</em> take
+sub-seq_cst orders), v0.10.0 normalizes to seq_cst everywhere.</p>
+<p>When you pass a sub-seq_cst order to a 16-byte op, you get a compile-
+time warning at every call site:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>nim-debra DWCAS upgrades memory order to moSequentiallyConsistent at the
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>instruction level. Pass moSequentiallyConsistent to silence this warning,
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>or wrap the call site in `dwcasOrderRelaxedCAS:` if the relaxation is
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>intentional.
+</code></pre></div>
+<p>If the relaxation is audited and intentional (notably: the LCRQ producer
+publish CAS, which mathematically wants <code>moRelease</code> / <code>moRelaxed</code>), wrap
+just that call site:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">dwcasOrderRelaxedCAS</span><span class="p">:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="k">discard</span><span class="w"> </span><span class="n">cell</span><span class="p">.</span><span class="n">compareExchangeStrong</span><span class="p">(</span><span class="n">expected</span><span class="p">,</span><span class="w"> </span><span class="n">desired</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span><span class="p">)</span>
+</code></pre></div>
+<p>The warning continues to fire at every unwrapped call site. The wrap is
+per-site, not per-module — you can't accidentally silence the warning
+globally.</p>
+<h3 id="when-to-use-strong-vs-weak-compareexchange">When to use Strong vs Weak compareExchange<a class="headerlink" href="#when-to-use-strong-vs-weak-compareexchange" title="Permanent link">¶</a></h3>
+<p>The Strong/Weak distinction matters only on ARMv8.0 cores that use the
+LL/SC primitives <code>ldaxp</code> / <code>stlxp</code>. On all other supported targets the
+two are equivalent in both cost and behaviour:</p>
+<ul>
+<li><strong>x86_64 (gcc and clang).</strong> Both <code>compareExchangeStrong</code> and
+  <code>compareExchangeWeak</code> lower to <code>cmpxchg16b</code>, which is always-strong.
+  The <code>weak</code> flag is a no-op.</li>
+<li><strong>arm64 with FEAT_LSE / LSE2 (Apple Silicon, modern server chips).</strong>
+  Both lower to <code>caspal</code> (single-instruction CAS). The <code>weak</code> flag is a
+  no-op. Verified by <code>objdump</code> of a release-mode probe on Apple Silicon:
+  both procs emit identical <code>caspal</code> instructions, no <code>ldaxp</code> / <code>stlxp</code>
+  pairs are emitted on either path. Empirical measurement under pure
+  contention on Apple Silicon (cycle-13 CI run): the
+  <code>compareExchangeWeak</code> failure rate matches <code>compareExchangeStrong</code>
+  exactly (13.86% real contention loss on the measured workload, 0%
+  spurious-failure delta). The Strong/Weak distinction collapses on
+  this microarchitecture.</li>
+<li><strong>arm64 ARMv8.0 (LL/SC fallback, e.g. Raspberry Pi 3, Cortex-A53).</strong>
+  Weak uses <code>ldaxp</code> / <code>stlxp</code> and is permitted to fail spuriously;
+  Strong wraps the LL/SC pair in a retry loop.</li>
+</ul>
+<p>Practical guidance:</p>
+<ul>
+<li><strong>Default to Strong</strong> on all targets. It is the safer choice (no
+  spurious-failure branch to handle) and equivalent cost on every
+  target v0.10.0 explicitly supports (CI cells are x86_64 and
+  Apple-Silicon-equivalent ARMv8.1+).</li>
+<li><strong>Use Weak only if</strong> you have measured your specific workload and
+  chip and confirmed (a) Strong is showing CAS-loop overhead from
+  contention, AND (b) your target is ARMv8.0 LL/SC, AND (c) the
+  surrounding loop already reloads <code>expected</code> on the failure path.</li>
+</ul>
+<p>The unsuffixed-name aliases <code>compareExchange</code> route to Strong, matching
+the <code>std/atomics</code> default. Weak must be spelled out explicitly.</p>
+<h2 id="6-compatibility-matrix">6. Compatibility matrix<a class="headerlink" href="#6-compatibility-matrix" title="Permanent link">¶</a></h2>
+<h3 id="supported-compilers">Supported compilers<a class="headerlink" href="#supported-compilers" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Compiler</th>
+<th>Supported</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gcc</td>
+<td>Yes</td>
+<td>DWCAS via <code>__sync_val_compare_and_swap</code> on <code>__int128</code>. Requires <code>-mcx16</code> on x86_64 (shipped via nim.cfg); requires <code>-march=armv8.1-a+lse -mno-outline-atomics</code> on aarch64.</td>
+</tr>
+<tr>
+<td>clang</td>
+<td>Yes</td>
+<td>DWCAS via <code>__atomic_compare_exchange_n</code> on <code>__int128</code>. Inlines <code>cmpxchg16b</code> on x86_64 under <code>-mcx16</code>; inlines <code>caspal</code> on aarch64 under default LSE (Apple Silicon native, Linux ARM requires <code>-march=armv8.1-a+lse</code>).</td>
+</tr>
+<tr>
+<td>llvm_gcc</td>
+<td>Yes</td>
+<td>Treated as clang-shape (<code>__atomic_*</code> path)</td>
+</tr>
+<tr>
+<td>nintendoswitch</td>
+<td>Accepted</td>
+<td>Treated as clang-shape (<code>__atomic_*</code> path)</td>
+</tr>
+<tr>
+<td>vcc (MSVC)</td>
+<td>Yes (x64 and ARM64 seq_cst)</td>
+<td>Full <code>Atomic[T]</code> surface via <code>_Interlocked*</code> intrinsics family (<code>&lt;intrin.h&gt;</code>); DWCAS via <code>_InterlockedCompareExchange128</code>. No <code>-m</code>-style flags required — MSVC always emits <code>cmpxchg16b</code> on x86_64 / <code>casp</code>+LL/SC on ARM64. The DWCAS comparand array is declared <code>__declspec(align(16)) __int64 _cmp[2]</code> (load-bearing: MSDN requires 16-byte alignment for <code>_InterlockedCompareExchange128</code>'s <code>ComparandResult</code> parameter). DWCAS sites wrap the intrinsic with a full hardware fence before and after to upgrade MSVC's default release-acquire to seq_cst: <code>_mm_mfence()</code> on x64, <code>__dmb(_ARM64_BARRIER_SY)</code> on ARM64. ARM64 Windows is not in the v0.10.0 CI matrix (windows-2022 x64 only) but the dispatch is symmetric.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="supported-architectures-for-dwcas">Supported architectures (for DWCAS)<a class="headerlink" href="#supported-architectures-for-dwcas" title="Permanent link">¶</a></h3>
+<p>Dispatch is by <strong>compiler</strong>, not architecture. Three arms cover both x86_64
+and aarch64:</p>
+<ul>
+<li><strong>GCC (any arch)</strong>: <code>__sync_val_compare_and_swap</code> on <code>__int128</code>. Required
+  because GCC's <code>__atomic_*_n</code> family at 16 bytes silently falls back to
+  <code>libatomic</code> (<code>__atomic_load_16</code>, <code>__atomic_compare_exchange_16</code>, etc.) on
+  BOTH x86_64 (regardless of <code>-mcx16</code>) AND aarch64 (regardless of LSE flags) —
+  only the legacy <code>__sync_*</code> builtins reliably inline to <code>cmpxchg16b</code> /
+  <code>casp</code> under GCC.</li>
+<li><strong>Clang / llvm_gcc / nintendoswitch (any arch)</strong>: <code>__atomic_compare_exchange_n</code>
+  on <code>__int128</code>. Clang's <code>__atomic_*</code> family inlines correctly under <code>-mcx16</code>
+  (x86_64) or default LSE (aarch64).</li>
+<li><strong>vcc (MSVC) (x86_64 or ARM64)</strong>: <code>_InterlockedCompareExchange128</code> from
+  <code>&lt;intrin.h&gt;</code>. The intrinsic is guaranteed lock-free on every Windows-on-AMD64
+  target (cmpxchg16b is mandatory in the platform ABI since Windows Vista) and
+  Windows-on-ARM64 target (MSVC emits <code>casp</code> under FEAT_LSE or LL/SC otherwise).
+  load/store/exchange synthesize from <code>_InterlockedCompareExchange128</code> (no native
+  128-bit load/store/exchange on MSVC). The 1/2/4/8-byte surface uses the
+  <code>_Interlocked*</code> family directly (<code>_InterlockedExchange*</code> / <code>_InterlockedCompareExchange*</code>
+  / <code>_InterlockedExchangeAdd*</code> / <code>_InterlockedAnd|Or|Xor*</code>); see Phase B in
+  <code>src/debra/atomics.nim</code> for the full importc binding table.</li>
+<li><strong>Comparand alignment (load-bearing).</strong> MSDN requires the
+    <code>ComparandResult</code> parameter of <code>_InterlockedCompareExchange128</code> to be
+    16-byte aligned. Each of the 5 DWCAS emit sites declares the local
+    comparand array as <code>__declspec(align(16)) __int64 _cmp[2]</code>; dropping
+    that pragma is undefined behavior per MSDN and would silently
+    miscompare on platforms that enforce alignment (ARM64 in particular).</li>
+<li><strong>Full hardware fence wrap for seq_cst.</strong> MSVC's <code>_Interlocked*</code>
+    intrinsics document only release-acquire semantics by default
+    (x86 hardware happens to give seq_cst for <code>lock cmpxchg16b</code>, but
+    the <em>intrinsic's contract</em> is release-acquire). To match
+    <code>std/atomics</code> Sequentially Consistent semantics, DWCAS sites
+    bracket the intrinsic with a full hardware fence on both sides
+    of the CAS: <code>_mm_mfence()</code> (from <code>&lt;intrin.h&gt;</code>) on x64,
+    <code>__dmb(_ARM64_BARRIER_SY)</code> on ARM64 Windows. Dispatch is by the
+    MSVC predefine <code>_M_ARM64</code> via a <code>#ifdef</code> inside the emit body.
+    <code>_mm_mfence</code> lowers to <code>mfence</code> on x86; <code>__dmb _SY</code> lowers to
+    <code>dmb sy</code> on ARM64. Both give full system-domain ordering, lifting
+    the intrinsic from release-acquire to seq_cst on both architectures.</li>
+<li><strong>ARM64 Windows CI coverage.</strong> ARM64 Windows (Snapdragon X+,
+    Windows-on-ARM) is not in the v0.10.0 CI matrix (windows-2022 x64
+    only). The emit dispatch is symmetric (<code>#ifdef _M_ARM64</code> selects
+    <code>__dmb</code>); the surface is identical to x64 from a callsite
+    perspective. PR welcome on regressions.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Arch</th>
+<th>Supported</th>
+<th>Required compiler flag</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>x86_64 (amd64)</td>
+<td>Yes</td>
+<td><code>-mcx16</code> (both gcc and clang). MSVC: no flag required (<code>_InterlockedCompareExchange128</code> is unconditional). Without <code>-mcx16</code> on gcc/clang, both <code>__sync_*</code> and <code>__atomic_*</code> reject <code>__int128</code> CAS.</td>
+</tr>
+<tr>
+<td>arm64 (aarch64)</td>
+<td>Yes</td>
+<td><code>-march=armv8.1-a+lse -mno-outline-atomics</code> (gcc); default LSE on Apple Silicon, <code>-march=armv8.1-a+lse</code> on Linux ARM (clang). MSVC: no flag required (<code>_InterlockedCompareExchange128</code> emits <code>casp</code>/LL+SC as appropriate).</td>
+</tr>
+<tr>
+<td>32-bit (i386, armv7)</td>
+<td><strong>No</strong></td>
+<td>Gate 1 (<code>sizeof(pointer) == 8</code>) fails at compile time</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ci-cell-coverage">CI cell coverage<a class="headerlink" href="#ci-cell-coverage" title="Permanent link">¶</a></h3>
+<table>
+<thead>
+<tr>
+<th>Cell</th>
+<th>DWCAS coverage</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ubuntu-24.04 + gcc + x86_64</td>
+<td>Yes</td>
+<td>Macro probe + objdump verify <code>cmpxchg16b</code></td>
+</tr>
+<tr>
+<td>ubuntu-24.04 + clang + x86_64</td>
+<td>Yes</td>
+<td>Macro probe + objdump verify <code>cmpxchg16b</code></td>
+</tr>
+<tr>
+<td>ubuntu-24.04-arm + gcc + arm64 (native)</td>
+<td>Yes</td>
+<td>Macro probe + objdump verify <code>casp</code> / <code>caspal</code></td>
+</tr>
+<tr>
+<td>ubuntu-24.04-arm + clang + arm64 (native)</td>
+<td>Yes</td>
+<td>Macro probe + objdump verify <code>casp</code> / <code>caspal</code></td>
+</tr>
+<tr>
+<td>macos-15 + clang + arm64</td>
+<td>Yes</td>
+<td>Macro probe + objdump verify <code>casp</code> / <code>caspal</code></td>
+</tr>
+<tr>
+<td>windows-2022 + MSVC + x86_64</td>
+<td>Yes</td>
+<td>Full test suite under <code>--cc:vcc</code>; macro probe + objdump steps skipped (MSVC has no <code>__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16</code> and dumpbin output differs from objdump). The vcc DWCAS path is exercised end-to-end by the test suite.</td>
+</tr>
+<tr>
+<td>ubuntu-24.04 + TSAN</td>
+<td>Yes</td>
+<td>Contention tests under thread sanitizer</td>
+</tr>
+<tr>
+<td>macos-15 + Apple Clang + x86_64 (Rosetta)</td>
+<td>Yes</td>
+<td>Cross-compiled on arm64 macos-15 with <code>-arch x86_64</code>, executed via Rosetta 2 across all 4 MM × 2 backend cells; <code>otool -tV</code> verifies <code>cmpxchg16b</code> emit + libatomic-fallback regression gate. Restores macOS x86_64 coverage retired when GitHub sunset macos-13 (2025-12-08).</td>
+</tr>
+</tbody>
+</table>
+<p>The cross-compiler macro probe is the gate that fails the build <em>before</em>
+any DWCAS code runs if the toolchain doesn't actually have the
+underlying capability. It is intentionally redundant with the per-op
+<code>_Static_assert</code> inside the emit body — the probe runs once per CI
+cell, the static asserts run at every call site.</p>
+<h3 id="regression-test-libatomic-fallback-detection">Regression test: libatomic-fallback detection<a class="headerlink" href="#regression-test-libatomic-fallback-detection" title="Permanent link">¶</a></h3>
+<p>CI's objdump verification step is a release-blocking gate that fails the
+build if any <code>__atomic_*_16</code> libatomic symbol — or <code>__aarch64_cas16_*</code>
+outline-atomics symbol — appears as a call target (either <code>bl &lt;symbol&gt;</code>
+or <code>b &lt;symbol&gt;</code> tail-call) in either the DWCAS objdump fixture or the
+<code>tests/test_dwcas_roundtrip.nim</code> test binary.</p>
+<p>This catches accidental reintroduction of the GCC <code>__atomic_*_n</code> libcall
+footgun: at width 16, GCC's generic <code>__atomic_*_n</code> builtins silently
+lower to libatomic libcalls instead of inlining the appropriate DWCAS
+instruction. The codebase uses the legacy <code>__sync_*</code> builtins on GCC
+paths specifically to dodge this — see the atomic128 reference and
+PR #14 cycle 12 for the historical incident.</p>
+<p>Applied to: <code>ubuntu-24.04</code> (gcc x86_64), <code>ubuntu-24.04-arm</code> (gcc
+aarch64), <code>macos-15</code> (Apple Clang arm64). Skipped on <code>windows-2022</code>
+(MSVC uses the <code>_Interlocked*</code> family, not libatomic).</p>
+<h2 id="7-worked-example-lcrq-style-cell">7. Worked example: LCRQ-style cell<a class="headerlink" href="#7-worked-example-lcrq-style-cell" title="Permanent link">¶</a></h2>
+<p>The driving use case for DWCAS in v0.10.0 is the LCRQ cell, where a
+producer publishes <code>(index, value)</code> atomically and a consumer claims
+the same pair atomically. The pair shape is <code>Pair[uint64, T]</code> where
+<code>first</code> is the index / generation half and <code>second</code> is the payload.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">import</span><span class="w"> </span><span class="n">debra</span><span class="o">/</span><span class="n">atomics</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">type</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span><span class="n">CellValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">ptr</span><span class="w"> </span><span class="n">Node</span><span class="w">   </span><span class="c"># raw pointer payload; trivially copyable</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span><span class="n">Cell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">object</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="n">state</span><span class="w"> </span><span class="sx">{.align</span>:<span class="w"> </span><span class="sx">16.}</span><span class="p">:</span><span class="w"> </span><span class="n">Atomic</span><span class="o">[</span><span class="n">Pair</span><span class="o">[</span><span class="n">uint64</span><span class="p">,</span><span class="w"> </span><span class="n">CellValue</span><span class="o">]]</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c"># Producer: publish (idx, value) only if the cell is still empty</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c"># (i.e. its generation half matches the expected pre-publish state).</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="k">proc</span><span class="w"> </span><span class="nf">publish</span><span class="p">(</span><span class="n">cell</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">Cell</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="p">:</span><span class="w"> </span><span class="n">uint64</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">:</span><span class="w"> </span><span class="n">CellValue</span><span class="p">):</span><span class="w"> </span><span class="nb">bool</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">expected</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Pair</span><span class="o">[</span><span class="n">uint64</span><span class="p">,</span><span class="w"> </span><span class="n">CellValue</span><span class="o">]</span><span class="p">(</span><span class="n">first</span><span class="p">:</span><span class="w"> </span><span class="n">idx</span><span class="p">,</span><span class="w"> </span><span class="n">second</span><span class="p">:</span><span class="w"> </span><span class="kp">nil</span><span class="p">)</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">  </span><span class="k">let</span><span class="w"> </span><span class="n">desired</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Pair</span><span class="o">[</span><span class="n">uint64</span><span class="p">,</span><span class="w"> </span><span class="n">CellValue</span><span class="o">]</span><span class="p">(</span><span class="n">first</span><span class="p">:</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="mh">0x1</span><span class="sc">'u64, second: value)</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">  </span><span class="c"># The producer publish is the one place we genuinely want</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="w">  </span><span class="c"># release/relaxed semantics — wrap it to silence the upgrade warning.</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">  </span><span class="n">dwcasOrderRelaxedCAS</span><span class="p">:</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cell</span><span class="p">.</span><span class="n">state</span><span class="p">.</span><span class="n">compareExchangeStrong</span><span class="p">(</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="w">      </span><span class="n">expected</span><span class="p">,</span><span class="w"> </span><span class="n">desired</span><span class="p">,</span><span class="w"> </span><span class="n">moRelease</span><span class="p">,</span><span class="w"> </span><span class="n">moRelaxed</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="p">)</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a><span class="c"># Consumer: claim (idx, value) atomically by swapping in the</span>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="c"># "claimed" sentinel (high bit set on the generation half).</span>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="k">proc</span><span class="w"> </span><span class="nf">claim</span><span class="p">(</span><span class="n">cell</span><span class="p">:</span><span class="w"> </span><span class="kd">var</span><span class="w"> </span><span class="n">Cell</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="p">:</span><span class="w"> </span><span class="n">uint64</span><span class="p">):</span><span class="w"> </span><span class="n">CellValue</span><span class="w"> </span><span class="o">=</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="w">  </span><span class="kd">var</span><span class="w"> </span><span class="n">snapshot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cell</span><span class="p">.</span><span class="n">state</span><span class="p">.</span><span class="n">load</span><span class="p">(</span><span class="n">moAcquire</span><span class="p">)</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a><span class="w">  </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">snapshot</span><span class="p">.</span><span class="n">first</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="mh">0x1</span><span class="sc">'u64) != 0'</span><span class="n">u64</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="n">snapshot</span><span class="p">.</span><span class="n">first</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="p">(</span><span class="n">idx</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="mh">0x1</span><span class="p">):</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a><span class="w">    </span><span class="kd">var</span><span class="w"> </span><span class="n">expected</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">snapshot</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="w">    </span><span class="k">let</span><span class="w"> </span><span class="n">desired</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Pair</span><span class="o">[</span><span class="n">uint64</span><span class="p">,</span><span class="w"> </span><span class="n">CellValue</span><span class="o">]</span><span class="p">(</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="w">      </span><span class="n">first</span><span class="p">:</span><span class="w"> </span><span class="n">snapshot</span><span class="p">.</span><span class="n">first</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="mh">0x8000_0000_0000_0000</span><span class="sc">'u64,</span>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="w">      </span><span class="n">second</span><span class="p">:</span><span class="w"> </span><span class="n">snapshot</span><span class="p">.</span><span class="n">second</span><span class="p">,</span>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a><span class="w">    </span><span class="p">)</span>
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">cell</span><span class="p">.</span><span class="n">state</span><span class="p">.</span><span class="n">compareExchangeWeak</span><span class="p">(</span><span class="n">expected</span><span class="p">,</span><span class="w"> </span><span class="n">desired</span><span class="p">):</span>
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a><span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">snapshot</span><span class="p">.</span><span class="n">second</span>
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a><span class="w">    </span><span class="n">snapshot</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">expected</span><span class="w">   </span><span class="c"># CAS-failure overwrote expected with current value</span>
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a><span class="w">  </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kp">nil</span>
+</code></pre></div>
+<p>Two things to note about this example:</p>
+<ul>
+<li><strong><code>expected</code> and <code>desired</code> are distinct locals.</strong> The <code>compareExchange*</code>
+  doc-comments document this as a contract: on CAS failure, <code>expected</code>
+  is overwritten in place with the current value of the cell. Aliasing
+  <code>expected</code> and <code>desired</code> is defined-but-confusing on the wider 16-byte
+  surface and the doc-comments call it out explicitly.</li>
+<li><strong>The consumer uses <code>compareExchangeWeak</code> inside the loop.</strong> On
+  ARMv8.0 LL/SC cores (no LSE), weak-CAS may fail spuriously (<code>stlxp</code>
+  is permitted to fail without contention). The loop reloads
+  <code>expected</code> from the failure path and retries. On x86_64
+  (<code>cmpxchg16b</code>) and on arm64 with FEAT_LSE / LSE2 (<code>caspal</code>, e.g.
+  Apple Silicon, modern server chips), weak is identical to strong —
+  both lower to the same single instruction and the spurious-failure
+  branch never fires. See §5 "When to use Strong vs Weak" for the
+  full guidance: default to Strong unless you have measured a Weak
+  win on a specific ARMv8.0 target.</li>
+</ul>
+<p>For the full LCRQ algorithm see the v0.10.0+ wave specs in the
+<code>lockfreequeues</code> project; the cell above is just the DWCAS substrate.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">¶</a></h2>
+<ul>
+<li><a href="../../api/"><code>docs/api.md</code></a> — auto-generated API reference for the
+  full <code>debra/atomics</code> surface (signatures, doc-comments, source links).</li>
+<li><code>src/debra/atomics.nim</code> — the module preamble at lines 1–25 is the
+  canonical statement of the four (now five) invariants this module
+  enforces over <code>std/atomics</code>.</li>
+<li><code>THIRD_PARTY_LICENSES.md</code> — DWCAS compiler-dispatch pattern adapted
+  from <a href="https://github.com/patternnoster/atomic128">atomic128</a> by
+  patternnoster (MIT). Pinned upstream commit
+  <code>d45ba3d348a9620a25552f9cf50dc7ccef05ef90</code>.</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"></path></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="June 4, 2026 09:06:16 UTC"><span class="timeago" datetime="2026-06-04T09:06:16+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="June 4, 2026 09:06:16 UTC">2026-06-04</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"></path></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="June 2, 2026 21:18:26 UTC"><span class="timeago" datetime="2026-06-02T21:18:26+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="June 2, 2026 21:18:26 UTC">2026-06-02</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/elijahr/nim-debra" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"></path></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy", "content.code.annotate", "navigation.instant", "navigation.sections", "navigation.expand", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../js/timeago.min.js"></script>
+      
+        <script src="../../js/timeago_mkdocs_material.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": true, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>

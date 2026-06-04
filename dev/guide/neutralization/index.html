@@ -655,6 +655,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="How Neutralization Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#posix-linux-macos-bsd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POSIX (Linux, macOS, BSD)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -742,10 +770,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#signal-choice" class="md-nav__link">
+  <a href="#signal-choice-posix-only" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Signal Choice
+        Signal Choice (POSIX only)
       
     </span>
   </a>
@@ -765,6 +793,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Platform Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deadlock-constraint-both-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deadlock Constraint (Both Platforms)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -853,6 +898,34 @@
     
   
     Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../atomics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Atomics
   
 
     
@@ -995,6 +1068,34 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="How Neutralization Works">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#posix-linux-macos-bsd" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POSIX (Linux, macOS, BSD)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Windows
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1082,10 +1183,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#signal-choice" class="md-nav__link">
+  <a href="#signal-choice-posix-only" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Signal Choice
+        Signal Choice (POSIX only)
       
     </span>
   </a>
@@ -1105,6 +1206,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Platform Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deadlock-constraint-both-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deadlock Constraint (Both Platforms)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1190,12 +1308,15 @@
 
 
 <h1 id="neutralization">Neutralization<a class="headerlink" href="#neutralization" title="Permanent link">¶</a></h1>
-<p>Understanding the signal-based neutralization protocol.</p>
+<p>Understanding the thread-neutralization protocol. The protocol is
+platform-specific (POSIX uses signal delivery; Windows uses
+SuspendThread/ResumeThread), but the API is identical on both
+platforms.</p>
 <h2 id="state-machine">State Machine<a class="headerlink" href="#state-machine" title="Permanent link">¶</a></h2>
 <p><a class="glightbox" data-type="image" data-width="auto" data-height="auto" href="../../assets/diagrams/neutralize.svg" data-desc-position="bottom"><img alt="Neutralize Typestate" src="../../assets/diagrams/neutralize.svg"></a></p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">¶</a></h2>
 <p>Neutralization solves the stalled thread problem: what happens when a thread stays pinned for a long time? Without intervention, it blocks reclamation and memory accumulates unboundedly.</p>
-<p>DEBRA+ uses POSIX signals to neutralize stalled threads, allowing epoch advancement and bounded memory.</p>
+<p>DEBRA+ uses POSIX signals (or, on Windows, SuspendThread/ResumeThread) to neutralize stalled threads, allowing epoch advancement and bounded memory.</p>
 <h2 id="the-stalled-thread-problem">The Stalled Thread Problem<a class="headerlink" href="#the-stalled-thread-problem" title="Permanent link">¶</a></h2>
 <p>If a thread stays pinned at an old epoch:</p>
 <ul>
@@ -1204,14 +1325,33 @@
 <li>System may run out of memory</li>
 </ul>
 <h2 id="how-neutralization-works">How Neutralization Works<a class="headerlink" href="#how-neutralization-works" title="Permanent link">¶</a></h2>
+<h3 id="posix-linux-macos-bsd">POSIX (Linux, macOS, BSD)<a class="headerlink" href="#posix-linux-macos-bsd" title="Permanent link">¶</a></h3>
 <ol>
 <li><strong>Detection</strong>: Reclamation detects thread pinned at old epoch</li>
-<li><strong>Signal</strong>: Send SIGUSR1 to stalled thread</li>
-<li><strong>Handler</strong>: Signal handler sets neutralization flag</li>
-<li><strong>Check</strong>: Thread checks flag when it unpins</li>
+<li><strong>Signal</strong>: Send SIGUSR1 to stalled thread (<code>pthread_kill</code>)</li>
+<li><strong>Handler</strong>: Signal handler runs asynchronously in the target's
+   context and flips <code>pinned=false</code>, <code>neutralized=true</code> for the
+   target's slot</li>
+<li><strong>Check</strong>: Thread observes the flag on next pin attempt</li>
 <li><strong>Acknowledge</strong>: Thread acknowledges neutralization</li>
 <li><strong>Advance</strong>: Safe epoch can now advance past stalled thread</li>
 </ol>
+<h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">¶</a></h3>
+<ol>
+<li><strong>Detection</strong>: Reclamation detects thread pinned at old epoch</li>
+<li><strong>Suspend</strong>: Scanner calls <code>SuspendThread</code> on the target's
+   duplicated handle</li>
+<li><strong>Flip</strong>: Scanner directly walks the manager's <code>threads[]</code> array
+   and flips <code>pinned=false</code>, <code>neutralized=true</code> for the target's slot</li>
+<li><strong>Resume</strong>: Scanner calls <code>ResumeThread</code></li>
+<li><strong>Check</strong>: Thread observes the flag on next pin attempt</li>
+<li><strong>Advance</strong>: Safe epoch can now advance past stalled thread</li>
+</ol>
+<p>The Windows arm is semantically equivalent to the POSIX arm — both
+result in the target slot being flipped. The difference is that the
+flip happens synchronously on the scanner side (Windows) rather than
+asynchronously in the target's context (POSIX). The same byte-stride
+descriptor is used for the slot walk on both platforms.</p>
 <h2 id="triggering-neutralization">Triggering Neutralization<a class="headerlink" href="#triggering-neutralization" title="Permanent link">¶</a></h2>
 <p>The simple convenience API allows scanning for and signaling stalled threads:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">let</span><span class="w"> </span><span class="n">signalsSent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">neutralizeStalled</span><span class="p">(</span><span class="n">manager</span><span class="p">)</span>
@@ -1317,15 +1457,38 @@
 <p>How far behind before neutralizing? Default is 2 epochs.</p>
 <p>Lower threshold = more aggressive neutralization, better memory bounds, more interruptions.</p>
 <p>Higher threshold = more lenient on long operations, higher memory usage, fewer interruptions.</p>
-<h3 id="signal-choice">Signal Choice<a class="headerlink" href="#signal-choice" title="Permanent link">¶</a></h3>
-<p>DEBRA+ uses SIGUSR1 by default. Requirements:</p>
+<h3 id="signal-choice-posix-only">Signal Choice (POSIX only)<a class="headerlink" href="#signal-choice-posix-only" title="Permanent link">¶</a></h3>
+<p>DEBRA+ uses SIGUSR1 by default on POSIX. Requirements:</p>
 <ul>
 <li>Must not be used by application</li>
 <li>Must not have default handler</li>
 <li>Must be available on platform</li>
 </ul>
+<p>On Windows there is no signal involved; neutralization uses
+<code>SuspendThread</code> / <code>ResumeThread</code> and no signal number is consumed.</p>
 <h2 id="platform-considerations">Platform Considerations<a class="headerlink" href="#platform-considerations" title="Permanent link">¶</a></h2>
-<p>Neutralization works on POSIX systems (Linux, macOS, BSD). Windows does not support pthread_kill and would require alternative approaches.</p>
+<p>Neutralization is supported on:</p>
+<ul>
+<li><strong>POSIX</strong> (Linux, macOS, BSD): via <code>pthread_kill</code> + SIGUSR1 async
+  handler.</li>
+<li><strong>Windows</strong>: via <code>SuspendThread</code> / <code>ResumeThread</code> invoked
+  synchronously by the scanner. Added in v0.10.0.</li>
+</ul>
+<p>The API surface is identical on both platforms; the implementation
+detail is hidden behind <code>debra/signal.neutralizeRemoteSlot</code>.</p>
+<h3 id="deadlock-constraint-both-platforms">Deadlock Constraint (Both Platforms)<a class="headerlink" href="#deadlock-constraint-both-platforms" title="Permanent link">¶</a></h3>
+<p>Do NOT invoke DEBRA reclamation while holding a lock that other
+DEBRA-using threads might be blocked on. The constraint exists on
+both platforms but the mechanism differs:</p>
+<ul>
+<li><strong>POSIX</strong>: the SIGUSR1 handler runs in the target's context and
+  may need to acquire shared state.</li>
+<li><strong>Windows</strong>: the scanner blocks briefly inside <code>SuspendThread</code>
+  (kernel call), then walks the manager directly. The risk is the
+  target holding a lock that the scanner needs <em>after</em> this call.</li>
+</ul>
+<p>Either way, the safe pattern is to keep DEBRA reclamation and
+application-level locks disjoint.</p>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">¶</a></h2>
 <h3 id="keep-critical-sections-short">Keep Critical Sections Short<a class="headerlink" href="#keep-critical-sections-short" title="Permanent link">¶</a></h3>
 <p>Avoid neutralization by keeping pin/unpin sections minimal:</p>
@@ -1377,7 +1540,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"></path></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="April 30, 2026 09:37:23 UTC"><span class="timeago" datetime="2026-04-30T09:37:23+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="April 30, 2026 09:37:23 UTC">2026-04-30</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="June 3, 2026 07:12:57 UTC"><span class="timeago" datetime="2026-06-03T07:12:57+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="June 3, 2026 07:12:57 UTC">2026-06-03</span>
   </span>
 
     
