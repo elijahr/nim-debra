@@ -368,9 +368,8 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # `GetExitCodeThread` returns 0 with `ERROR_ACCESS_DENIED` and we
     # would mis-classify every terminated-thread suspend/resume failure
     # as a live-thread error and `raiseAssert`. (gemini cycle-41 CRITICAL ×2)
-    let h = openThread(
-      THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, WINBOOL(0), tid.tid
-    )
+    let h =
+      openThread(THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, WINBOOL(0), tid.tid)
     if h == Handle(0):
       return
 
