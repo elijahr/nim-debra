@@ -20,7 +20,7 @@
 ## CFG-analyzer soundness gate (analyzer removed, substring rotated,
 ## walk-coverage shrunk).
 
-import std/[os, osproc, strformat, strutils]
+import std/[osproc, strformat, strutils]
 
 type
   ExpectedOutcome = enum
@@ -122,15 +122,16 @@ const cases = @[
 ]
 
 proc detectHostArch(): string =
-  ## Returns "amd64", "arm64", or whatever `uname -m` reports normalized.
-  let (uname, rc) = execCmdEx("uname -m")
-  if rc != 0:
-    return "unknown"
-  let s = uname.strip()
-  case s
-  of "x86_64", "amd64": "amd64"
-  of "arm64", "aarch64": "arm64"
-  else: s
+  ## Returns the host architecture via compile-time Nim predicates.
+  ## Portable across Windows/Linux/macOS — no runtime `uname -m` spawn.
+  when defined(amd64) or defined(x86_64):
+    "amd64"
+  elif defined(arm64) or defined(aarch64):
+    "arm64"
+  elif defined(i386) or defined(i686):
+    "i386"
+  else:
+    "unknown"
 
 proc detectIsRealGcc(): bool =
   ## True only if `cc --version` reports GNU GCC (not Apple Clang or
