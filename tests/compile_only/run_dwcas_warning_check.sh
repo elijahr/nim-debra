@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # DWCAS warning-emission and silencer-suppression check (impl plan Tasks 18, 19).
 #
-# Compiles two fixtures under `--warning:User:on` and inspects nim's stderr:
+# Compiles two fixtures under `--warning[User]:on` and inspects nim's stderr:
 #   * t_dwcas_warning.nim     -- MUST emit the seq_cst-upgrade warning
 #   * t_dwcas_silenced.nim    -- MUST NOT emit it (wrapped in dwcasOrderRelaxedCAS)
 #
@@ -19,7 +19,7 @@ fail=0
 
 # --- Task 18: warning MUST fire on unwrapped sub-seq_cst order ---
 emit_out="$(nim c --path:src --threads:on -d:testing --hints:off \
-  --warning:User:on -f -c tests/compile_only/t_dwcas_warning.nim 2>&1)"
+  --warning[User]:on -f -c tests/compile_only/t_dwcas_warning.nim 2>&1)"
 emit_rc=$?
 if [ "$emit_rc" -ne 0 ]; then
   echo "FAIL [Task 18]: fixture compile failed (rc=$emit_rc):"
@@ -37,7 +37,7 @@ fi
 
 # --- Task 19: warning MUST NOT fire when wrapped in dwcasOrderRelaxedCAS ---
 silenced_out="$(nim c --path:src --threads:on -d:testing --hints:off \
-  --warning:User:on -f -c tests/compile_only/t_dwcas_silenced.nim 2>&1)"
+  --warning[User]:on -f -c tests/compile_only/t_dwcas_silenced.nim 2>&1)"
 silenced_rc=$?
 if [ "$silenced_rc" -ne 0 ]; then
   echo "FAIL [Task 19]: fixture compile failed (rc=$silenced_rc):"
