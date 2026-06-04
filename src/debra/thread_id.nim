@@ -216,6 +216,24 @@ when defined(windows):
     ## equivalent test path is therefore skipped in `t_thread_id`.
     ThreadId(handle: cast[Handle](value))
 
+  proc closeThreadId*(tid: var ThreadId) {.raises: [].} =
+    ## Release the kernel handle owned by `tid` (Windows arm only).
+    ##
+    ## Per-thread handles are duplicated at `registerThread` time and
+    ## leak until process exit unless closed. Per-slot `unregisterThread`
+    ## cannot safely close the handle (the scanner may have already
+    ## loaded it into a local — see the KNOWN_GAP block in
+    ## `unregisterThread`). Manager-teardown is the safe close point:
+    ## all worker threads must have joined before `=destroy` runs (per
+    ## the destructor's documented precondition), so no scanner can
+    ## hold a stale reference. Safe to call on `InvalidThreadId` (the
+    ## `Handle(0)` sentinel) — `CloseHandle(0)` is a documented no-op
+    ## that sets `ERROR_INVALID_HANDLE` but does not crash; we guard
+    ## explicitly to avoid touching last-error.
+    if tid.handle != Handle(0):
+      discard closeHandle(tid.handle)
+      tid.handle = Handle(0)
+
   # `sendSignal` is intentionally NOT defined on Windows. Cross-thread
   # neutralization on Windows uses `neutralizeRemoteSlot` (defined below
   # via include after the POSIX arm) which suspends, flips, resumes.

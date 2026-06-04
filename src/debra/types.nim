@@ -179,3 +179,17 @@ proc `=destroy`*[MaxThreads: static int, CC: static PinScopeCardinality](
       bag = nextBag
     manager.threads[i].currentBag = nil
     manager.threads[i].limboBagTail = nil
+    when defined(windows):
+      # Release per-thread handles allocated at `registerThread` time.
+      # Per-slot `unregisterThread` cannot safely close the handle
+      # (concurrent scanner may have already loaded it — see KNOWN_GAP
+      # in `unregisterThread`). Manager-teardown is the safe close
+      # point: the `boundClients == 0` assertion above plus the
+      # documented "workers must have joined before destroy"
+      # precondition guarantee no scanner is in flight. Closing here
+      # bounds the per-process handle accounting at 1 close per
+      # registered worker (gemini cycle-34).
+      var tid = manager.threads[i].threadId.load(moAcquire)
+      if tid.isValid():
+        tid.closeThreadId()
+        manager.threads[i].threadId.store(InvalidThreadId, moRelease)
