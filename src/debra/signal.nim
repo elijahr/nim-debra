@@ -329,13 +329,23 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
           neutralizedPtr[].store(true, moRelease)
 
     # Resume. If this fails the target is permanently suspended,
-    # which would deadlock the whole process. Treat ResumeThread
-    # failure as a hard error: the target was already terminated
-    # (ResumeThread returns -1) or the handle is invalid (we'd have
-    # caught that above). In practice a successful SuspendThread
-    # implies the handle is valid for ResumeThread, so this branch
-    # is defensive.
-    discard resumeThread(tid.handle)
+    # which would deadlock the whole process. winlean's
+    # `resumeThread` returns `int32`; on failure the Win32 API
+    # returns `DWORD(-1)` (== `0xFFFFFFFF`), which arrives here as
+    # `-1`. A successful SuspendThread above implies the handle is
+    # valid for ResumeThread, so reaching this failure branch means
+    # the target was terminated between the two calls (or some
+    # other unrecoverable kernel-level fault). Raise rather than
+    # silently leaving the target permanently suspended — silent
+    # success here would deadlock any subsequent join/wait on the
+    # target and corrupt the neutralization protocol invariants.
+    let resumeResult = resumeThread(tid.handle)
+    if resumeResult < 0:
+      raise newException(
+        OSError,
+        "ResumeThread failed after SuspendThread succeeded; target " &
+          "thread is permanently suspended. This is unrecoverable.",
+      )
   else:
     discard slot # POSIX path ignores the slot — handler reads threadLocalIdx
     discard tid.sendSignal(QuiescentSignal)
