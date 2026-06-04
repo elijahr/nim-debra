@@ -27,11 +27,34 @@ type
     eoCompiles # `nim c` must exit 0; no substring needed.
     eoCompileFails # `nim c` must exit non-zero; substring must appear.
 
+  ArchGate = enum
+    agAny # Runs on every arch (default).
+    agAmd64Gcc
+      # amd64 only AND real GCC (Apple Clang allows __sync_*_16
+      # without -mcx16 so the fixture cannot be exercised).
+
   Case = object
     name: string
     file: string
     outcome: ExpectedOutcome
     substring: string
+    archGate: ArchGate
+    extraFlags: string
+      ## Extra flags passed to `nim c` / `nim check` for this case
+      ## (e.g., `--cpu:i386 --os:linux` for the 32-bit gate cross-check).
+      ## Empty default keeps the case host-arch-bound. When non-empty,
+      ## the runner uses `nim check` (no codegen) so the case runs on
+      ## any host without needing 32-bit cross-compile toolchains.
+    needsCCompile: bool
+      ## When true, the case requires the actual C compiler to run
+      ## (i.e., the failure is in a C-emit body such as gate 3's inline
+      ## `_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)`).
+      ## Default false: cases fail at Nim semantic phase, so
+      ## `--compileOnly` is sufficient and avoids invoking the C
+      ## compiler at all. When true, `--compileOnly` is dropped so the
+      ## C compiler actually sees the emit body and fires its own
+      ## diagnostic. Linking may still fail; that is fine — the runner
+      ## only needs non-zero exit plus substring match.
 
 const cases = @[
   Case(
@@ -58,12 +81,110 @@ const cases = @[
     outcome: eoCompileFails,
     substring: "T: ptr | pointer",
   ),
+  Case(
+    name: "DWCAS gate 2: undersized Pair halves rejected (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_gate2_misalign.nim",
+    outcome: eoCompileFails,
+    substring: "must be exactly 16 bytes",
+  ),
+  Case(
+    name: "DWCAS gate 2: oversized Pair half rejected (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_gate2_halfsize.nim",
+    outcome: eoCompileFails,
+    substring: "must be <= 8 bytes",
+  ),
+  Case(
+    name: "DWCAS load rejects moRelease (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_load_moRelease.nim",
+    outcome: eoCompileFails,
+    substring: "moRelease / moAcquireRelease is not a valid memory order for load",
+  ),
+  Case(
+    name: "DWCAS store rejects moAcquire (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_store_moAcquire.nim",
+    outcome: eoCompileFails,
+    substring: "moAcquire / moAcquireRelease / moConsume is not a valid",
+  ),
+  Case(
+    name: "DWCAS CAS rejects failure-order moRelease (must fail-with-substring)",
+    file: "tests/should_fail/t_dwcas_cas_failure_moRelease.nim",
+    outcome: eoCompileFails,
+    substring: "compareExchange failure order",
+  ),
+  Case(
+    name:
+      "DWCAS gate 3: -mno-cx16 trips inline _Static_assert " &
+      "(must fail-with-substring, amd64+GCC only)",
+    file: "tests/should_fail/t_dwcas_no_mcx16.nim",
+    outcome: eoCompileFails,
+    substring: "nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16",
+    archGate: agAmd64Gcc,
+    needsCCompile: true,
+  ),
+  Case(
+    name:
+      "DWCAS gate 1: 32-bit target rejected " &
+      "(must fail-with-substring; runs on any host via nim check --cpu:i386)",
+    file: "tests/should_fail/t_dwcas_gate1_32bit.nim",
+    outcome: eoCompileFails,
+    substring: "require a 64-bit target",
+    extraFlags: "--cpu:i386 --os:linux",
+  ),
 ]
 
+proc detectHostArch(): string =
+  ## Returns the host architecture via compile-time Nim predicates.
+  ## Portable across Windows/Linux/macOS — no runtime `uname -m` spawn.
+  when defined(amd64) or defined(x86_64):
+    "amd64"
+  elif defined(arm64) or defined(aarch64):
+    "arm64"
+  elif defined(i386) or defined(i686):
+    "i386"
+  else:
+    "unknown"
+
+proc detectIsRealGcc(): bool =
+  ## True only when the Nim C backend in use is real GNU GCC (not Apple
+  ## Clang, not LLVM clang). Discriminates via Nim's compile-time
+  ## `defined(gcc)` / `defined(clang)` predicates rather than spawning
+  ## `cc --version`, which is both slow and unreliable on CI runners
+  ## where `cc` may be a wrapper script. `defined(gcc)` reflects the
+  ## actual `--cc:` setting (or its default), which is what the
+  ## should-fail test cases will use when invoked. Apple's clang sets
+  ## `clang` but not `gcc`; real GCC sets `gcc` and not `clang`
+  ## (gemini cycle-34).
+  when defined(gcc) and not defined(clang): true else: false
+
+proc shouldSkip(c: Case): bool =
+  case c.archGate
+  of agAny:
+    false
+  of agAmd64Gcc:
+    let arch = detectHostArch()
+    let gcc = detectIsRealGcc()
+    not (arch == "amd64" and gcc)
+
 proc runCase(c: Case): bool =
-  let cmd =
-    &"nim c --threads:on --hints:off --warnings:off --path:src --compileOnly {c.file}"
-  let (output, exitCode) = execCmdEx(cmd)
+  # When `extraFlags` is set (e.g., `--cpu:i386 --os:linux` for the 32-bit
+  # gate cross-check), use `nim check` instead of `nim c --compileOnly`.
+  # `nim check` runs the semantic phase only — no C codegen — so it works
+  # on any host without needing a cross-compile toolchain. The compile-time
+  # `static: assert` we want to catch fires in the semantic phase.
+  let baseCmd =
+    if c.extraFlags.len > 0:
+      &"nim check --threads:on --hints:off --warnings:off --path:src {c.extraFlags} {c.file}"
+    elif c.needsCCompile:
+      # Drop `--compileOnly` so the C compiler actually runs and the
+      # inline `_Static_assert` in the emit body fires (e.g., gate 3's
+      # `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` check under `-mno-cx16`).
+      # `--compileOnly` skips C compile/link entirely, so emit-body
+      # diagnostics never surface. Use a per-case nimcache to avoid
+      # collisions with the project nimcache.
+      &"nim c --threads:on --hints:off --warnings:off --path:src --nimcache:nimcache/should_fail/{c.file.extractFilename} {c.file}"
+    else:
+      &"nim c --threads:on --hints:off --warnings:off --path:src --compileOnly {c.file}"
+  let (output, exitCode) = execCmdEx(baseCmd)
   case c.outcome
   of eoCompiles:
     if exitCode != 0:
@@ -88,12 +209,18 @@ proc runCase(c: Case): bool =
 
 proc main() =
   var failed = 0
+  var skipped = 0
   for c in cases:
+    if shouldSkip(c):
+      echo &"[SKIP] {c.name} (archGate={c.archGate}, host arch/cc mismatch)"
+      inc skipped
+      continue
     if not runCase(c):
       inc failed
   if failed > 0:
     echo &"\n{failed} compile-fail case(s) failed."
     quit(1)
-  echo &"\nAll {cases.len} compile-fail cases passed."
+  echo &"\nAll {cases.len - skipped} compile-fail cases passed " &
+    &"({skipped} skipped by archGate)."
 
 main()

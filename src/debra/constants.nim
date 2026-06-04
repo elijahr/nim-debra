@@ -1,7 +1,5 @@
 ## Constants for DEBRA+ implementation.
 
-import std/posix
-
 const
   DefaultMaxThreads* = 64 ## Default maximum number of threads that can be registered.
 
@@ -12,4 +10,15 @@ const
     ## wider, otherwise the per-slot padding in `ThreadState` will not
     ## actually separate adjacent slots into distinct cache lines.
 
-let QuiescentSignal* = SIGUSR1 ## POSIX signal used for thread neutralization.
+when defined(windows):
+  # Windows has no analog of SIGUSR1; the neutralization protocol uses
+  # SuspendThread/ResumeThread directly (see `thread_id.nim` and
+  # `signal.nim` for the Windows arm of the protocol). `QuiescentSignal`
+  # is retained as a compile-time-only stub so call sites that pass it
+  # to platform-neutral helpers compile, but it has no signal-delivery
+  # meaning on Windows.
+  const QuiescentSignal*: cint = 0
+    ## Windows stub — see module comment. Not a real signal number.
+else:
+  import std/posix
+  let QuiescentSignal* = SIGUSR1 ## POSIX signal used for thread neutralization.

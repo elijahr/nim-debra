@@ -21,6 +21,12 @@ tests/**/[a-z_]*
 # earlier rule. Re-include directories first, then re-include .nim files.
 !tests/**/
 !tests/**/*.nim
+!tests/**/*.nim.cfg
+!tests/**/*.sh
+!tests/**/*.c
+!tests/**/*.expected.*
+!tests/**/*.supp
+!tests/**/README.md
 ## Debug binaries and symbols
 tests/debug_*
 **/*.dSYM/
@@ -61,9 +67,6 @@ docs/plans/
 deps/
 nimble.paths
 config.nims
-
-# Atlas local config
-nim.cfg
 
 # Local PR description scratch file (do not commit)
 .pr-description.md

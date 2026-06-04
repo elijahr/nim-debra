@@ -85,6 +85,25 @@ jobs:
         run: |
           git fetch origin gh-pages --depth=1 || true
 
+      # ----------------------------------------------------------------
+      # Release-blocking docs gates (added v0.10.0). These must run
+      # BEFORE any mike deploy step so a broken docs build cannot
+      # publish.
+      # ----------------------------------------------------------------
+
+      - name: Doc-comment audit (DWCAS surface)
+        # Fails the workflow if any exported proc/template inside the
+        # DWCAS specialization block of src/debra/atomics.nim lacks a
+        # `##` doc-comment. See scripts/audit_atomics_doc_comments.sh.
+        run: |
+          bash scripts/audit_atomics_doc_comments.sh src/debra/atomics.nim
+
+      - name: mkdocs build --strict
+        # Strict build catches broken links, missing nav entries, and
+        # mkdocstrings extraction failures. Release-blocking.
+        run: |
+          mkdocs build --strict
+
       - name: Deploy docs (manual version)
         if: github.event_name == 'workflow_dispatch' && inputs.version != ''
         run: |

@@ -11,6 +11,7 @@ import typestates
 import ../types
 import ../constants
 import ../thread_id
+import ../signal
 
 type
   NeutralizeContext*[MaxThreads: static int, CC: static PinScopeCardinality = ccSingle] = object of RootObj
@@ -87,7 +88,12 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
   ## Returns count of signals sent.
   var ctx = NeutralizeContext[MaxThreads, CC](s)
   let activeMask = ctx.manager.activeThreadMask.load(moAcquire)
-  let currentTid = currentThreadId()
+  # Self-skip uses `isCurrent(tid)` rather than `tid == currentThreadId()`
+  # to avoid allocating a fresh `DuplicateHandle` per scan iteration on
+  # Windows. `isCurrent` compares OS-level thread IDs via
+  # `GetThreadId(tid.handle) == GetCurrentThreadId()` (POSIX uses
+  # `pthread_equal(tid, pthread_self())`), both of which are
+  # non-allocating. Closes the v0.10.0 documented handle-leak gap.
 
   for i in 0 ..< MaxThreads:
     if (activeMask and (1'u64 shl i)) != 0:
@@ -98,9 +104,13 @@ proc scanAndSignal*[MaxThreads: static int, CC: static PinScopeCardinality](
         if threadEpoch < ctx.threshold:
           # Thread is stalled - send signal
           let tid = ctx.manager.threads[i].threadId.load(moAcquire)
-          if tid.isValid and tid != currentTid:
-            # Don't signal ourselves or unset threads
-            discard tid.sendSignal(QuiescentSignal)
+          if tid.isValid and not isCurrent(tid):
+            # Don't signal ourselves or unset threads.
+            # `neutralizeRemoteSlot` abstracts the platform difference:
+            # POSIX delivers SIGUSR1 (handler reads target's
+            # `threadLocalIdx`); Windows suspends the target, flips the
+            # slot using the explicit `i` argument, then resumes.
+            neutralizeRemoteSlot(tid, i)
             inc ctx.signalsSent
 
   result = ScanComplete[MaxThreads, CC](ctx)

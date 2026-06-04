@@ -18,6 +18,13 @@ import ./t_convenience
 import ./t_refptr
 import ./t_integration
 import ./t_atomics
+import ./test_dwcas_roundtrip
+import ./test_dwcas_generation_rollover
+import ./test_dwcas_pair_ptr
+import ./test_dwcas_pair_alignment
+import ./test_dwcas_pair_shape_positive
+import ./test_dwcas_memory_orders
+import ./test_dwcas_fetch_ops
 import ./t_atomics_dsl
 import ./t_thread_id
 import ./t_item_processing

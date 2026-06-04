@@ -137,6 +137,16 @@ proc unregisterThread*[
   # Step 1: clear the signal-delivery hint BEFORE releasing the mask bit.
   # Inverse order would expose a window where the mask says "free" but the
   # threadId still points at the (now-departing) thread.
+  #
+  # Cycle-40 pivot (Windows): the slot's `ThreadId` is now the raw OS
+  # thread ID (`uint32`), not a duplicated kernel handle. There is
+  # nothing to close at unregister time — the OS owns the thread ID
+  # and reclaims it when the thread terminates. The earlier
+  # `handlesPendingClose` deferred-close queue is gone; the handle
+  # leak (cycle-22/39 Known Gap) and use-after-close race (cycle-38
+  # CRITICAL) are both eliminated by construction. The on-demand
+  # `OpenThread`/`CloseHandle` pair in `neutralizeRemoteSlot` scopes
+  # the only handle that ever exists to a single critical section.
   manager.threads[handle.idx].threadId.store(InvalidThreadId, moRelease)
 
   # Step 2: clear the mask bit via CAS-with-retry, mirroring the

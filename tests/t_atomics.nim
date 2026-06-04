@@ -149,6 +149,55 @@ suite "fetch ops":
     check a64.fetchAdd(uint64(1)) == uint64(0xFF)
     check a64.load() == uint64(0x100)
 
+  test "fetchSub works with all integer widths":
+    # Exercises the MSVC 1-byte fetchSub path which negates through `int8`
+    # because `cchar` is Nim's `char` and unary `-` is undefined on it.
+    var a8: Atomic[int8]
+    a8.store(int8(10))
+    check a8.fetchSub(int8(3)) == int8(10)
+    check a8.load() == int8(7)
+    var au8: Atomic[uint8]
+    au8.store(uint8(200))
+    check au8.fetchSub(uint8(50)) == uint8(200)
+    check au8.load() == uint8(150)
+    var a16: Atomic[int16]
+    a16.store(int16(1000))
+    check a16.fetchSub(int16(250)) == int16(1000)
+    check a16.load() == int16(750)
+    var a32: Atomic[uint32]
+    a32.store(uint32(0x1_0000))
+    check a32.fetchSub(uint32(1)) == uint32(0x1_0000)
+    check a32.load() == uint32(0xFFFF)
+    var a64: Atomic[int64]
+    a64.store(int64(0x1_0000_0000))
+    check a64.fetchSub(int64(1)) == int64(0x1_0000_0000)
+    check a64.load() == int64(0xFFFF_FFFF)
+
+  test "fetchSub handles signed-low boundary without UB":
+    # Regression for MSVC fetchSub: negation must be computed in the
+    # unsigned domain so values whose signed reinterpretation is `.low`
+    # do not trigger C signed-overflow UB. Exercise all 4 widths with
+    # the boundary bit pattern (high bit set), via the unsigned types
+    # so the literal fits without conversion errors on signed `.low`.
+    var au8: Atomic[uint8]
+    au8.store(0'u8)
+    # 128'u8 reinterpreted as int8 is -128 (int8.low); naive `-cast[int8](v)`
+    # would overflow. Correct behavior: 0 - 128 wraps to 128 in uint8.
+    check au8.fetchSub(128'u8) == 0'u8
+    check au8.load() == (0'u8 - 128'u8)
+    var au16: Atomic[uint16]
+    au16.store(0'u16)
+    check au16.fetchSub(0x8000'u16) == 0'u16
+    check au16.load() == (0'u16 - 0x8000'u16)
+    var au32: Atomic[uint32]
+    au32.store(0'u32)
+    check au32.fetchSub(0x8000_0000'u32) == 0'u32
+    check au32.load() == (0'u32 - 0x8000_0000'u32)
+    var au64: Atomic[uint64]
+    au64.store(0'u64)
+    check au64.fetchSub(0x8000_0000_0000_0000'u64) == 0'u64
+    check au64.load() == (0'u64 - 0x8000_0000_0000_0000'u64)
+
 suite "compareExchange":
   test "compareExchangeStrong success":
     var a: Atomic[int]
@@ -380,15 +429,33 @@ suite "static rejection":
     )
 
   test "compareExchange failure stronger than success does not compile":
-    # success=moRelease, failure=moAcquire: failure is not <= success
-    # ordinally (moAcquire=2, moRelease=3) so this passes; let's pick
-    # a real violation: success=moAcquire (2), failure=moSeqCst (5).
+    # Real ord violation: success=moAcquire (2), failure=moSeqCst (5).
     check not compiles(
       block:
         var a: Atomic[int]
         var expected = 0
         discard
           a.compareExchangeStrong(expected, 1, moAcquire, moSequentiallyConsistent)
+    )
+
+  test "compareExchange success=moRelease, failure=moAcquire does not compile":
+    # C11 §7.17.7.4: moRelease has no load-acquire on the success path,
+    # so the failure load cannot acquire either. The prior raw
+    # `ord(failure) <= ord(success)` check would have allowed this
+    # (moAcquire=2 <= moRelease=3) — the stricter lattice check forbids it.
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(expected, 1, moRelease, moAcquire)
+    )
+
+  test "compareExchange success=moRelease, failure=moConsume does not compile":
+    check not compiles(
+      block:
+        var a: Atomic[int]
+        var expected = 0
+        discard a.compareExchangeStrong(expected, 1, moRelease, moConsume)
     )
 
   test "compareExchange failure=moRelease does not compile":
@@ -776,3 +843,212 @@ when compileOption("threads"):
         joinThread(threads[i])
 
       check counter.load() == float64(NumThreads * Increments)
+
+# ---------------------------------------------------------------------------
+# DWCAS (v0.10.0): Pair[A, B] type shape
+# ---------------------------------------------------------------------------
+
+suite "Pair type shape":
+  test "Pair[uint64, uint64] is 16 bytes and 16-byte aligned":
+    static:
+      doAssert sizeof(Pair[uint64, uint64]) == 16
+      doAssert alignof(Pair[uint64, uint64]) == 16
+
+  test "Pair[uint64, ptr int] is 16 bytes and 16-byte aligned":
+    static:
+      doAssert sizeof(Pair[uint64, ptr int]) == 16
+      doAssert alignof(Pair[uint64, ptr int]) == 16
+
+  test "Pair stores and reads back first/second":
+    let p = Pair[uint64, uint64](first: 7'u64, second: 9'u64)
+    check p.first == 7'u64
+    check p.second == 9'u64
+
+suite "DWCAS gate 1 (pointer size)":
+  test "host is 64-bit and module exports a size-16 specialization block":
+    # Smoke: on a 64-bit target this compiles. Gate 1 itself (the
+    # `{.error:.}` else-arm) is a design-time wrapper verified by code
+    # review + Task 33 audit script. A runtime 32-bit cross-compile
+    # should_fail is deferred to v0.10.1 (see §13 "Known limitations:
+    # gate-1 32-bit verification").
+    static:
+      doAssert sizeof(pointer) == 8
+    # Positive smoke for enforceDwcasConstraints: must compile cleanly
+    # for valid Pair shapes.
+    enforceDwcasConstraints(uint64, uint64)
+    enforceDwcasConstraints(uint64, ptr int)
+
+suite "DWCAS load (round-trip seed)":
+  test "load on freshly-stored Atomic[Pair[uint64, uint64]] returns same bits":
+    var a: Atomic[Pair[uint64, uint64]]
+    # Store via direct memcpy seeding (load-only test; store path arrives in task 8).
+    var seed = Pair[uint64, uint64](first: 7'u64, second: 9'u64)
+    copyMem(addr a, addr seed, 16)
+    let r = a.load()
+    check r.first == 7'u64
+    check r.second == 9'u64
+
+suite "DWCAS store/load round-trip":
+  test "store then load returns same Pair":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 11'u64, second: 13'u64))
+    let r = a.load()
+    check r.first == 11'u64
+    check r.second == 13'u64
+
+suite "DWCAS exchange":
+  test "exchange returns old, installs new":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    let old = a.exchange(Pair[uint64, uint64](first: 3'u64, second: 4'u64))
+    check old.first == 1'u64
+    check old.second == 2'u64
+    let cur = a.load()
+    check cur.first == 3'u64
+    check cur.second == 4'u64
+
+suite "DWCAS compareExchangeStrong":
+  test "success: expected matches, returns true, slot updated, expected unchanged":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchangeStrong(
+      expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+    )
+    check ok
+    check expected.first == 1'u64
+    check expected.second == 2'u64
+    let cur = a.load()
+    check cur.first == 5'u64
+    check cur.second == 6'u64
+
+  test "failure: expected mismatch, returns false, slot unchanged, expected updated":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 99'u64, second: 99'u64)
+    let ok = a.compareExchangeStrong(
+      expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+    )
+    check not ok
+    check expected.first == 1'u64
+    check expected.second == 2'u64
+    let cur = a.load()
+    check cur.first == 1'u64
+    check cur.second == 2'u64
+
+  test "single-order overload derives failure order from success":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 7'u64, second: 8'u64))
+    var expected = Pair[uint64, uint64](first: 7'u64, second: 8'u64)
+    let ok = a.compareExchangeStrong(
+      expected,
+      Pair[uint64, uint64](first: 9'u64, second: 10'u64),
+      moSequentiallyConsistent,
+    )
+    check ok
+    let cur = a.load()
+    check cur.first == 9'u64
+    check cur.second == 10'u64
+
+  test "five-arg overload with explicit success+failure orders":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 21'u64, second: 22'u64))
+    var expected = Pair[uint64, uint64](first: 21'u64, second: 22'u64)
+    let ok = a.compareExchangeStrong(
+      expected,
+      Pair[uint64, uint64](first: 23'u64, second: 24'u64),
+      moSequentiallyConsistent,
+      moSequentiallyConsistent,
+    )
+    check ok
+    let cur = a.load()
+    check cur.first == 23'u64
+    check cur.second == 24'u64
+
+suite "DWCAS compareExchangeWeak":
+  test "success: expected matches, returns true, slot updated":
+    # Note: weak CAS can spuriously fail on aarch64 LL/SC even under
+    # no contention; retry loop guards against the spurious-failure case.
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    var ok = false
+    for _ in 0 ..< 64:
+      expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+      ok = a.compareExchangeWeak(
+        expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64)
+      )
+      if ok:
+        break
+      # If spurious-failure path, the slot should still hold (1, 2).
+      check a.load().first == 1'u64
+    check ok
+    let cur = a.load()
+    check cur.first == 5'u64
+    check cur.second == 6'u64
+
+  test "failure: expected mismatch, returns false, expected updated":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 99'u64, second: 99'u64)
+    let ok =
+      a.compareExchangeWeak(expected, Pair[uint64, uint64](first: 5'u64, second: 6'u64))
+    check not ok
+    check expected.first == 1'u64
+    check expected.second == 2'u64
+
+suite "DWCAS compareExchange aliases":
+  test "compareExchange (3-arg default-order) routes to Strong":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok =
+      a.compareExchange(expected, Pair[uint64, uint64](first: 7'u64, second: 8'u64))
+    check ok
+    let cur = a.load()
+    check cur.first == 7'u64
+    check cur.second == 8'u64
+
+  test "compareExchange (4-arg single-order) routes to Strong":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchange(
+      expected,
+      Pair[uint64, uint64](first: 7'u64, second: 8'u64),
+      moSequentiallyConsistent,
+    )
+    check ok
+
+  test "compareExchange (5-arg explicit-orders) routes to Strong":
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    let ok = a.compareExchange(
+      expected,
+      Pair[uint64, uint64](first: 7'u64, second: 8'u64),
+      moSequentiallyConsistent,
+      moSequentiallyConsistent,
+    )
+    check ok
+
+suite "DWCAS per-callsite warning silencer":
+  test "dwcasOrderRelaxedCAS suppresses moSeqCst-upgrade warning":
+    # Compile-only check: this fixture intentionally passes moRelease/moRelaxed
+    # to a CAS. Without the wrapper, a {.warning.} fires; with the wrapper,
+    # it is silenced. Real verification of suppression is the CI compile-output
+    # grep test (Task 19); this suite confirms the wrapper exists and compiles.
+    var a: Atomic[Pair[uint64, uint64]]
+    a.store(Pair[uint64, uint64](first: 1'u64, second: 2'u64))
+    var expected = Pair[uint64, uint64](first: 1'u64, second: 2'u64)
+    dwcasOrderRelaxedCAS:
+      discard a.compareExchangeStrong(
+        expected,
+        Pair[uint64, uint64](first: 3'u64, second: 4'u64),
+        moRelease,
+        moRelaxed,
+      )
+    # No runtime check: the real verification is the CI compile-output grep
+    # (Task 19) that confirms the moSeqCst-upgrade warning is silenced. This
+    # test block exists so the dwcasOrderRelaxedCAS wrapper is exercised at
+    # compile time; reaching this point IS the smoke test.

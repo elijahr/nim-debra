@@ -86,9 +86,15 @@ proc register*[MaxThreads: static int, CC: static PinScopeCardinality](
     while (expected and bit) == 0:
       let desired = expected or bit
       if mgr.activeThreadMask.compareExchangeWeak(
-        expected, desired, moRelease, moAcquire
+        expected, desired, moAcquireRelease, moAcquire
       ):
-        # Successfully claimed slot i
+        # Successfully claimed slot i.
+        #
+        # Cycle-40 pivot (Windows): the slot stores the raw OS thread
+        # ID (`uint32`), not a duplicated handle. There is no handle
+        # to drain on re-claim — the cycle-37/38 deferred-close
+        # machinery is gone entirely, along with the handle leak and
+        # use-after-close race surfaces.
         # Store thread ID for signaling
         mgr.threads[i].threadId.store(currentThreadId(), moRelease)
         # Set thread-local index for signal handler. Both `threadLocalIdx`

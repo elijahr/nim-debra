@@ -40,9 +40,13 @@ operations the hardware does lock-free, so accidentally lock-ful
 nimble install debra
 ```
 
-Requires Nim 2.2.0 or newer and a GCC, Clang, LLVM-GCC, or Nintendo Switch
-toolchain. The atomics module wraps the `__atomic_*` builtins and does not
-support MSVC.
+Requires Nim 2.2.0 or newer and a GCC, Clang, LLVM-GCC, Nintendo Switch,
+or MSVC (vcc) toolchain. The atomics module wraps the compiler's
+lock-free intrinsics (`__sync_*` on GCC for 16-byte CAS, `__atomic_*`
+elsewhere and on Clang, the `_Interlocked*` family on MSVC including
+`_InterlockedCompareExchange128` for DWCAS). See
+[`docs/guide/atomics.md`](docs/guide/atomics.md) for the full
+compiler / arch dispatch table.
 
 ## Quick start
 
@@ -175,8 +179,8 @@ runnable register → work → unregister cycle that demonstrates slot reuse.
 
 If a registered thread has been parked inside a system call for too long,
 the reclaimer can be blocked indefinitely waiting for it to leave its
-epoch. `neutralizeStalled` sends SIGUSR1 to the offender so the signal
-handler can unpin it artificially:
+epoch. `neutralizeStalled` interrupts the offender (SIGUSR1 on POSIX;
+`SuspendThread`/`ResumeThread` on Windows) so its slot is force-unpinned:
 
 ```nim
 let signalled = neutralizeStalled(manager, epochsBeforeNeutralize = 4)
@@ -192,8 +196,8 @@ application has not claimed SIGUSR1 for something else.
 - **Epoch-based reclamation.** Two SC atomic stores per critical section on the read path; no per-access RMWs.
 - **Custom atomics module.** Compile-time error for any atomic that is not `__atomic_always_lock_free` at the requested width, and `Atomic[ref T]` is rejected outright.
 - **Typestate-checked API.** Pin → retire → unpin transitions are enforced at compile time. Calling `retire` outside a pinned scope is a type error, not a runtime crash.
-- **Signal-based neutralization.** The SIGUSR1 protocol from Brown 2017 unblocks reclamation when registered threads are stalled inside the kernel.
-- **Memory-manager coverage.** CI runs the test suite under `--mm:arc`, `--mm:orc`, `--mm:atomicArc`, and `--mm:refc`, plus the C++ backend.
+- **Platform-portable neutralization.** The Brown 2017 SIGUSR1 protocol on POSIX (Linux, macOS, BSD); a `SuspendThread`/`ResumeThread`-based equivalent on Windows. Both unblock reclamation when registered threads are stalled inside the kernel. See `docs/guide/neutralization.md`.
+- **Platform coverage.** CI runs the test suite under `--mm:arc`, `--mm:orc`, `--mm:atomicArc`, and `--mm:refc`, plus the C++ backend, across Linux (x86_64 + aarch64), macOS (Apple Silicon), and Windows (MSVC/vcc).
 - **Convenience layer.** `withPin`, `retireAndReclaim`, and `advanceEvery` cover the common cases without dropping down to typestate primitives.
 
 ## Memory managers
@@ -233,6 +237,17 @@ If you ship a project that depends on nim-debra, send a PR adding it here.
 
 Bug reports and PRs are welcome. Development setup, the cross-manager test
 matrix, and PR conventions are in [docs/contributing.md](docs/contributing.md).
+
+## Attribution
+
+nim-debra v0.10.0's 16-byte atomics (DWCAS) implementation borrows the
+compiler-dispatch pattern from [atomic128](https://github.com/patternnoster/atomic128)
+by patternnoster (MIT licensed). The GCC `__sync_val_compare_and_swap` /
+Clang `__atomic_compare_exchange_n` split documented in
+atomic128's `atomic128_ref.hpp` is the canonical reference for working
+around GCC's silent libatomic-fallback behavior on `__atomic_compare_exchange_16`.
+See [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) for the verbatim MIT
+license text, pinned to commit `d45ba3d348a9620a25552f9cf50dc7ccef05ef90`.
 
 ## License
 
