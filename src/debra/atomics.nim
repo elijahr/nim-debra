@@ -587,13 +587,7 @@ proc load*[T](
     # x86 semantics to seq_cst across the weaker ARM64 model. On x64,
     # the naked mov is already acquire under TSO; sub-seq_cst orders
     # are honored as compile barriers, matching the documented surface.
-    {.
-      emit: [
-        "\n#ifdef _M_ARM64\n",
-        "__dmb(_ARM64_BARRIER_SY);\n",
-        "#endif\n",
-      ]
-    .}
+    {.emit: ["\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n"].}
     let raw =
       when sizeof(T) == 1:
         cast[T](msvcIsoVolatileLoad8(cast[ptr cchar](addr loc.value)))
@@ -607,9 +601,7 @@ proc load*[T](
         {.error: "Atomic[T] vcc load supports only 1/2/4/8 byte T".}
     {.
       emit: [
-        "_ReadWriteBarrier();\n",
-        "#ifdef _M_ARM64\n",
-        "__dmb(_ARM64_BARRIER_SY);\n",
+        "_ReadWriteBarrier();\n", "#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n",
         "#endif\n",
       ]
     .}
@@ -1079,11 +1071,12 @@ proc threadFence*(order: MemoryOrder) {.inline.} =
       # intrinsics) and are exactly what the `MemoryBarrier` macro
       # expands to — emitted directly to avoid `<windows.h>` bloat
       # and namespace pollution (gemini cycle-29).
-      {.emit: ["#ifdef _M_ARM64\n",
-              "__dmb(_ARM64_BARRIER_SY);\n",
-              "#else\n",
-              "__faststorefence();\n",
-              "#endif\n"].}
+      {.
+        emit: [
+          "#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
+          "__faststorefence();\n", "#endif\n",
+        ]
+      .}
     else:
       msvcReadWriteBarrier()
   else:
@@ -1307,8 +1300,7 @@ when sizeof(pointer) == 8:
           "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);", "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n",
-          "#endif\n", " memcpy(", resultPtr,
-          ", _cmp, 16); }",
+          "#endif\n", " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1534,8 +1526,8 @@ when sizeof(pointer) == 8:
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
-          " memcpy(", resultPtr, ", _cmp, 16); }",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " memcpy(",
+          resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1630,8 +1622,8 @@ when sizeof(pointer) == 8:
           "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp) != 0);", "\n#ifdef _M_ARM64\n",
-          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
-          " memcpy(", expectedPtr, ", _cmp, 16); }",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " memcpy(", expectedPtr,
+          ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1781,8 +1773,8 @@ when sizeof(pointer) == 8:
           "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp) != 0);", "\n#ifdef _M_ARM64\n",
-          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
-          " memcpy(", expectedPtr, ", _cmp, 16); }",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " memcpy(", expectedPtr,
+          ", _cmp, 16); }",
         ]
       .}
     elif defined(clang) or defined(llvm_gcc) or defined(nintendoswitch):
