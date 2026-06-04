@@ -684,36 +684,39 @@ proc store*[T](
   enforceAtomicConstraints(T)
   validStoreOrder(order)
   when defined(vcc):
-    # Per-order MSVC store dispatch (gemini cycle-42 MEDIUM):
+    # Per-order MSVC store dispatch.
     #
-    #   * moSeqCst (and moSequentiallyConsistent): emit a locked
-    #     `_InterlockedExchange*`. On x86_64 the locked `xchg` is a full
-    #     seq_cst fence with the store baked in; on ARM64 the intrinsic
-    #     lowers to `stlxr` + the architectural seq_cst sequence MSVC
-    #     uses for `_Interlocked*` operations. This is the previous
-    #     behavior and remains correct for the strongest order.
+    #   * moSeqCst: locked `_InterlockedExchange*`. On x86_64 the
+    #     locked `xchg` is a full seq_cst fence with the store baked
+    #     in; on ARM64 the intrinsic lowers to the architectural
+    #     seq_cst sequence MSVC uses for `_Interlocked*` operations.
     #
-    #   * moRelaxed / moRelease (the only other valid store orders;
-    #     moAcquire / moAcquireRelease / moConsume are rejected by
-    #     `validStoreOrder`):
-    #       - On x86_64 (TSO), a width-≤8 naturally-aligned `mov` is
-    #         atomic and provides release semantics for free. We emit
-    #         `__iso_volatile_storeN` (a pure machine store, NOT a
-    #         locked RMW) preceded by `_ReadWriteBarrier()` so the
-    #         compiler cannot sink prior ops below the store. This
-    #         drops the unnecessary `lock xchg` prefix that
-    #         `_InterlockedExchange*` would otherwise emit, saving
-    #         ~20-30 cycles per relaxed/release store and avoiding the
-    #         cache-line ping that the locked instruction induces.
-    #       - On ARM64 the memory model is weak: a plain store is NOT
-    #         release. We therefore fall back to `_InterlockedExchange*`
-    #         which emits `stlxr` (store-release-exclusive) — release
-    #         semantics for moRelease, and stronger-than-needed for
-    #         moRelaxed but still correct (relaxed permits stronger
-    #         orders). The arch dispatch is performed via `{.emit:.}`
-    #         around the choice rather than at Nim-level (no
-    #         `defined(arm64)` predicate is reliably set under MSVC),
-    #         using the MSVC `_M_ARM64` preprocessor define.
+    #   * moRelease:
+    #       - x86_64 (TSO): width-≤8 naturally-aligned `mov` is
+    #         release for free. Emit `__iso_volatile_storeN` preceded
+    #         by `_ReadWriteBarrier()` (compile barrier) so the
+    #         compiler cannot sink prior ops below the store. Drops
+    #         the unnecessary `lock xchg` that `_InterlockedExchange*`
+    #         would emit, saving ~20-30 cycles per store and avoiding
+    #         the cache-line ping the locked instruction induces.
+    #       - ARM64 (weak): a plain `str` is NOT release. Fall back
+    #         to `_InterlockedExchange*` which emits `stlr` /
+    #         `stlxr`-loop release semantics.
+    #
+    #   * moRelaxed: plain `__iso_volatile_storeN` on BOTH ISAs
+    #     (gemini cycle-43 HIGH). Previously moRelaxed was lumped
+    #     with moRelease and routed to `_InterlockedExchange*` on
+    #     ARM64, paying full release-RMW cost (locked stlxr loop)
+    #     for callers that explicitly opted out of release ordering.
+    #     The `str` instruction is atomic at single-copy granularity
+    #     for width-≤8 naturally-aligned targets; relaxed semantics
+    #     require only that the store be atomic (no inter-thread
+    #     ordering guarantees), which `__iso_volatile_store*` plus
+    #     `_ReadWriteBarrier()` provides on both x86_64 and ARM64.
+    #
+    # ARM64 dispatch is performed via `#ifdef _M_ARM64` rather than a
+    # Nim-level arch predicate (no `defined(arm64)` is reliably set
+    # under MSVC).
     when order == moSequentiallyConsistent:
       when sizeof(T) == 1:
         discard msvcInterlockedExchange8(
@@ -733,12 +736,27 @@ proc store*[T](
         )
       else:
         {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
+    elif order == moRelaxed:
+      # Plain volatile store on BOTH ISAs. No hardware fence; compile
+      # barrier suppresses re-ordering of unrelated ops across the
+      # store, but `__iso_volatile_storeN` itself emits no ordering.
+      msvcReadWriteBarrier()
+      when sizeof(T) == 1:
+        msvcIsoVolatileStore8(cast[ptr cchar](addr loc.value), cast[cchar](desired))
+      elif sizeof(T) == 2:
+        msvcIsoVolatileStore16(cast[ptr cshort](addr loc.value), cast[cshort](desired))
+      elif sizeof(T) == 4:
+        msvcIsoVolatileStore32(cast[ptr cint](addr loc.value), cast[cint](desired))
+      elif sizeof(T) == 8:
+        msvcIsoVolatileStore64(
+          cast[ptr clonglong](addr loc.value), cast[clonglong](desired)
+        )
+      else:
+        {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
     else:
-      # moRelaxed or moRelease.
-      # ARM64 needs stlxr for moRelease; on x86_64 a plain store suffices.
-      # We compile both arms and select with `#ifdef _M_ARM64` so the
-      # same Nim source handles both targets without a Nim-level arch
-      # predicate.
+      # moRelease. ARM64 needs stlxr / locked RMW for release;
+      # x86_64 a plain store suffices. Dispatch via `#ifdef _M_ARM64`
+      # so the same Nim source handles both targets.
       {.emit: ["\n#ifndef _M_ARM64\n"].}
       msvcReadWriteBarrier()
       when sizeof(T) == 1:
