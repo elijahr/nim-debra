@@ -290,3 +290,120 @@ jobs:
             fi
           }
           nimble_run nimble testExamples
+
+  test-macos-x86_64-rosetta:
+    # Restores macOS x86_64 CI coverage retired by GitHub's 2025-12-08
+    # macos-13 sunset. Apple Silicon macos-15 runners ship Apple Clang
+    # (capable of cross-compiling to x86_64 via `-arch x86_64`) and
+    # Rosetta 2 (capable of executing x86_64 Mach-O binaries on arm64
+    # hardware). Combining the two gives REAL macOS x86_64 test
+    # coverage: a real x86_64 binary that actually executes the DEBRA+
+    # surface, including the inlined cmpxchg16b DWCAS path.
+    #
+    # Why a separate job (not a matrix axis): coverage at this width is
+    # 4 MM × 2 backend = 8 cells, parallel-independent of the main 32-cell
+    # matrix. Folding into the existing matrix would either explode it to
+    # 64 cells or require skip-conditionals on every step.
+    name: test (macos-15-rosetta / x86_64 / ${{ matrix.mm }} / ${{ matrix.backend }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        nim-version: ['stable']
+        mm: [arc, orc, refc, atomicArc]
+        backend: [c, cpp]
+    env:
+      # Apple Clang cross-compile flags for x86_64-apple-darwin.
+      # Mirrors what nim.cfg would emit for `--cpu:amd64` but injected
+      # through --passC / --passL because we are crossing on a macos
+      # host where Nim's default native config still targets arm64.
+      MACOS_X86_64_NIMFLAGS: '--cpu:amd64 --passC:-arch --passC:x86_64 --passL:-arch --passL:x86_64'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Nim ${{ matrix.nim-version }}
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: ${{ matrix.nim-version }}
+
+      - name: Cache Nimble packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nimble
+          key: macos-15-rosetta-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
+
+      - name: Verify Rosetta 2 available
+        shell: bash
+        run: |
+          set -euo pipefail
+          # macos-15 GitHub-hosted runners ship Rosetta 2 preinstalled.
+          # Probe by exec'ing an x86_64 shell builtin under `arch`.
+          arch -x86_64 uname -m | tee /tmp/rosetta-uname
+          if ! grep -qx 'x86_64' /tmp/rosetta-uname; then
+            echo "::error::Rosetta 2 not available on this runner — arch -x86_64 uname -m did not print x86_64"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: nimble install -y
+
+      - name: Clear compilation cache
+        shell: bash
+        run: rm -rf ~/.cache/nim
+
+      - name: Build + run tests (x86_64 cross-compile, Rosetta 2 execute)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # We bypass `nimble test` here: that task hardcodes a 4-MM × 2-backend
+          # internal loop, and we want exactly one matrix-driven (mm, backend)
+          # invocation per GitHub Actions cell so failures point at the right cell.
+          BACKEND_CMD=c
+          if [[ "${{ matrix.backend }}" == "cpp" ]]; then
+            BACKEND_CMD=cpp
+          fi
+          nim $BACKEND_CMD -r --mm:${{ matrix.mm }} --threads:on --path:src -d:testing \
+            ${MACOS_X86_64_NIMFLAGS} \
+            tests/test.nim
+
+      - name: objdump verification (macos x86_64 cmpxchg16b emit)
+        # Mirror the main job's objdump regression gate but for the
+        # macOS x86_64 cross-compile. We use `otool -tV` (the macOS-native
+        # disassembler) since `objdump` is not in the default PATH on
+        # macos-15. Only runs on the arc/c cell to avoid redundant work —
+        # the emit is fixed by the compiler + flags, not by --mm or --backend.
+        if: matrix.mm == 'arc' && matrix.backend == 'c'
+        shell: bash
+        run: |
+          set -euo pipefail
+          nim c -d:release --passC:-fno-lto \
+            ${MACOS_X86_64_NIMFLAGS} \
+            -o:/tmp/fixture-macos-x86 tests/probes/dwcas_objdump_fixture.nim
+          file /tmp/fixture-macos-x86 | tee /tmp/fixture-file.txt
+          if ! grep -qF 'Mach-O 64-bit executable x86_64' /tmp/fixture-file.txt; then
+            echo "::error::cross-compile did not produce a Mach-O x86_64 binary"
+            exit 1
+          fi
+          otool -tV /tmp/fixture-macos-x86 > /tmp/fixture-macos-x86.disasm
+          if ! grep -qF 'cmpxchg16b' /tmp/fixture-macos-x86.disasm; then
+            echo "::group::otool output for diagnosis"
+            grep -iE 'cmpxchg|atomic|cas' /tmp/fixture-macos-x86.disasm | head -30
+            echo "::endgroup::"
+            echo "::error::expected cmpxchg16b mnemonic missing in macOS x86_64 cross-compile"
+            exit 1
+          fi
+          echo "otool verification PASSED: cmpxchg16b mnemonic found in macOS x86_64 binary"
+
+          # Same libatomic-fallback guard as the linux/macos-arm64 cells.
+          # Apple Clang on x86_64-apple-darwin should NOT route DWCAS
+          # through libatomic — it should inline cmpxchg16b directly.
+          libatomic_regex='__atomic_(load|store|exchange|compare_exchange)_16'
+          if grep -qE "$libatomic_regex" /tmp/fixture-macos-x86.disasm; then
+            echo "::error::libatomic-fallback symbol detected in macOS x86_64 fixture"
+            echo "::group::Offending symbols"
+            grep -E "$libatomic_regex" /tmp/fixture-macos-x86.disasm | head -10
+            echo "::endgroup::"
+            exit 1
+          fi
+          echo "libatomic-fallback regression check PASSED (macOS x86_64 fixture clean)"
