@@ -1277,24 +1277,22 @@ when sizeof(pointer) == 8:
       # GP fault on x64 and unaligned-access trap on ARM64.
       #
       # MSVC `_InterlockedCompareExchange128` is documented seq_cst on x64
-      # (implicit `lock`) but only release-acquire on ARM64 (it lowers to
-      # `caspal` or `ldaxp`/`stlxp`). We add explicit `_mm_mfence()` (from
-      # `<intrin.h>`, already included above) before and after to upgrade
-      # to full seq_cst on x64. On x64 `_mm_mfence` lowers to `mfence` and
-      # is effectively a no-op alongside the implicit `lock` of the CAS.
-      # `_mm_mfence` is x86-only; on ARM64 Windows we emit
-      # `__dmb(_ARM64_BARRIER_SY)` from `<intrin.h>` instead. Both lower
-      # to a full system-domain fence (`mfence` on x64, `dmb sy` on
-      # aarch64). The `MemoryBarrier()` macro from `<windows.h>` would
-      # handle both, but pulling in `<windows.h>` globally on vcc
-      # inflates every compilation unit and was rejected.
+      # (implicit `lock` prefix on `cmpxchg16b`) but only release-acquire
+      # on ARM64 (it lowers to `caspal` or `ldaxp`/`stlxp`). On x64 the
+      # `lock`-prefixed instruction is itself a full barrier per Intel
+      # SDM Vol. 3A §8.2.5; flanking it with `_mm_mfence` adds real
+      # latency (mfence is NOT a no-op next to lock-prefixed ops — the
+      # earlier comment claim was wrong) without strengthening ordering.
+      # We therefore emit `__dmb(_ARM64_BARRIER_SY)` only on ARM64 to
+      # upgrade its release-acquire to seq_cst; on x64 the CAS alone
+      # carries the full fence.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2] = {0, 0};", "\n#ifdef _M_ARM64\n",
-          "__dmb(_ARM64_BARRIER_SY);\n", "#else\n", "_mm_mfence();\n", "#endif\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);", "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n",
-          "#else\n", "_mm_mfence();\n", "#endif\n", " memcpy(", resultPtr,
+          "#endif\n", " memcpy(", resultPtr,
           ", _cmp, 16); }",
         ]
       .}
@@ -1405,23 +1403,23 @@ when sizeof(pointer) == 8:
       # decomposed into scalar ExchangeHigh/ExchangeLow args, so it does not
       # need alignment.)
       #
-      # Full hardware fence before and after the CAS loop upgrades the
-      # `_InterlockedCompareExchange128` release-acquire contract to
-      # seq_cst: `_mm_mfence()` on x64, `__dmb(_ARM64_BARRIER_SY)` on
-      # ARM64. No-op alongside the implicit `lock` of the CAS on x64.
+      # Upgrade `_InterlockedCompareExchange128` from release-acquire to
+      # seq_cst on ARM64 via `__dmb(_ARM64_BARRIER_SY)`. On x64 the
+      # `lock`-prefixed `cmpxchg16b` is itself a full memory barrier
+      # (Intel SDM Vol. 3A §8.2.5), so explicit `_mm_mfence` adds
+      # latency without strengthening ordering — emit fences on ARM64
+      # only.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
           ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "_mm_mfence();\n", "#endif\n",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "_mm_mfence();\n", "#endif\n", " }",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " }",
         ]
       .}
     else:
@@ -1505,23 +1503,24 @@ when sizeof(pointer) == 8:
       # `_cmp` holds the prior value seen each iteration; on CAS success
       # it carries the value that was atomically replaced (returned).
       # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for
-      # the alignment rationale; `_new` does not need it. Full hardware
-      # fence before/after the CAS loop upgrades MSVC's documented
-      # release-acquire to seq_cst: `_mm_mfence()` on x64,
-      # `__dmb(_ARM64_BARRIER_SY)` on ARM64.
+      # the alignment rationale; `_new` does not need it. Upgrade
+      # release-acquire to seq_cst on ARM64 via `__dmb`; on x64 the
+      # `lock`-prefixed `cmpxchg16b` is itself a full barrier (Intel
+      # SDM Vol. 3A §8.2.5), so explicit `_mm_mfence` would only add
+      # latency without strengthening ordering — emit fences on ARM64
+      # only.
       {.
         emit: [
           "{ __int64 _new[2]; memcpy(_new, ", desiredPtr,
           ", 16); __declspec(align(16)) __int64 _cmp[2] = {0, 0};",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "_mm_mfence();\n", "#endif\n",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " (void)_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", 0, 0, _cmp);",
           " while (!_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp)) {\n", "#if defined(_M_X64)\n", "_mm_pause();\n",
           "#elif defined(_M_ARM64)\n", "__yield();\n", "#endif\n", " }",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "_mm_mfence();\n", "#endif\n", " memcpy(", resultPtr, ", _cmp, 16); }",
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
+          " memcpy(", resultPtr, ", _cmp, 16); }",
         ]
       .}
     else:
@@ -1603,19 +1602,20 @@ when sizeof(pointer) == 8:
       # x86_64 or ARM64 — MSVC implements both natively and there's no
       # weak variant).
       # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for
-      # the alignment rationale; `_new` does not need it. Full hardware
-      # fence before/after the CAS upgrades MSVC's documented
-      # release-acquire to seq_cst: `_mm_mfence()` on x64,
-      # `__dmb(_ARM64_BARRIER_SY)` on ARM64.
+      # the alignment rationale; `_new` does not need it. Upgrade
+      # release-acquire to seq_cst on ARM64 via `__dmb`; on x64 the
+      # `lock`-prefixed `cmpxchg16b` is itself a full barrier (Intel
+      # SDM Vol. 3A §8.2.5), so explicit `_mm_mfence` would only add
+      # latency without strengthening ordering — emit fences on ARM64
+      # only.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
           ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16);",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "_mm_mfence();\n", "#endif\n", " ", result,
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp) != 0);", "\n#ifdef _M_ARM64\n",
-          "__dmb(_ARM64_BARRIER_SY);\n", "#else\n", "_mm_mfence();\n", "#endif\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
@@ -1753,19 +1753,20 @@ when sizeof(pointer) == 8:
       # presented to the caller as always-strong). Weak ≡ Strong; emit
       # the same body as dwcasCasStrong.
       # MSDN: ComparandResult must be 16-byte aligned. See dwcasLoad for
-      # the alignment rationale; `_new` does not need it. Full hardware
-      # fence before/after the CAS upgrades MSVC's documented
-      # release-acquire to seq_cst: `_mm_mfence()` on x64,
-      # `__dmb(_ARM64_BARRIER_SY)` on ARM64.
+      # the alignment rationale; `_new` does not need it. Upgrade
+      # release-acquire to seq_cst on ARM64 via `__dmb`; on x64 the
+      # `lock`-prefixed `cmpxchg16b` is itself a full barrier (Intel
+      # SDM Vol. 3A §8.2.5), so explicit `_mm_mfence` would only add
+      # latency without strengthening ordering — emit fences on ARM64
+      # only.
       {.
         emit: [
           "{ __declspec(align(16)) __int64 _cmp[2]; memcpy(_cmp, ", expectedPtr,
           ", 16); __int64 _new[2]; memcpy(_new, ", desiredPtr, ", 16);",
-          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#else\n",
-          "_mm_mfence();\n", "#endif\n", " ", result,
+          "\n#ifdef _M_ARM64\n", "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n", " ", result,
           " = (_InterlockedCompareExchange128((__int64 volatile *)", locPtr,
           ", _new[1], _new[0], _cmp) != 0);", "\n#ifdef _M_ARM64\n",
-          "__dmb(_ARM64_BARRIER_SY);\n", "#else\n", "_mm_mfence();\n", "#endif\n",
+          "__dmb(_ARM64_BARRIER_SY);\n", "#endif\n",
           " memcpy(", expectedPtr, ", _cmp, 16); }",
         ]
       .}
