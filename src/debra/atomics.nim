@@ -1888,6 +1888,122 @@ when sizeof(pointer) == 8:
     compareExchangeStrong(loc, expected, desired)
 
   # -------------------------------------------------------------------------
+  # 16-byte componentwise fetch ops on `Atomic[Pair[A, B]]` where both
+  # halves are integers. Implemented as CAS-loops on top of the 16-byte
+  # `compareExchangeWeak` primitive — there is no native instruction for
+  # 128-bit fetch-add (cmpxchg16b / casp are CAS-only); the CAS-loop is
+  # the correct, zero-overhead-vs-handrolled lowering.
+  #
+  # Semantics: each op atomically replaces `(loc.first, loc.second)` with
+  # `(loc.first OP delta.first, loc.second OP delta.second)` and returns
+  # the prior pair. The two halves are updated as a single 128-bit atomic
+  # transaction — no observer can see a `(new_first, old_second)` or
+  # `(old_first, new_second)` half-state.
+  #
+  # `order` is applied to the SUCCESS path of the inner CAS; the failure
+  # path uses `moRelaxed` (re-fetch + retry). The CAS-loop preserves
+  # atomicity; under contention the loop may iterate multiple times.
+  #
+  # Push warning[User]: off across the block because the inner
+  # `compareExchangeWeak` would otherwise emit the seq_cst-upgrade
+  # warning when callers pass a sub-seq_cst `order`. The fetch* ops are
+  # documented at the surface as "order applied to inner CAS success
+  # path", so the upgrade is callable-visible and the warning is noise
+  # at this layer.
+  # -------------------------------------------------------------------------
+
+  {.push warning[User]: off.}
+
+  proc fetchAdd*[A, B: SomeInteger](
+      loc: var Atomic[Pair[A, B]],
+      delta: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent,
+  ): Pair[A, B] {.inline.} =
+    ## Atomically add `delta.first` to `loc.first` and `delta.second` to
+    ## `loc.second`, returning the prior 128-bit pair. Both halves are
+    ## updated as a single atomic transaction via a 16-byte CAS-loop
+    ## (cmpxchg16b / casp / `_InterlockedCompareExchange128`).
+    ##
+    ## Wraparound matches the underlying integer half-type
+    ## (`SomeInteger`): unsigned halves wrap modulo `2^(sizeof(half)*8)`;
+    ## signed halves overflow per Nim signed-overflow rules.
+    enforceDwcasConstraints(A, B)
+    var prev = load(loc, moRelaxed)
+    while true:
+      let next =
+        Pair[A, B](first: prev.first + delta.first, second: prev.second + delta.second)
+      if compareExchangeWeak(loc, prev, next, order, moRelaxed):
+        return prev
+
+  proc fetchSub*[A, B: SomeInteger](
+      loc: var Atomic[Pair[A, B]],
+      delta: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent,
+  ): Pair[A, B] {.inline.} =
+    ## Componentwise atomic subtract. See `fetchAdd` for transactional
+    ## semantics and overflow behavior.
+    enforceDwcasConstraints(A, B)
+    {.push warning[User]: off.}
+    var prev = load(loc, moRelaxed)
+    while true:
+      let next =
+        Pair[A, B](first: prev.first - delta.first, second: prev.second - delta.second)
+      if compareExchangeWeak(loc, prev, next, order, moRelaxed):
+        return prev
+
+  proc fetchAnd*[A, B: SomeInteger](
+      loc: var Atomic[Pair[A, B]],
+      mask: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent,
+  ): Pair[A, B] {.inline.} =
+    ## Componentwise atomic bitwise AND. See `fetchAdd` for transactional
+    ## semantics.
+    enforceDwcasConstraints(A, B)
+    {.push warning[User]: off.}
+    var prev = load(loc, moRelaxed)
+    while true:
+      let next = Pair[A, B](
+        first: prev.first and mask.first, second: prev.second and mask.second
+      )
+      if compareExchangeWeak(loc, prev, next, order, moRelaxed):
+        return prev
+
+  proc fetchOr*[A, B: SomeInteger](
+      loc: var Atomic[Pair[A, B]],
+      mask: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent,
+  ): Pair[A, B] {.inline.} =
+    ## Componentwise atomic bitwise OR. See `fetchAdd` for transactional
+    ## semantics.
+    enforceDwcasConstraints(A, B)
+    {.push warning[User]: off.}
+    var prev = load(loc, moRelaxed)
+    while true:
+      let next =
+        Pair[A, B](first: prev.first or mask.first, second: prev.second or mask.second)
+      if compareExchangeWeak(loc, prev, next, order, moRelaxed):
+        return prev
+
+  proc fetchXor*[A, B: SomeInteger](
+      loc: var Atomic[Pair[A, B]],
+      mask: Pair[A, B],
+      order: static MemoryOrder = moSequentiallyConsistent,
+  ): Pair[A, B] {.inline.} =
+    ## Componentwise atomic bitwise XOR. See `fetchAdd` for transactional
+    ## semantics.
+    enforceDwcasConstraints(A, B)
+    {.push warning[User]: off.}
+    var prev = load(loc, moRelaxed)
+    while true:
+      let next = Pair[A, B](
+        first: prev.first xor mask.first, second: prev.second xor mask.second
+      )
+      if compareExchangeWeak(loc, prev, next, order, moRelaxed):
+        return prev
+
+  {.pop.}
+
+  # -------------------------------------------------------------------------
   # Per-callsite memory-order silencer (design §3, Friction-1 closure).
   # Wraps a DWCAS call site in `{.push warning[User]: off.}` / `{.pop.}`
   # so that an intentional, audited memory-order relaxation (notably the

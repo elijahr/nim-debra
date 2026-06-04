@@ -90,6 +90,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Strong for `std/atomics` migration ergonomics), and `compareExchange`
   unsuffixed-name aliases (3 overloads, route to
   `compareExchangeStrong` for `std/atomics`-compatible spelling).
+- 16-byte componentwise `fetchAdd` / `fetchSub` / `fetchAnd` /
+  `fetchOr` / `fetchXor` for `Atomic[Pair[A, B]]` where both halves
+  are `SomeInteger`. Implemented as CAS-loops on top of the 16-byte
+  `compareExchangeWeak` primitive — there is no native 128-bit fetch
+  instruction (`cmpxchg16b` / `casp` / `_InterlockedCompareExchange128`
+  are CAS-only); the CAS-loop is the correct, zero-overhead-vs-
+  handrolled lowering. Both halves are updated as a single 128-bit
+  atomic transaction; no observer can see a half-state. Memory order
+  applied to the success path of the inner CAS; failure path is
+  `moRelaxed` (re-fetch + retry). Tests in
+  `tests/test_dwcas_fetch_ops.nim` cover round-trip per op, integer
+  wraparound, and an 8-thread × 10_000-iter contention test.
 - `Pair[A, B]` type with field-level `{.align: 16.}` on `first` for
   16-byte cell layout (object-level align pragma is rejected by Nim
   2.2.10 scope rules; the field-level form elevates the whole object).
@@ -147,9 +159,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PR welcome if you hit a regression on Intel Macs.
 - macos-14 deprecation begins 2026-07-06. v0.10.x lifecycle may
   require forward-pin to macos-16 or later.
-- 16-byte `fetchAdd` / `fetchSub` / `fetchAnd` / `fetchOr` /
-  `fetchXor` are OUT of scope for v0.10.0 (LCRQ does not require
-  16-byte arithmetic RMW; deferred to a future revision).
 - `compareExchangeStrong` vs `compareExchangeWeak` distinction is a
   no-op on every CI cell. x86_64 emits `cmpxchg16b` (always-strong)
   for both; arm64 with FEAT_LSE / LSE2 emits `caspal` (always-strong)

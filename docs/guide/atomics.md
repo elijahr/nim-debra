@@ -95,6 +95,7 @@ load/store/exchange ops that go with it. The surface is:
 | `compareExchangeStrong` (3 overloads)     | Strong 16-byte CAS. `(success, failure)`, single-order, and default-order forms.     |
 | `compareExchangeWeak` (3 overloads)       | Weak 16-byte CAS. `(success, failure)`, single-order, and default-order forms. May fail spuriously only on ARMv8.0 LL/SC; equivalent to Strong elsewhere. See §5.   |
 | `compareExchange` aliases (3 overloads)   | Unsuffixed-name aliases routing to `compareExchangeStrong`, for `std/atomics`-style spelling. |
+| `fetchAdd` / `fetchSub` / `fetchAnd` / `fetchOr` / `fetchXor` | 16-byte componentwise atomic RMW on `Atomic[Pair[A, B]]` where `A, B: SomeInteger`. Both halves updated as a single 128-bit transaction via a CAS-loop (cmpxchg16b / casp / `_InterlockedCompareExchange128` is CAS-only — there is no native 128-bit fetch instruction). |
 | `dwcasOrderRelaxedCAS:`                   | Template that wraps a single call site to suppress the seq_cst-upgrade warning.      |
 
 In addition, v0.10.0 ships CI infrastructure that `std/atomics` does not
@@ -128,10 +129,12 @@ Don't reach for this module just because nim-debra uses it. Concrete
 - **You're on a 32-bit ABI and want 16-byte atomics.** DWCAS requires a
   64-bit target. The 32-bit ABI fails gate 1 (`sizeof(pointer) == 8`)
   at compile time.
-- **You want fetch-and-add on a 16-byte cell.** `fetchAdd` / `fetchSub`
-  / `fetchAnd` / `fetchOr` / `fetchXor` are scoped to `SomeInteger` and
-  `SomeFloat` ≤ 8 bytes. 16-byte arithmetic RMW is out of scope for
-  v0.10.0; LCRQ doesn't need it.
+- **You want fetch-and-add on a 16-byte cell where the halves are not
+  integers.** The 16-byte `fetchAdd` / `fetchSub` / `fetchAnd` / `fetchOr`
+  / `fetchXor` ops require both halves to be `SomeInteger`. Floats or
+  pointer halves are not supported (bitwise ops have no meaningful
+  semantics on floats; arithmetic on pointer halves likewise). Use
+  `compareExchange*` directly for non-integer pair payloads.
 - **You want a portable `std/atomics`-shaped surface across all Nim
   targets.** Use `std/atomics`. `debra/atomics` is intentionally narrower.
 
