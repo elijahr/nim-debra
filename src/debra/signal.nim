@@ -363,7 +363,14 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # thread is a no-op (the thread cannot still be in a pinned
     # critical section since it no longer exists), so we return
     # without raising.
-    let h = openThread(THREAD_SUSPEND_RESUME, WINBOOL(0), tid.tid)
+    # `THREAD_QUERY_INFORMATION` is required so `GetExitCodeThread` (used
+    # below in the benign-failure path) succeeds; without it
+    # `GetExitCodeThread` returns 0 with `ERROR_ACCESS_DENIED` and we
+    # would mis-classify every terminated-thread suspend/resume failure
+    # as a live-thread error and `raiseAssert`. (gemini cycle-41 CRITICAL ×2)
+    let h = openThread(
+      THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, WINBOOL(0), tid.tid
+    )
     if h == Handle(0):
       return
 

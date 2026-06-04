@@ -61,7 +61,16 @@ when defined(windows):
   # terminated between the scanner observing its thread ID and the
   # OpenThread call); callers must treat 0 as "thread is gone,
   # neutralization is moot".
-  const THREAD_SUSPEND_RESUME* = 0x0002'u32
+  const
+    THREAD_SUSPEND_RESUME* = 0x0002'u32
+    THREAD_QUERY_INFORMATION* = 0x0040'u32
+      ## Required by `GetExitCodeThread` (used in `signal.nim` to
+      ## distinguish a benign Suspend/ResumeThread failure caused by
+      ## the target having already terminated from a genuine error
+      ## against a live thread). Without this right,
+      ## `GetExitCodeThread` returns 0 / `ERROR_ACCESS_DENIED` and the
+      ## benign-failure path collapses into `raiseAssert` on every
+      ## terminated-thread failure. (gemini cycle-41 CRITICAL ×2)
   proc openThread*(
     dwDesiredAccess: uint32, bInheritHandle: WINBOOL, dwThreadId: uint32
   ): Handle {.stdcall, dynlib: "kernel32", importc: "OpenThread", sideEffect.}
