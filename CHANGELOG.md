@@ -193,20 +193,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence-counter helpers) — v0.10.1 candidate per the design doc
   §10. Not required for the v0.10.0 release scope; LCRQ callers can
   bump the generation half manually in the interim.
-- Windows scanner per-iteration thread-handle leak — FIXED in v0.10.0
-  via the `isCurrent(tid)` helper: the neutralization scanner's
-  self-skip check now uses `GetThreadId(tid.handle) ==
-  GetCurrentThreadId()` instead of allocating a fresh
-  `DuplicateHandle` per scan via `tid == currentThreadId()`. Per-thread
-  registration still calls `currentThreadId()` once at
-  `registerThread` time, so allocation is bounded to one handle per
-  worker thread (not per scan cycle). An earlier attempt (898c160) to
-  also close those bounded handles on `unregisterThread` introduced a
-  use-after-close race against concurrent `scanAndSignal` callers and
-  was reverted; the registration-time handles persist until process
-  exit. v0.11.0+ candidate: a deferred-close mechanism (per-manager
-  pending-close queue drained only after no scanner can hold a
-  reference, e.g. at end-of-scan-epoch).
+- Windows per-register/unregister-cycle thread-handle leak on slot
+  churn — PARTIALLY MITIGATED in v0.10.0; bounded residual leak
+  remains. The neutralization scanner's self-skip check uses
+  `GetThreadId(tid.handle) == GetCurrentThreadId()` (no per-scan
+  `DuplicateHandle`), so per-thread allocation is one handle per
+  worker thread at `registerThread` time, not per scan cycle. On
+  `unregisterThread`, the outgoing handle is stashed in a per-slot
+  `handlesPendingClose[]` queue on `DebraManager`, and `=destroy`
+  drains the queue (closing all stashed handles after all workers
+  have quiesced — the only point where close is race-free against
+  concurrent scanners). The residual gap: if a slot is re-claimed
+  by a new worker before manager destruction, the new worker's
+  later `unregisterThread` overwrites `handlesPendingClose[i]`,
+  leaking the prior occupant's handle until process exit. The
+  leak is bounded by (slot churn rate × manager lifetime); the OS
+  reclaims all handles at process exit regardless. We intentionally
+  do NOT drain on slot re-claim: an earlier attempt (cycle-38)
+  introduced a use-after-close race against concurrent
+  `scanAndSignal` callers that had already loaded the prior
+  occupant's `threadId` (gemini cycle-38 CRITICAL). Defer-close at
+  `=destroy` is the only race-free drain point absent an
+  epoch-tracking scheme. v0.11.0+ candidate: tie handle close to
+  DEBRA+'s own epoch advancement so handles can be closed after
+  all scanners have moved past the unregister epoch (eliminates
+  the bounded leak entirely).
 - Windows orc/c shutdown SIGSEGV in `examples/reclamation_background` —
   the example prints "Background reclamation example completed
   successfully" and then crashes during process teardown inside Nim's

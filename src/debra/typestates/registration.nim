@@ -88,24 +88,24 @@ proc register*[MaxThreads: static int, CC: static PinScopeCardinality](
       if mgr.activeThreadMask.compareExchangeWeak(
         expected, desired, moAcquireRelease, moAcquire
       ):
-        # Successfully claimed slot i
-        when defined(windows):
-          # If this slot was previously unregistered, its outgoing
-          # handle is stashed in `handlesPendingClose[i]` awaiting the
-          # manager `=destroy` drain. Re-claiming the slot would
-          # overwrite that entry on the next `unregisterThread`,
-          # silently leaking the previous handle. Drain on claim
-          # instead: by this point the prior owner has already
-          # cleared its `threadId` (release-store visible via the
-          # mask-bit acquire above) and any scanner that loaded the
-          # old handle has already either used it or skipped it; no
-          # subsequent scanner can see it (the mask bit was clear).
-          # Closing here bounds the queue at one entry per live slot
-          # (gemini cycle-37).
-          var pending = mgr.handlesPendingClose[i]
-          if pending.isValid():
-            pending.closeThreadId()
-            mgr.handlesPendingClose[i] = InvalidThreadId
+        # Successfully claimed slot i.
+        #
+        # NOTE: we intentionally do NOT drain `handlesPendingClose[i]`
+        # here. An earlier revision (cycle-38) closed any pending
+        # handle on slot re-claim to bound the queue at one entry
+        # per live slot, but gemini correctly identified a
+        # use-after-close race (cycle-38 CRITICAL): a scanner that
+        # already loaded the prior occupant's threadId from
+        # `mgr.threads[i].threadId` may still be about to call
+        # `suspendThread(tid.handle)`. Closing the handle here lets
+        # the OS recycle it; the scanner then suspends an unrelated
+        # thread. Defer-close at `=destroy` (when all workers have
+        # quiesced) is the only safe drain point. The tradeoff is a
+        # bounded leak: a slot that churns through register/
+        # unregister cycles before manager destruction may overwrite
+        # `handlesPendingClose[i]`, leaking the prior handle until
+        # the OS reclaims it at process exit. See CHANGELOG
+        # "Known Gaps".
         # Store thread ID for signaling
         mgr.threads[i].threadId.store(currentThreadId(), moRelease)
         # Set thread-local index for signal handler. Both `threadLocalIdx`
