@@ -1031,28 +1031,31 @@ proc fetchSub*[T: SomeInteger](
   enforceAtomicConstraints(T)
   when defined(vcc):
     # MSVC has no _InterlockedExchangeSub; we emit fetchAdd of the
-    # two's-complement negation. Works for signed and unsigned T because
-    # the bit-level negation behavior is identical (uint8/16/32/64 are
-    # cast through the matching signed int*).
+    # two's-complement negation. We compute the negation in the unsigned
+    # domain (`0 - x` on uintN) so the wrap is well-defined for ALL
+    # inputs, including signed `.low` (where `-x` on the signed type is
+    # C/C++ signed-overflow UB). The resulting bit pattern is then cast
+    # to the intrinsic's signed argument type. This works uniformly for
+    # signed and unsigned T because two's-complement representation is
+    # identical at the bit level.
     when sizeof(T) == 1:
       # `cchar` is Nim's `char`, not an integer type, so unary `-` is not
-      # defined on it. Negate through `int8` (the matching signed integer
-      # type for a 1-byte MSVC intrinsic) and cast the result back to
-      # `cchar` for the importc signature.
+      # defined on it. Compute `-v` as `0 - v` in uint8, then cast to
+      # cchar for the importc signature.
       cast[T](msvcInterlockedExchangeAdd8(
-        cast[ptr cchar](addr loc.value), cast[cchar](-cast[int8](v))
+        cast[ptr cchar](addr loc.value), cast[cchar](0'u8 - cast[uint8](v))
       ))
     elif sizeof(T) == 2:
       cast[T](msvcInterlockedExchangeAdd16(
-        cast[ptr cshort](addr loc.value), -cast[cshort](v)
+        cast[ptr cshort](addr loc.value), cast[cshort](0'u16 - cast[uint16](v))
       ))
     elif sizeof(T) == 4:
       cast[T](msvcInterlockedExchangeAdd32(
-        cast[ptr clong](addr loc.value), -cast[clong](v)
+        cast[ptr clong](addr loc.value), cast[clong](0'u32 - cast[uint32](v))
       ))
     elif sizeof(T) == 8:
       cast[T](msvcInterlockedExchangeAdd64(
-        cast[ptr clonglong](addr loc.value), -cast[clonglong](v)
+        cast[ptr clonglong](addr loc.value), cast[clonglong](0'u64 - cast[uint64](v))
       ))
     else:
       {.error: "Atomic[T] vcc fetchSub supports only 1/2/4/8 byte T".}

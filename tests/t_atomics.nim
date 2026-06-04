@@ -173,6 +173,31 @@ suite "fetch ops":
     check a64.fetchSub(int64(1)) == int64(0x1_0000_0000)
     check a64.load() == int64(0xFFFF_FFFF)
 
+  test "fetchSub handles signed-low boundary without UB":
+    # Regression for MSVC fetchSub: negation must be computed in the
+    # unsigned domain so values whose signed reinterpretation is `.low`
+    # do not trigger C signed-overflow UB. Exercise all 4 widths with
+    # the boundary bit pattern (high bit set), via the unsigned types
+    # so the literal fits without conversion errors on signed `.low`.
+    var au8: Atomic[uint8]
+    au8.store(0'u8)
+    # 128'u8 reinterpreted as int8 is -128 (int8.low); naive `-cast[int8](v)`
+    # would overflow. Correct behavior: 0 - 128 wraps to 128 in uint8.
+    check au8.fetchSub(128'u8) == 0'u8
+    check au8.load() == (0'u8 - 128'u8)
+    var au16: Atomic[uint16]
+    au16.store(0'u16)
+    check au16.fetchSub(0x8000'u16) == 0'u16
+    check au16.load() == (0'u16 - 0x8000'u16)
+    var au32: Atomic[uint32]
+    au32.store(0'u32)
+    check au32.fetchSub(0x8000_0000'u32) == 0'u32
+    check au32.load() == (0'u32 - 0x8000_0000'u32)
+    var au64: Atomic[uint64]
+    au64.store(0'u64)
+    check au64.fetchSub(0x8000_0000_0000_0000'u64) == 0'u64
+    check au64.load() == (0'u64 - 0x8000_0000_0000_0000'u64)
+
 suite "compareExchange":
   test "compareExchangeStrong success":
     var a: Atomic[int]
