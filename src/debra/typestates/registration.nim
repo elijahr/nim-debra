@@ -90,22 +90,11 @@ proc register*[MaxThreads: static int, CC: static PinScopeCardinality](
       ):
         # Successfully claimed slot i.
         #
-        # NOTE: we intentionally do NOT drain `handlesPendingClose[i]`
-        # here. An earlier revision (cycle-38) closed any pending
-        # handle on slot re-claim to bound the queue at one entry
-        # per live slot, but gemini correctly identified a
-        # use-after-close race (cycle-38 CRITICAL): a scanner that
-        # already loaded the prior occupant's threadId from
-        # `mgr.threads[i].threadId` may still be about to call
-        # `suspendThread(tid.handle)`. Closing the handle here lets
-        # the OS recycle it; the scanner then suspends an unrelated
-        # thread. Defer-close at `=destroy` (when all workers have
-        # quiesced) is the only safe drain point. The tradeoff is a
-        # bounded leak: a slot that churns through register/
-        # unregister cycles before manager destruction may overwrite
-        # `handlesPendingClose[i]`, leaking the prior handle until
-        # the OS reclaims it at process exit. See CHANGELOG
-        # "Known Gaps".
+        # Cycle-40 pivot (Windows): the slot stores the raw OS thread
+        # ID (`uint32`), not a duplicated handle. There is no handle
+        # to drain on re-claim — the cycle-37/38 deferred-close
+        # machinery is gone entirely, along with the handle leak and
+        # use-after-close race surfaces.
         # Store thread ID for signaling
         mgr.threads[i].threadId.store(currentThreadId(), moRelease)
         # Set thread-local index for signal handler. Both `threadLocalIdx`

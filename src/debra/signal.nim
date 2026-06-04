@@ -327,64 +327,88 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     if not tid.isValid:
       return
 
-    # Suspend the target. SuspendThread returns the previous suspend
-    # count, or `DWORD(-1)` (== `0xFFFFFFFF`) on failure. winlean's
-    # `suspendThread` currently returns `int32`, so the failure
-    # sentinel arrives as `-1`. We `cast[int32]` the return value
-    # explicitly and compare against `-1'i32` so the check survives
-    # any future winlean signature change (e.g., to an unsigned
-    # `DWORD`/`uint32`) — under such a change a bare `< 0` would
-    # always be false and failure would become silent (gemini
-    # cycle-29/34). Failure here means the handle is invalid or the
-    # thread already terminated; treat as no-op (the target is gone).
-    let prevCount = cast[int32](suspendThread(tid.handle))
-    if prevCount == -1'i32:
+    # Open a temporary handle to the target thread by its OS thread
+    # ID. The handle lifetime is bounded to this proc's body via the
+    # `try`/`finally` below, so there is no shared handle resource to
+    # leak or race on (cycle-40 pivot eliminates the cycle-22/35-39
+    # handle-lifetime hazards by construction).
+    #
+    # `OpenThread` returns 0 if the target thread has already
+    # terminated between the scanner observing the slot's thread ID
+    # and this call. That race is benign: neutralization on a dead
+    # thread is a no-op (the thread cannot still be in a pinned
+    # critical section since it no longer exists), so we return
+    # without raising.
+    let h = openThread(THREAD_SUSPEND_RESUME, WINBOOL(0), tid.tid)
+    if h == Handle(0):
       return
 
-    # Walk the global manager descriptor exactly like the POSIX
-    # handler. On Windows the scanner runs this from its own context
-    # (not the target's), so `threadLocalIdx` is the SCANNER's slot
-    # index, not the target's — we use the explicit `slot` argument
-    # instead.
-    let mgrPtr = globalManagerPtr.load(moAcquire)
-    if mgrPtr != nil:
-      let basePtr = cast[ptr UncheckedArray[byte]](mgrPtr)
-      let headerSize = threadsArrayOffsetBytes.load(moAcquire)
-      let stride = threadStateStrideBytes.load(moAcquire)
-      if stride != 0:
-        let threadOffset = headerSize + slot * stride
-        let pinnedPtr =
-          cast[ptr Atomic[bool]](addr basePtr[threadOffset + threadStatePinnedOffset()])
-        let neutralizedPtr = cast[ptr Atomic[bool]](addr basePtr[
-          threadOffset + threadStateNeutralizedOffset()
-        ])
-        if pinnedPtr[].load(moAcquire):
-          pinnedPtr[].store(false, moRelease)
-          neutralizedPtr[].store(true, moRelease)
+    try:
+      # Suspend the target. SuspendThread returns the previous suspend
+      # count, or `DWORD(-1)` (== `0xFFFFFFFF`) on failure. winlean's
+      # `suspendThread` currently returns `int32`, so the failure
+      # sentinel arrives as `-1`. We `cast[int32]` the return value
+      # explicitly and compare against `-1'i32` so the check survives
+      # any future winlean signature change (e.g., to an unsigned
+      # `DWORD`/`uint32`) — under such a change a bare `< 0` would
+      # always be false and failure would become silent (gemini
+      # cycle-29/34). Failure here means the thread terminated
+      # between `OpenThread` and `SuspendThread` (an even tighter
+      # race than the OpenThread-time check above); treat as no-op.
+      let prevCount = cast[int32](suspendThread(h))
+      if prevCount == -1'i32:
+        return
 
-    # Resume. If this fails the target is permanently suspended,
-    # which would deadlock the whole process. winlean's
-    # `resumeThread` returns `int32`; on failure the Win32 API
-    # returns `DWORD(-1)` (== `0xFFFFFFFF`), which arrives here as
-    # `-1`. As with the `SuspendThread` check above, `cast[int32]` the
-    # return value explicitly and compare against `-1'i32` rather than
-    # `< 0` so the check survives any future winlean signature change
-    # to an unsigned `DWORD`/`uint32` return (gemini cycle-29/34). A
-    # successful SuspendThread above implies the handle is valid for
-    # ResumeThread, so reaching this failure branch means the target
-    # was terminated between the two calls (or some other
-    # unrecoverable kernel-level fault). Fail loudly via
-    # `raiseAssert` (Defect — not tracked by `raises:` effect lists,
-    # so callers under `{.transition.}` / `{.raises: [].}` compile
-    # unchanged) rather than silently leaving the target permanently
-    # suspended. Silent success here would deadlock any subsequent
-    # join/wait on the target and corrupt the neutralization
-    # protocol invariants.
-    if cast[int32](resumeThread(tid.handle)) == -1'i32:
-      raiseAssert(
-        "ResumeThread failed after SuspendThread succeeded; target " &
-          "thread is permanently suspended. This is unrecoverable."
-      )
+      # Walk the global manager descriptor exactly like the POSIX
+      # handler. On Windows the scanner runs this from its own context
+      # (not the target's), so `threadLocalIdx` is the SCANNER's slot
+      # index, not the target's — we use the explicit `slot` argument
+      # instead.
+      let mgrPtr = globalManagerPtr.load(moAcquire)
+      if mgrPtr != nil:
+        let basePtr = cast[ptr UncheckedArray[byte]](mgrPtr)
+        let headerSize = threadsArrayOffsetBytes.load(moAcquire)
+        let stride = threadStateStrideBytes.load(moAcquire)
+        if stride != 0:
+          let threadOffset = headerSize + slot * stride
+          let pinnedPtr = cast[ptr Atomic[bool]](addr basePtr[
+            threadOffset + threadStatePinnedOffset()
+          ])
+          let neutralizedPtr = cast[ptr Atomic[bool]](addr basePtr[
+            threadOffset + threadStateNeutralizedOffset()
+          ])
+          if pinnedPtr[].load(moAcquire):
+            pinnedPtr[].store(false, moRelease)
+            neutralizedPtr[].store(true, moRelease)
+
+      # Resume. If this fails the target is permanently suspended,
+      # which would deadlock the whole process. winlean's
+      # `resumeThread` returns `int32`; on failure the Win32 API
+      # returns `DWORD(-1)` (== `0xFFFFFFFF`), which arrives here as
+      # `-1`. As with the `SuspendThread` check above, `cast[int32]` the
+      # return value explicitly and compare against `-1'i32` rather than
+      # `< 0` so the check survives any future winlean signature change
+      # to an unsigned `DWORD`/`uint32` return (gemini cycle-29/34). A
+      # successful SuspendThread above implies the handle is valid for
+      # ResumeThread, so reaching this failure branch means the target
+      # was terminated between the two calls (or some other
+      # unrecoverable kernel-level fault). Fail loudly via
+      # `raiseAssert` (Defect — not tracked by `raises:` effect lists,
+      # so callers under `{.transition.}` / `{.raises: [].}` compile
+      # unchanged) rather than silently leaving the target permanently
+      # suspended. Silent success here would deadlock any subsequent
+      # join/wait on the target and corrupt the neutralization
+      # protocol invariants.
+      if cast[int32](resumeThread(h)) == -1'i32:
+        raiseAssert(
+          "ResumeThread failed after SuspendThread succeeded; target " &
+            "thread is permanently suspended. This is unrecoverable."
+        )
+    finally:
+      # Always close the temporary handle, even on raiseAssert above.
+      # Handle lifetime is exactly the duration of this proc body; no
+      # handle ever escapes into the slot or the manager.
+      discard closeHandle(h)
   else:
     discard slot # POSIX path ignores the slot — handler reads threadLocalIdx
     discard tid.sendSignal(QuiescentSignal)

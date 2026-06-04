@@ -75,8 +75,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `QuiescentSignal` is a compile-time stub. The shared call site in
   `neutralize.scanAndSignal` routes through a new platform-neutral
   `neutralizeRemoteSlot(tid, slot)` entry point. `ThreadId` on
-  Windows wraps a `Handle` duplicated from `GetCurrentThread()`'s
-  pseudo-handle via `DuplicateHandle(DUPLICATE_SAME_ACCESS)`. The
+  Windows stores the raw OS thread ID (`uint32`, the `DWORD`
+  returned by `GetCurrentThreadId`); `neutralizeRemoteSlot` acquires
+  a temporary handle via `OpenThread(THREAD_SUSPEND_RESUME)`,
+  performs the suspend/flip/resume critical section, and
+  `CloseHandle`s in a `finally` block — handle lifetime is bounded
+  to the call. No handle is ever stored in the slot or the manager,
+  eliminating the handle-leak and use-after-close race surfaces by
+  construction (gemini cycle-40 pivot from the
+  earlier `DuplicateHandle(DUPLICATE_SAME_ACCESS)` design). The
   deadlock constraint that exists on POSIX (do not invoke DEBRA
   reclamation while holding a lock other DEBRA-using threads may be
   blocked on) applies identically on Windows (same hazard, different
@@ -132,6 +139,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   doc-comment audit (`scripts/audit_atomics_doc_comments.sh`) that
   fails the workflow if any exported proc/template inside the DWCAS
   specialization block lacks a `##` doc-comment.
+
+### Changed
+
+- **Windows `ThreadId` representation: raw OS thread ID, not
+  duplicated `Handle`.** The Windows arm of `src/debra/thread_id.nim`
+  now stores the `uint32` returned by `GetCurrentThreadId` directly;
+  `currentThreadId()` allocates nothing. Cross-thread neutralization
+  in `neutralizeRemoteSlot` (`src/debra/signal.nim`) acquires a
+  temporary handle via `OpenThread(THREAD_SUSPEND_RESUME)`, performs
+  the suspend/flip/resume critical section, and `CloseHandle`s in a
+  `finally` block — handle lifetime is bounded to the call. The
+  earlier in-development design (cycles 19-39) stored a handle
+  duplicated from `GetCurrentThread()`'s pseudo-handle and carried
+  a bounded handle leak on slot churn plus a use-after-close race
+  between scanner and `unregisterThread`. Both surfaces are
+  eliminated by construction: no shared handle resource exists to
+  race on or leak. Removed: `DebraManager.handlesPendingClose`
+  field, `closeThreadId` helper, `=destroy` handle-cleanup loop,
+  `unregisterThread` handle-stash logic, scanner-time
+  `GetThreadId(handle)` round-trip. `==`, `isCurrent`, and `isValid`
+  on Windows are now direct `uint32` comparisons (gemini cycle-40).
 
 ### Constraints
 
@@ -193,31 +221,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence-counter helpers) — v0.10.1 candidate per the design doc
   §10. Not required for the v0.10.0 release scope; LCRQ callers can
   bump the generation half manually in the interim.
-- Windows per-register/unregister-cycle thread-handle leak on slot
-  churn — PARTIALLY MITIGATED in v0.10.0; bounded residual leak
-  remains. The neutralization scanner's self-skip check uses
-  `GetThreadId(tid.handle) == GetCurrentThreadId()` (no per-scan
-  `DuplicateHandle`), so per-thread allocation is one handle per
-  worker thread at `registerThread` time, not per scan cycle. On
-  `unregisterThread`, the outgoing handle is stashed in a per-slot
-  `handlesPendingClose[]` queue on `DebraManager`, and `=destroy`
-  drains the queue (closing all stashed handles after all workers
-  have quiesced — the only point where close is race-free against
-  concurrent scanners). The residual gap: if a slot is re-claimed
-  by a new worker before manager destruction, the new worker's
-  later `unregisterThread` overwrites `handlesPendingClose[i]`,
-  leaking the prior occupant's handle until process exit. The
-  leak is bounded by (slot churn rate × manager lifetime); the OS
-  reclaims all handles at process exit regardless. We intentionally
-  do NOT drain on slot re-claim: an earlier attempt (cycle-38)
-  introduced a use-after-close race against concurrent
-  `scanAndSignal` callers that had already loaded the prior
-  occupant's `threadId` (gemini cycle-38 CRITICAL). Defer-close at
-  `=destroy` is the only race-free drain point absent an
-  epoch-tracking scheme. v0.11.0+ candidate: tie handle close to
-  DEBRA+'s own epoch advancement so handles can be closed after
-  all scanners have moved past the unregister epoch (eliminates
-  the bounded leak entirely).
 - Windows orc/c shutdown SIGSEGV in `examples/reclamation_background` —
   the example prints "Background reclamation example completed
   successfully" and then crashes during process teardown inside Nim's

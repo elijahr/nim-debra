@@ -12,14 +12,22 @@
 ##   the target slot's `pinned`/`neutralized` flags. The `sendSignal`
 ##   proc is the primary entry point on POSIX.
 ##
-## - **Windows**: the identifier is a duplicated thread `Handle` with
-##   `THREAD_ALL_ACCESS` (via `DuplicateHandle` of the pseudo-handle
-##   returned by `GetCurrentThread`). Remote neutralization uses
-##   `SuspendThread` / `ResumeThread`: the scanner suspends the target,
-##   directly flips its slot via the same pointer-arithmetic walk that
-##   the POSIX signal handler uses, then resumes. This avoids the
-##   async-signal-safety constraints of the POSIX path; `signal.nim`'s
-##   handler-install machinery is a no-op on Windows.
+## - **Windows**: the identifier is the raw OS thread ID (`uint32`,
+##   the `DWORD` returned by `GetCurrentThreadId`). It is OS-managed —
+##   no kernel handle is allocated, duplicated, or stored. Remote
+##   neutralization uses `SuspendThread` / `ResumeThread`: the scanner
+##   opens a temporary handle via `OpenThread(THREAD_SUSPEND_RESUME)`,
+##   suspends the target, directly flips its slot via the same
+##   pointer-arithmetic walk that the POSIX signal handler uses,
+##   resumes, then `CloseHandle`s in a `finally` block. Handle
+##   lifetime is the duration of a single `neutralizeRemoteSlot` call.
+##   This avoids the async-signal-safety constraints of the POSIX path;
+##   `signal.nim`'s handler-install machinery is a no-op on Windows.
+##   The earlier design (v0.10.0-dev, cycles 19-39) stored a duplicated
+##   handle in the slot; that design carried a bounded handle leak on
+##   slot churn and a use-after-close race between scanner and
+##   unregister. The on-demand `OpenThread`/`CloseHandle` design
+##   eliminates both by construction (gemini cycle-40).
 ##
 ## **Deadlock constraint (both platforms)**: do NOT call DEBRA reclamation
 ## while holding a lock that other DEBRA-using threads might be blocked
@@ -37,210 +45,121 @@ import std/strutils
 when defined(windows):
   import std/winlean
 
-  # GetCurrentThread returns a pseudo-handle (-2) that is only valid in
-  # the calling thread's context. winlean does not export it; importc
-  # directly. The pseudo-handle must be passed to DuplicateHandle to
-  # obtain a real, cross-thread-usable handle.
-  proc getCurrentThread(): Handle {.
-    stdcall, dynlib: "kernel32", importc: "GetCurrentThread", sideEffect
+  proc getCurrentThreadIdRaw(): uint32 {.
+    stdcall, dynlib: "kernel32", importc: "GetCurrentThreadId", sideEffect
   .}
+    ## Win32 `GetCurrentThreadId` — returns the OS-level DWORD identifier
+    ## of the calling thread without allocating a handle. This is the
+    ## sole ingest path for the Windows `ThreadId`: the raw OS thread
+    ## ID is stored directly, no kernel object is involved.
 
-  # GetThreadId returns the OS-level thread ID (DWORD) for a given
-  # thread handle. Used for identity comparison: two `Handle` values
-  # for the same OS thread (e.g. obtained via separate
-  # `DuplicateHandle` calls) compare UNEQUAL, but their `GetThreadId`
-  # results are equal. Self-signal detection in `scanAndSignal`
-  # depends on this — without it the scanner would `SuspendThread` on
-  # its own handle and deadlock.
-  proc getThreadIdFromHandle(
-    h: Handle
-  ): uint32 {.stdcall, dynlib: "kernel32", importc: "GetThreadId", sideEffect.}
+  # OpenThread acquires a fresh handle to an existing thread by its
+  # OS-level thread ID. Used by `neutralizeRemoteSlot` to scope a
+  # SuspendThread/ResumeThread pair around the slot flip; the handle
+  # is CloseHandle'd in a `finally` block so its lifetime is bounded
+  # to that critical section. Returns 0 on failure (e.g. target
+  # terminated between the scanner observing its thread ID and the
+  # OpenThread call); callers must treat 0 as "thread is gone,
+  # neutralization is moot".
+  const THREAD_SUSPEND_RESUME* = 0x0002'u32
+  proc openThread*(
+    dwDesiredAccess: uint32, bInheritHandle: WINBOOL, dwThreadId: uint32
+  ): Handle {.stdcall, dynlib: "kernel32", importc: "OpenThread", sideEffect.}
 
   type ThreadId* = object
     ## Platform-abstracted thread identifier (Windows arm).
     ##
-    ## Carries a duplicated thread `Handle` (8 bytes) from
-    ## `DuplicateHandle(GetCurrentThread(), DUPLICATE_SAME_ACCESS)`.
-    ## The handle is valid across threads (unlike the calling-thread
-    ## pseudo-handle returned by `GetCurrentThread`) and is the target
-    ## argument to `SuspendThread` / `ResumeThread`.
+    ## Carries the raw OS thread ID (`uint32`, the `DWORD` returned by
+    ## `GetCurrentThreadId`). OS-managed — no kernel handle is
+    ## duplicated, stored, or owned. Identity is structural: two
+    ## `ThreadId` values for the same OS thread compare equal by
+    ## direct integer comparison.
     ##
-    ## **Identity vs. handle**: each call to `currentThreadId()`
-    ## allocates a FRESH handle, so handle values are NOT comparable
-    ## across calls. The `==` operator below uses `GetThreadId(handle)`
-    ## to extract the stable OS-level thread ID for comparison — that
-    ## value is the same across all duplicated handles of the same
-    ## thread. Self-signal detection in `scanAndSignal` depends on
-    ## this; without it the scanner would `SuspendThread` on its own
-    ## handle and deadlock.
+    ## Cross-thread neutralization (`SuspendThread`/`ResumeThread`)
+    ## requires a kernel handle, but the handle is acquired on demand
+    ## inside `neutralizeRemoteSlot` via `OpenThread`, used under a
+    ## `try`/`finally` for the suspend-flip-resume critical section,
+    ## and `CloseHandle`d before return. Handle lifetime is bounded to
+    ## that critical section; no handle is ever stored in the slot or
+    ## the manager.
+    ##
+    ## This eliminates the bounded handle leak (slot churn) and the
+    ## use-after-close race against the scanner that the earlier
+    ## duplicated-handle design carried (cycles 19-39 traversed
+    ## various mitigations before the cycle-40 pivot).
     ##
     ## Keeping `ThreadId` at 8 bytes (same as POSIX) avoids triggering
-    ## the 16-byte DWCAS path in `Atomic[ThreadId]`. The DWCAS path is
-    ## only specialized for `Atomic[Pair[A, B]]`; a 16-byte
-    ## `Atomic[ThreadId]` would fail the `nonAtomicType` dispatch and
-    ## the runtime alignment check would need 16-byte alignment on the
-    ## containing field — both avoided by stashing identity in
-    ## `GetThreadId(handle)` instead of an inline field.
-    ##
-    ## The duplicated handle remains valid until `CloseHandle` is called
-    ## on it. Per-thread handles are allocated at `registerThread` time
-    ## and closed at `unregisterThread` time — bounded allocation, one
-    ## handle per registered worker. The hot-path scanner self-skip uses
-    ## `isCurrent(tid)` (no allocation) rather than `tid ==
-    ## currentThreadId()` to avoid per-scan handle churn that would
-    ## otherwise dominate the kernel-object accounting under
-    ## heavy reclamation cycles. An earlier fix (898c160) attempted to
-    ## close per-thread handles on `unregisterThread` and on scanner
-    ## exit, but the unregister-side close introduced a use-after-close
-    ## race against concurrent `scanAndSignal` callers (the scanner had
-    ## already loaded the handle into a local before the unregister
-    ## ran) and was reverted; the deferred-close redesign is tracked
-    ## as a v0.11.0 candidate.
-    handle*: Handle
+    ## the 16-byte DWCAS path in `Atomic[ThreadId]`. A bare `uint32`
+    ## (4 bytes) would still be lock-free, but the object wrapper is
+    ## retained for API parity with the POSIX arm and to keep the
+    ## `unsafeThreadIdFromInt` test helpers compiling unchanged.
+    tid*: uint32
 
-  let InvalidThreadId* = ThreadId(handle: Handle(0))
-    ## Sentinel value representing no thread. `Handle(0)` is INVALID
-    ## for thread handles on Windows; the `==` operator special-cases
-    ## the zero handle to avoid calling `GetThreadId(0)` (which would
-    ## return 0 but emit a Win32 error).
-
-  proc getCurrentThreadId(): uint32 {.
-    stdcall, dynlib: "kernel32", importc: "GetCurrentThreadId", sideEffect
-  .}
-    ## Win32 `GetCurrentThreadId` — returns the OS-level DWORD identifier
-    ## of the calling thread without allocating a handle. Used by
-    ## `isCurrent` to compare against a stored handle without burning
-    ## a fresh `DuplicateHandle`.
-
-  proc isCurrent*(tid: ThreadId): bool {.inline, raises: [].} =
-    ## Non-allocating identity check: returns true iff `tid` refers to
-    ## the calling thread. Reads the stable DWORD thread ID via
-    ## `GetThreadId(tid.handle)` (no allocation) and compares to the
-    ## caller's own DWORD via `GetCurrentThreadId()` (no allocation).
-    ##
-    ## Preferred over `tid == currentThreadId()` for hot-path self-skip
-    ## checks (e.g. the neutralization scanner): the latter would
-    ## allocate a fresh `DuplicateHandle` on every scan iteration,
-    ## leaking Windows kernel handles until the process exits.
-    if tid.handle == Handle(0):
-      return false
-    getThreadIdFromHandle(tid.handle) == getCurrentThreadId()
+  let InvalidThreadId* = ThreadId(tid: 0'u32)
+    ## Sentinel value representing no thread. The Win32 thread-ID
+    ## space starts at 4 (the kernel allocates DWORDs in multiples of
+    ## 4, skipping 0); zero is guaranteed never to alias a real
+    ## thread.
 
   proc currentThreadId*(): ThreadId {.raises: [].} =
     ## Get the ThreadId of the current thread.
     ##
-    ## Returns a `Handle` duplicated from `GetCurrentThread()`'s
-    ## pseudo-handle, with full access rights so the scanner can later
-    ## call `SuspendThread`/`ResumeThread`. `DuplicateHandle` on the
-    ## current-thread pseudo-handle within the same process is documented
-    ## by MSDN to fail only on invalid arguments (which the call shape
-    ## here cannot produce), so the API surface is `{.raises: [].}` for
-    ## parity with the POSIX arm. On the impossible failure case a
-    ## `doAssert` fires with the Windows error code — better than
-    ## silently producing an invalid handle that would later misroute
-    ## SuspendThread to nowhere.
-    ##
-    ## **Performance note**: each call allocates a fresh kernel handle.
-    ## For identity-check use cases (e.g. self-skip in a hot scanner
-    ## loop), prefer `isCurrent(tid)` which performs the comparison
-    ## without any allocation.
-    var dup: Handle = Handle(0)
-    let ok = duplicateHandle(
-      getCurrentProcess(),
-      getCurrentThread(),
-      getCurrentProcess(),
-      addr dup,
-      0, # dwDesiredAccess ignored when DUPLICATE_SAME_ACCESS is set
-      0, # bInheritHandle = FALSE
-      DUPLICATE_SAME_ACCESS,
-    )
-    doAssert ok != 0,
-      "DuplicateHandle(GetCurrentThread()) failed; this is not expected " &
-        "for the in-process pseudo-handle call shape"
-    ThreadId(handle: dup)
+    ## Zero allocation: returns the raw `GetCurrentThreadId()` result.
+    ## The Windows arm formerly allocated a fresh kernel handle via
+    ## `DuplicateHandle(GetCurrentThread())` per call; the cycle-40
+    ## pivot eliminated that. There is no longer any handle resource
+    ## to track, leak, or race against.
+    ThreadId(tid: getCurrentThreadIdRaw())
 
-  proc `==`*(a, b: ThreadId): bool =
-    ## Compare two ThreadIds for equality.
-    ##
-    ## Identity uses `GetThreadId(handle)` to extract the stable OS
-    ## thread ID from each handle. Direct handle comparison would
-    ## misreport same-thread calls as UNEQUAL because each
-    ## `currentThreadId()` allocates a fresh handle via
-    ## `DuplicateHandle` — and `scanAndSignal`'s self-signal guard
-    ## depends on the same-thread check being correct (otherwise the
-    ## scanner deadlocks by `SuspendThread`ing its own handle).
-    ##
-    ## The `Handle(0)` sentinel is special-cased: two zero handles
-    ## compare equal without calling `GetThreadId(0)` (which would
-    ## set Win32 last-error). One zero and one non-zero compare
-    ## unequal trivially.
-    if a.handle == Handle(0) and b.handle == Handle(0):
-      true
-    elif a.handle == Handle(0) or b.handle == Handle(0):
-      false
-    elif a.handle == b.handle:
-      # Same underlying HANDLE -> same OS thread. Skip the
-      # `GetThreadId(...)` syscall round-trip; identical handles cannot
-      # alias different threads (gemini cycle-34).
-      true
-    else:
-      getThreadIdFromHandle(a.handle) == getThreadIdFromHandle(b.handle)
+  proc isCurrent*(tid: ThreadId): bool {.inline, raises: [].} =
+    ## Non-allocating identity check: returns true iff `tid` refers to
+    ## the calling thread. Direct `uint32` compare against
+    ## `GetCurrentThreadId()`.
+    if tid.tid == 0'u32:
+      return false
+    tid.tid == getCurrentThreadIdRaw()
+
+  proc `==`*(a, b: ThreadId): bool {.inline.} =
+    ## Compare two ThreadIds for equality. Direct `uint32` compare —
+    ## the OS thread ID is the canonical identity, so structural
+    ## equality is the same as thread-identity equality.
+    a.tid == b.tid
 
   proc `$`*(tid: ThreadId): string =
-    ## Render a `ThreadId` for diagnostics. Renders the underlying
-    ## handle as a hex integer; used by `unittest2.check` when an
-    ## equality assertion involving a `ThreadId` fails.
-    "ThreadId(0x" & cast[uint](tid.handle).toHex & ")"
+    ## Render a `ThreadId` for diagnostics. Renders the OS thread ID
+    ## as a hex integer; used by `unittest2.check` when an equality
+    ## assertion involving a `ThreadId` fails.
+    "ThreadId(0x" & tid.tid.toHex & ")"
 
-  proc isValid*(tid: ThreadId): bool =
+  proc isValid*(tid: ThreadId): bool {.inline.} =
     ## Check if this ThreadId represents a valid thread.
-    tid.handle != Handle(0)
+    tid.tid != 0'u32
 
-  proc unsafeThreadId*(handle: Handle): ThreadId =
-    ## Create a ThreadId from a raw Handle.
+  proc unsafeThreadId*(tid: uint32): ThreadId =
+    ## Create a ThreadId from a raw OS thread ID (`uint32`).
     ## For testing purposes only.
-    ThreadId(handle: handle)
+    ThreadId(tid: tid)
 
   proc unsafeThreadIdFromInt*(value: int): ThreadId =
     ## Create a ThreadId from an integer value.
     ## For testing purposes only - creates a fake thread ID.
     ##
-    ## The handle stored here is not a real thread handle, so the
-    ## `==` operator's `GetThreadId` call would fail at runtime if a
-    ## fake non-zero value were compared. Tests that compare
-    ## fabricated IDs to each other rely on the `Handle(0)`
-    ## special-case in `==`, so the integer-distinct unit tests work
-    ## only for the zero / non-zero discrimination — not for general
-    ## fake-vs-fake equality. The POSIX test for "different fake IDs"
-    ## passes there because POSIX `==` is structural; the Windows
-    ## equivalent test path is therefore skipped in `t_thread_id`.
-    ThreadId(handle: cast[Handle](value))
-
-  proc closeThreadId*(tid: var ThreadId) {.raises: [].} =
-    ## Release the kernel handle owned by `tid` (Windows arm only).
-    ##
-    ## Per-thread handles are duplicated at `registerThread` time and
-    ## leak until process exit unless closed. Per-slot `unregisterThread`
-    ## cannot safely close the handle (the scanner may have already
-    ## loaded it into a local — see the KNOWN_GAP block in
-    ## `unregisterThread`). Manager-teardown is the safe close point:
-    ## all worker threads must have joined before `=destroy` runs (per
-    ## the destructor's documented precondition), so no scanner can
-    ## hold a stale reference. Safe to call on `InvalidThreadId` (the
-    ## `Handle(0)` sentinel) — `CloseHandle(0)` is a documented no-op
-    ## that sets `ERROR_INVALID_HANDLE` but does not crash; we guard
-    ## explicitly to avoid touching last-error.
-    if tid.handle != Handle(0):
-      discard closeHandle(tid.handle)
-      tid.handle = Handle(0)
+    ## Unlike the previous DuplicateHandle-based design, fake non-zero
+    ## thread IDs no longer trigger any kernel call: the `==` operator
+    ## is a direct `uint32` compare. Fabricated IDs compare correctly
+    ## against each other and against `InvalidThreadId`. The Windows
+    ## test skip for "different fake IDs" in `t_thread_id` is no
+    ## longer needed (but retained for now to avoid unrelated test
+    ## churn in this pivot commit).
+    ThreadId(tid: cast[uint32](value and 0xFFFF_FFFF))
 
   # `sendSignal` is intentionally NOT defined on Windows. Cross-thread
-  # neutralization on Windows uses `neutralizeRemoteSlot` (defined below
-  # via include after the POSIX arm) which suspends, flips, resumes.
-  # The POSIX-only signal-delivery surface (`sendSignal`,
-  # `QuiescentSignal`) is not portable and exposing a Windows stub
-  # would invite call sites to assume signal-delivery semantics that
-  # this platform cannot provide.
+  # neutralization on Windows uses `neutralizeRemoteSlot` (defined in
+  # signal.nim) which opens a temporary handle, suspends, flips,
+  # resumes, closes. The POSIX-only signal-delivery surface
+  # (`sendSignal`, `QuiescentSignal`) is not portable and exposing a
+  # Windows stub would invite call sites to assume signal-delivery
+  # semantics that this platform cannot provide.
 else:
   import std/posix
 
