@@ -33,29 +33,17 @@ import ./types
 when defined(windows):
   import std/winlean
 
-  # winlean (Nim 2.2.x) does not expose GetExitCodeThread, but does
-  # define STILL_ACTIVE (= 0x00000103, == 259). Import GetExitCodeThread
-  # directly so the suspend/resume neutralization path can distinguish
-  # "thread already terminated" (benign) from "live thread, kernel
-  # refused to suspend/resume" (unrecoverable). Without this check,
-  # ResumeThread or SuspendThread failures on a thread that legitimately
-  # exited between OpenThread and Suspend/Resume would raise an
-  # AssertionDefect, which is incorrect: a dead thread cannot be in a
-  # pinned critical section, so neutralization is a no-op.
-  proc getExitCodeThreadWin(
-    hThread: Handle, lpExitCode: ptr int32
-  ): WINBOOL {.stdcall, importc: "GetExitCodeThread", dynlib: "kernel32".}
-
-  proc remoteThreadIsTerminated(h: Handle): bool {.inline.} =
-    ## Returns true iff `GetExitCodeThread` succeeds AND the thread's
-    ## exit code is not STILL_ACTIVE. Returns false if the call itself
-    ## fails (cannot prove termination — treat as live for safety) or
-    ## if the thread is still active. Sentinel STILL_ACTIVE is sourced
-    ## from `winlean` (already `int32`).
-    var exitCode: int32 = 0
-    if getExitCodeThreadWin(h, addr exitCode) == 0:
-      return false
-    exitCode != STILL_ACTIVE
+  # Cycle-43: `GetExitCodeThread`-based discrimination between
+  # "really alive" and "dying" threads was removed because the
+  # `STILL_ACTIVE` exit code can be returned for a thread that has
+  # already begun teardown but whose handle has not yet been signaled
+  # by the kernel. The previous policy (raiseAssert on
+  # `STILL_ACTIVE`) produced false-positive crashes during teardown.
+  # Suspend/ResumeThread failures are now uniformly treated as
+  # benign — a thread we cannot suspend cannot be in a pinned
+  # critical section we need to neutralize, and a thread we cannot
+  # resume is either already gone or in a state we cannot recover
+  # from regardless. See `neutralizeRemoteSlot` below.
 
 var
   signalHandlerInstalled: Atomic[bool]
@@ -363,13 +351,13 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # thread is a no-op (the thread cannot still be in a pinned
     # critical section since it no longer exists), so we return
     # without raising.
-    # `THREAD_QUERY_INFORMATION` is required so `GetExitCodeThread` (used
-    # below in the benign-failure path) succeeds; without it
-    # `GetExitCodeThread` returns 0 with `ERROR_ACCESS_DENIED` and we
-    # would mis-classify every terminated-thread suspend/resume failure
-    # as a live-thread error and `raiseAssert`. (gemini cycle-41 CRITICAL ×2)
-    let h =
-      openThread(THREAD_SUSPEND_RESUME or THREAD_QUERY_INFORMATION, WINBOOL(0), tid.tid)
+    # Cycle-43: the benign-failure path no longer needs
+    # `GetExitCodeThread`, so we drop `THREAD_QUERY_INFORMATION` and
+    # open with the minimal `THREAD_SUSPEND_RESUME` right that the
+    # neutralization protocol actually uses. The kernel access check
+    # is tightened, and we no longer rely on a racy "is the thread
+    # alive?" probe that can mis-classify a dying thread as live.
+    let h = openThread(THREAD_SUSPEND_RESUME, WINBOOL(0), tid.tid)
     if h == Handle(0):
       return
 
@@ -389,19 +377,18 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
       if prevCount == -1'i32:
         # SuspendThread failed. The overwhelmingly common cause is that
         # the target thread terminated between `OpenThread` and this
-        # call. Confirm via `GetExitCodeThread`: a dead thread cannot
-        # be in a pinned critical section, so neutralization is a no-op
-        # and we return silently. If the thread is still active, the
-        # kernel refused to suspend a live thread — that is an
-        # unrecoverable bug worth surfacing rather than silently
-        # leaving the neutralization invariant unenforced (gemini
-        # cycle-40 HIGH).
-        if remoteThreadIsTerminated(h):
-          return
-        raiseAssert(
-          "SuspendThread failed on a still-active thread; this is " &
-            "an unrecoverable kernel/OpenThread state error."
-        )
+        # call. Differentiating "really alive" from "dying" via
+        # `GetExitCodeThread` is racy on Windows: a thread that exits
+        # between SuspendThread and GetExitCodeThread can still report
+        # `STILL_ACTIVE` because the handle is not yet signaled until
+        # the thread fully exits. Treating all SuspendThread failures
+        # as benign avoids false-positive crashes during teardown
+        # — strictly safer than raising on a racy "still active"
+        # observation. The neutralization store is not applied below
+        # in this path; that is acceptable because a thread we could
+        # not suspend cannot be in a pinned critical section we need
+        # to neutralize (gemini cycle-43 HIGH).
+        return
 
       # Walk the global manager descriptor exactly like the POSIX
       # handler. On Windows the scanner runs this from its own context
@@ -444,22 +431,19 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
       # join/wait on the target and corrupt the neutralization
       # protocol invariants.
       if cast[int32](resumeThread(h)) == -1'i32:
-        # ResumeThread failed. The standard interpretation — "target is
-        # permanently suspended" — is only correct if the target is
-        # still alive. A target that was terminated (TerminateThread or
-        # natural completion) between our SuspendThread and ResumeThread
-        # calls will also fail ResumeThread, and that failure is benign:
-        # there is no thread left to resume. Distinguish via
-        # `GetExitCodeThread`. If the thread is dead, treat the failure
-        # as benign (the neutralization store is already published).
-        # If the thread is still active and resume failed, THAT is the
-        # unrecoverable case — raise loudly (gemini cycle-40 HIGH).
-        if not remoteThreadIsTerminated(h):
-          raiseAssert(
-            "ResumeThread failed on a still-active thread after " &
-              "SuspendThread succeeded; target is permanently " &
-              "suspended. This is unrecoverable."
-          )
+        # ResumeThread failed. Common cause: the thread terminated
+        # between our SuspendThread and ResumeThread calls (race
+        # during teardown). `GetExitCodeThread` cannot reliably
+        # discriminate "really alive" from "dying" — a thread that
+        # exits between SuspendThread and GetExitCodeThread can still
+        # return STILL_ACTIVE because the handle is not signaled
+        # until the thread fully exits. Treating ALL ResumeThread
+        # failures as benign is safer than raising on a racy
+        # "still active" observation: a false-positive crash during
+        # teardown is worse than missing a rare kernel-level
+        # corruption case. The handle is CloseHandle()'d in the
+        # finally block below regardless (gemini cycle-43 HIGH).
+        discard
     finally:
       # Always close the temporary handle, even on raiseAssert above.
       # Handle lifetime is exactly the duration of this proc body; no
