@@ -210,6 +210,35 @@ when defined(vcc):
     p: ptr clonglong
   ): clonglong {.importc: "__iso_volatile_load64", header: "<intrin.h>".}
 
+  # ---- iso-volatile store (sizes 1/2/4/8): pure store primitive.
+  # `__iso_volatile_storeN` is a side-effect-free machine store that
+  # the optimizer cannot reorder around. Unlike `_InterlockedExchange*`
+  # it does NOT emit a locked `xchg` (a full RMW with seq_cst semantics
+  # on x86, and acquire-release fence-equivalent on ARM64); the plain
+  # store is sufficient for moRelaxed and — on x86_64 TSO — for
+  # moRelease as well (a width-≤8 naturally-aligned mov is atomic and
+  # has release semantics under TSO, with `_ReadWriteBarrier` preventing
+  # the compiler from sinking prior ops below it). On ARM64 memory is
+  # weakly ordered: for moRelease we still need an `stlxr`-class store,
+  # which the plain `__iso_volatile_storeN` does NOT provide, so we
+  # fall back to `_InterlockedExchange*` (emits `stlxr`) for any
+  # non-relaxed order on ARM64. (gemini cycle-42 MEDIUM)
+  proc msvcIsoVolatileStore8(
+    p: ptr cchar, v: cchar
+  ) {.importc: "__iso_volatile_store8", header: "<intrin.h>".}
+
+  proc msvcIsoVolatileStore16(
+    p: ptr cshort, v: cshort
+  ) {.importc: "__iso_volatile_store16", header: "<intrin.h>".}
+
+  proc msvcIsoVolatileStore32(
+    p: ptr cint, v: cint
+  ) {.importc: "__iso_volatile_store32", header: "<intrin.h>".}
+
+  proc msvcIsoVolatileStore64(
+    p: ptr clonglong, v: clonglong
+  ) {.importc: "__iso_volatile_store64", header: "<intrin.h>".}
+
   # ---- compiler reorder barrier (used as signalFence and as the
   # compile-barrier for sub-seq_cst fences) ----
   proc msvcReadWriteBarrier() {.importc: "_ReadWriteBarrier", header: "<intrin.h>".}
@@ -634,26 +663,95 @@ proc store*[T](
   enforceAtomicConstraints(T)
   validStoreOrder(order)
   when defined(vcc):
-    # Atomic store via `_InterlockedExchange*` (discard the prior value).
-    # The exchange itself is seq_cst on x86_64; sub-seq_cst orders are
-    # honored as compile-barriers via the implicit barrier in the
-    # function call.
-    when sizeof(T) == 1:
-      discard
-        msvcInterlockedExchange8(cast[ptr cchar](addr loc.value), cast[cchar](desired))
-    elif sizeof(T) == 2:
-      discard msvcInterlockedExchange16(
-        cast[ptr cshort](addr loc.value), cast[cshort](desired)
-      )
-    elif sizeof(T) == 4:
-      discard
-        msvcInterlockedExchange32(cast[ptr clong](addr loc.value), cast[clong](desired))
-    elif sizeof(T) == 8:
-      discard msvcInterlockedExchange64(
-        cast[ptr clonglong](addr loc.value), cast[clonglong](desired)
-      )
+    # Per-order MSVC store dispatch (gemini cycle-42 MEDIUM):
+    #
+    #   * moSeqCst (and moSequentiallyConsistent): emit a locked
+    #     `_InterlockedExchange*`. On x86_64 the locked `xchg` is a full
+    #     seq_cst fence with the store baked in; on ARM64 the intrinsic
+    #     lowers to `stlxr` + the architectural seq_cst sequence MSVC
+    #     uses for `_Interlocked*` operations. This is the previous
+    #     behavior and remains correct for the strongest order.
+    #
+    #   * moRelaxed / moRelease (the only other valid store orders;
+    #     moAcquire / moAcquireRelease / moConsume are rejected by
+    #     `validStoreOrder`):
+    #       - On x86_64 (TSO), a width-≤8 naturally-aligned `mov` is
+    #         atomic and provides release semantics for free. We emit
+    #         `__iso_volatile_storeN` (a pure machine store, NOT a
+    #         locked RMW) preceded by `_ReadWriteBarrier()` so the
+    #         compiler cannot sink prior ops below the store. This
+    #         drops the unnecessary `lock xchg` prefix that
+    #         `_InterlockedExchange*` would otherwise emit, saving
+    #         ~20-30 cycles per relaxed/release store and avoiding the
+    #         cache-line ping that the locked instruction induces.
+    #       - On ARM64 the memory model is weak: a plain store is NOT
+    #         release. We therefore fall back to `_InterlockedExchange*`
+    #         which emits `stlxr` (store-release-exclusive) — release
+    #         semantics for moRelease, and stronger-than-needed for
+    #         moRelaxed but still correct (relaxed permits stronger
+    #         orders). The arch dispatch is performed via `{.emit:.}`
+    #         around the choice rather than at Nim-level (no
+    #         `defined(arm64)` predicate is reliably set under MSVC),
+    #         using the MSVC `_M_ARM64` preprocessor define.
+    when order == moSequentiallyConsistent:
+      when sizeof(T) == 1:
+        discard msvcInterlockedExchange8(
+          cast[ptr cchar](addr loc.value), cast[cchar](desired)
+        )
+      elif sizeof(T) == 2:
+        discard msvcInterlockedExchange16(
+          cast[ptr cshort](addr loc.value), cast[cshort](desired)
+        )
+      elif sizeof(T) == 4:
+        discard msvcInterlockedExchange32(
+          cast[ptr clong](addr loc.value), cast[clong](desired)
+        )
+      elif sizeof(T) == 8:
+        discard msvcInterlockedExchange64(
+          cast[ptr clonglong](addr loc.value), cast[clonglong](desired)
+        )
+      else:
+        {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
     else:
-      {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
+      # moRelaxed or moRelease.
+      # ARM64 needs stlxr for moRelease; on x86_64 a plain store suffices.
+      # We compile both arms and select with `#ifdef _M_ARM64` so the
+      # same Nim source handles both targets without a Nim-level arch
+      # predicate.
+      {.emit: ["\n#ifndef _M_ARM64\n"].}
+      msvcReadWriteBarrier()
+      when sizeof(T) == 1:
+        msvcIsoVolatileStore8(cast[ptr cchar](addr loc.value), cast[cchar](desired))
+      elif sizeof(T) == 2:
+        msvcIsoVolatileStore16(cast[ptr cshort](addr loc.value), cast[cshort](desired))
+      elif sizeof(T) == 4:
+        msvcIsoVolatileStore32(cast[ptr cint](addr loc.value), cast[cint](desired))
+      elif sizeof(T) == 8:
+        msvcIsoVolatileStore64(
+          cast[ptr clonglong](addr loc.value), cast[clonglong](desired)
+        )
+      else:
+        {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
+      {.emit: ["\n#else /* _M_ARM64 */\n"].}
+      when sizeof(T) == 1:
+        discard msvcInterlockedExchange8(
+          cast[ptr cchar](addr loc.value), cast[cchar](desired)
+        )
+      elif sizeof(T) == 2:
+        discard msvcInterlockedExchange16(
+          cast[ptr cshort](addr loc.value), cast[cshort](desired)
+        )
+      elif sizeof(T) == 4:
+        discard msvcInterlockedExchange32(
+          cast[ptr clong](addr loc.value), cast[clong](desired)
+        )
+      elif sizeof(T) == 8:
+        discard msvcInterlockedExchange64(
+          cast[ptr clonglong](addr loc.value), cast[clonglong](desired)
+        )
+      else:
+        {.error: "Atomic[T] vcc store supports only 1/2/4/8 byte T".}
+      {.emit: ["\n#endif /* _M_ARM64 */\n"].}
   else:
     atomicStoreN(
       cast[ptr nonAtomicType(T)](addr loc.value),
