@@ -215,15 +215,18 @@ when defined(vcc):
   proc msvcReadWriteBarrier() {.importc: "_ReadWriteBarrier", header: "<intrin.h>".}
 
   # ---- full hardware memory fence for moSequentiallyConsistent
-  # thread fences. `MemoryBarrier` is a macro in `<winnt.h>` (reached
-  # via `<windows.h>`), NOT `<intrin.h>` — Nim's importc with the
-  # latter compiles (the identifier is "known" via SAL annotations)
-  # but the macro is not defined, so the C compiler emits an implicit
-  # function declaration that the linker cannot resolve. Per Microsoft
-  # Learn the macro expands to `__faststorefence` on x86_64 (or
-  # `__dmb(_ARM64_BARRIER_SY)` on aarch64), both of which are full
-  # hardware fences. ----
-  proc msvcMemoryBarrier() {.importc: "MemoryBarrier", header: "<windows.h>".}
+  # thread fences. We emit the underlying `<intrin.h>` primitives
+  # directly rather than `MemoryBarrier`: that macro lives in
+  # `<winnt.h>` (reached via `<windows.h>`), and pulling in the full
+  # Windows SDK header just for a one-line fence inflates preprocessor
+  # output by ~25k lines and pollutes the namespace with `min`/`max`/
+  # `ERROR` macros that clash with C++ stdlib and other Nim code
+  # (gemini cycle-29). Per Microsoft Learn `MemoryBarrier` expands to
+  # `__faststorefence` on x86_64 and `__dmb(_ARM64_BARRIER_SY)` on
+  # aarch64; both are declared in `<intrin.h>` which is already
+  # included for the `_Interlocked*` intrinsics. The call site uses
+  # an `{.emit:.}` with a `#ifdef _M_ARM64` dispatch, matching the
+  # existing arch-dispatch pattern used elsewhere in this file. ----
 
   # NOTE: The 16-byte DWCAS path on vcc emits inline C calls to
   # `_InterlockedCompareExchange128` directly via `{.emit:.}` (see the
@@ -1058,17 +1061,29 @@ proc fetchAdd*[T: SomeFloat](
 proc threadFence*(order: MemoryOrder) {.inline.} =
   ## Full memory fence between threads. All memory orders are valid.
   when defined(vcc):
-    # On vcc, moSeqCst maps to the full hardware `MemoryBarrier` macro
-    # (mfence on x86_64; dmb sy on ARM64). All weaker orders map to a
-    # compile-only `_ReadWriteBarrier` because the strong memory model
-    # of x86 (TSO) plus the locked semantics of MSVC's `_Interlocked*`
-    # intrinsics means a hardware fence is only required at seq_cst.
-    # On Windows-on-ARM64, MSVC's documented stance is identical:
-    # `_InterlockedExchange`-family ops carry implicit dmb semantics; only
-    # standalone seq_cst fences (`MemoryBarrier`) emit a bare dmb.
+    # On vcc, moSeqCst emits the same hardware fence that
+    # `MemoryBarrier` would expand to (`__faststorefence` on x86_64;
+    # `__dmb(_ARM64_BARRIER_SY)` on ARM64) — but via `<intrin.h>`
+    # primitives directly, avoiding a `<windows.h>` include. All weaker
+    # orders map to a compile-only `_ReadWriteBarrier` because the
+    # strong memory model of x86 (TSO) plus the locked semantics of
+    # MSVC's `_Interlocked*` intrinsics means a hardware fence is only
+    # required at seq_cst. On Windows-on-ARM64, MSVC's documented stance
+    # is identical: `_InterlockedExchange`-family ops carry implicit dmb
+    # semantics; only standalone seq_cst fences emit a bare dmb.
     case order
     of moSequentiallyConsistent:
-      msvcMemoryBarrier()
+      # Full hardware fence: `__faststorefence` on x86_64,
+      # `__dmb(_ARM64_BARRIER_SY)` on aarch64. Both are declared in
+      # `<intrin.h>` (already pulled in for the `_Interlocked*`
+      # intrinsics) and are exactly what the `MemoryBarrier` macro
+      # expands to — emitted directly to avoid `<windows.h>` bloat
+      # and namespace pollution (gemini cycle-29).
+      {.emit: ["#ifdef _M_ARM64\n",
+              "__dmb(_ARM64_BARRIER_SY);\n",
+              "#else\n",
+              "__faststorefence();\n",
+              "#endif\n"].}
     else:
       msvcReadWriteBarrier()
   else:
