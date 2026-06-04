@@ -326,16 +326,29 @@ template assertLockFree(T: typedesc) =
       # compile-time constant on both paths — and avoids needing to
       # toggle `/std:c11` for the C backend.
       static:
-        assert sizeof(T) <= 8,
-          "Atomic[" & astToStr(T) & "] vcc backend supports only " &
-            "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
-            "-d:debraAllowNonLockFreeAtomics to override"
+        when sizeof(pointer) == 4:
+          # 32-bit MSVC (`/x86`): only 1/2/4-byte atomics are guaranteed
+          # lock-free. 8-byte loads/stores are emulated via
+          # `__iso_volatile_load64` / `__iso_volatile_store64`, which
+          # on 32-bit x86 do *not* guarantee atomicity of the full
+          # 8-byte word — torn reads are possible (gemini cycle-34).
+          # Reject 8-byte T on 32-bit MSVC.
+          assert sizeof(T) <= 4,
+            "Atomic[" & $T & "] on 32-bit MSVC supports only 1/2/4 " &
+              "byte T (8-byte atomics are not lock-free without " &
+              "additional CAS scaffolding); pass " &
+              "-d:debraAllowNonLockFreeAtomics to override"
+        else:
+          assert sizeof(T) <= 8,
+            "Atomic[" & $T & "] vcc backend supports only " &
+              "1/2/4/8 byte T (DWCAS handles 16 separately); pass " &
+              "-d:debraAllowNonLockFreeAtomics to override"
     elif defined(cpp):
       {.
         emit: [
           "static_assert(__atomic_always_lock_free(sizeof(",
           T,
-          "), 0), \"Atomic[" & astToStr(T) & "] is not lock-free on this target; pass " &
+          "), 0), \"Atomic[" & $T & "] is not lock-free on this target; pass " &
             "-d:debraAllowNonLockFreeAtomics to override\");",
         ]
       .}
@@ -344,7 +357,7 @@ template assertLockFree(T: typedesc) =
         emit: [
           "_Static_assert(__atomic_always_lock_free(sizeof(",
           T,
-          "), 0), \"Atomic[" & astToStr(T) & "] is not lock-free on this target; pass " &
+          "), 0), \"Atomic[" & $T & "] is not lock-free on this target; pass " &
             "-d:debraAllowNonLockFreeAtomics to override\");",
         ]
       .}
@@ -358,7 +371,7 @@ template assertLockFree(T: typedesc) =
     # block, which is itself per-`T`.
     {.
       warning:
-        "Atomic[" & astToStr(T) &
+        "Atomic[" & $T &
         "] is not guaranteed lock-free on this target; if the C compiler " &
         "selects the libatomic spinlock fallback the lock-free guarantee " &
         "is lost. Compiled with -d:debraAllowNonLockFreeAtomics; verify " &
