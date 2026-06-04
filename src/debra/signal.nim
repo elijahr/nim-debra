@@ -328,12 +328,18 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
       return
 
     # Suspend the target. SuspendThread returns the previous suspend
-    # count, or DWORD(-1) (== 0xFFFFFFFF cast to int32 == -1) on
-    # failure. winlean's suspendThread returns int32. A negative
-    # return means failure (handle invalid or thread already
-    # terminated). Treat failure as no-op (the target is gone).
+    # count, or `DWORD(-1)` (== `0xFFFFFFFF`) on failure. winlean's
+    # `suspendThread` currently returns `int32`, so the failure
+    # sentinel arrives as `-1`. We compare against the bit pattern
+    # explicitly via `cast[int32](0xFFFFFFFF'u32)` so the check
+    # remains correct if winlean ever changes the return type to an
+    # unsigned `DWORD`/`uint32` — under which `< 0` would always be
+    # false and failure would become silent (gemini cycle-29). Failure
+    # here means the handle is invalid or the thread already
+    # terminated; treat as no-op (the target is gone).
+    const SuspendThreadFailed = cast[int32](0xFFFFFFFF'u32)
     let prevCount = suspendThread(tid.handle)
-    if prevCount < 0:
+    if prevCount == SuspendThreadFailed:
       return
 
     # Walk the global manager descriptor exactly like the POSIX
@@ -361,17 +367,22 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
     # which would deadlock the whole process. winlean's
     # `resumeThread` returns `int32`; on failure the Win32 API
     # returns `DWORD(-1)` (== `0xFFFFFFFF`), which arrives here as
-    # `-1`. A successful SuspendThread above implies the handle is
-    # valid for ResumeThread, so reaching this failure branch means
-    # the target was terminated between the two calls (or some
-    # other unrecoverable kernel-level fault). Fail loudly via
-    # `raiseAssert` (Defect — not tracked by `raises:` effect
-    # lists, so callers under `{.transition.}` / `{.raises: [].}`
-    # compile unchanged) rather than silently leaving the target
-    # permanently suspended. Silent success here would deadlock any
-    # subsequent join/wait on the target and corrupt the
-    # neutralization protocol invariants.
-    if resumeThread(tid.handle) < 0:
+    # `-1`. As with the `SuspendThread` check above, compare against
+    # the explicit bit-pattern sentinel rather than `< 0` so the
+    # check survives any future winlean signature change to an
+    # unsigned `DWORD`/`uint32` return (gemini cycle-29). A
+    # successful SuspendThread above implies the handle is valid for
+    # ResumeThread, so reaching this failure branch means the target
+    # was terminated between the two calls (or some other
+    # unrecoverable kernel-level fault). Fail loudly via
+    # `raiseAssert` (Defect — not tracked by `raises:` effect lists,
+    # so callers under `{.transition.}` / `{.raises: [].}` compile
+    # unchanged) rather than silently leaving the target permanently
+    # suspended. Silent success here would deadlock any subsequent
+    # join/wait on the target and corrupt the neutralization
+    # protocol invariants.
+    const ResumeThreadFailed = cast[int32](0xFFFFFFFF'u32)
+    if resumeThread(tid.handle) == ResumeThreadFailed:
       raiseAssert(
         "ResumeThread failed after SuspendThread succeeded; target " &
           "thread is permanently suspended. This is unrecoverable."
