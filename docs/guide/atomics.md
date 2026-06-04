@@ -315,7 +315,7 @@ and aarch64:
 | macos-15 + clang + arm64                  | Yes            | Macro probe + objdump verify `casp` / `caspal`       |
 | windows-2022 + MSVC + x86_64              | Yes            | Full test suite under `--cc:vcc`; macro probe + objdump steps skipped (MSVC has no `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` and dumpbin output differs from objdump). The vcc DWCAS path is exercised end-to-end by the test suite. |
 | ubuntu-24.04 + TSAN                       | Yes            | Contention tests under thread sanitizer              |
-| macOS x86_64                              | **Not in CI**  | macos-13 retired 2025-12-08; macOS coverage = arm64 only |
+| macOS x86_64 (Intel Mac)                  | Best-effort (not in CI) | macos-13 retired 2025-12-08; macOS coverage = arm64 only. Dispatch matches Linux x86_64 + Clang (`__atomic_compare_exchange_n` on `__int128`, `-mcx16` via `nim.cfg`, emits `cmpxchg16b`). Same instructions as the tested Linux + Clang cell. PR welcome on regressions. |
 
 The cross-compiler macro probe is the gate that fails the build *before*
 any DWCAS code runs if the toolchain doesn't actually have the

@@ -132,10 +132,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   out of scope). See the SMR bullet in the Added section above for
   the SuspendThread/ResumeThread protocol that replaces the POSIX
   SIGUSR1 path.
-- macOS x86_64 NOT in the CI matrix (macos-13 retired by GitHub
-  2025-12-08; macOS coverage = macos-15 arm64 only). Mitigated by
-  linux-x86_64 carrying x86_64 platform coverage and macos-15 carrying
-  macOS platform coverage.
+- macOS x86_64 (Intel Macs): supported on a best-effort basis but
+  NOT tested in CI (macos-13 retired by GitHub 2025-12-08; macOS
+  coverage = macos-15 arm64 only). The DWCAS dispatch matches the
+  Linux x86_64 + Clang arm: Apple Clang routes through
+  `__atomic_compare_exchange_n` on `__int128` under `-mcx16` (shipped
+  via `nim.cfg`), emitting the same `cmpxchg16b` instruction. The
+  `Atomic[T]` surface for 1-, 2-, 4-, and 8-byte `T` is identical to
+  the Linux + Clang path. Mitigated by linux-x86_64 carrying x86_64
+  platform coverage and macos-15 carrying macOS platform coverage.
+  PR welcome if you hit a regression on Intel Macs.
 - macos-14 deprecation begins 2026-07-06. v0.10.x lifecycle may
   require forward-pin to macos-16 or later.
 - 16-byte `fetchAdd` / `fetchSub` / `fetchAnd` / `fetchOr` /
