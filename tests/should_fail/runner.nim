@@ -20,7 +20,7 @@
 ## CFG-analyzer soundness gate (analyzer removed, substring rotated,
 ## walk-coverage shrunk).
 
-import std/[osproc, strformat, strutils]
+import std/[os, osproc, strformat, strutils]
 
 type
   ExpectedOutcome = enum
@@ -45,6 +45,16 @@ type
       ## Empty default keeps the case host-arch-bound. When non-empty,
       ## the runner uses `nim check` (no codegen) so the case runs on
       ## any host without needing 32-bit cross-compile toolchains.
+    needsCCompile: bool
+      ## When true, the case requires the actual C compiler to run
+      ## (i.e., the failure is in a C-emit body such as gate 3's inline
+      ## `_Static_assert(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16)`).
+      ## Default false: cases fail at Nim semantic phase, so
+      ## `--compileOnly` is sufficient and avoids invoking the C
+      ## compiler at all. When true, `--compileOnly` is dropped so the
+      ## C compiler actually sees the emit body and fires its own
+      ## diagnostic. Linking may still fail; that is fine — the runner
+      ## only needs non-zero exit plus substring match.
 
 const cases = @[
   Case(
@@ -109,6 +119,7 @@ const cases = @[
     outcome: eoCompileFails,
     substring: "nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16",
     archGate: agAmd64Gcc,
+    needsCCompile: true,
   ),
   Case(
     name:
@@ -163,6 +174,14 @@ proc runCase(c: Case): bool =
   let baseCmd =
     if c.extraFlags.len > 0:
       &"nim check --threads:on --hints:off --warnings:off --path:src {c.extraFlags} {c.file}"
+    elif c.needsCCompile:
+      # Drop `--compileOnly` so the C compiler actually runs and the
+      # inline `_Static_assert` in the emit body fires (e.g., gate 3's
+      # `__GCC_HAVE_SYNC_COMPARE_AND_SWAP_16` check under `-mno-cx16`).
+      # `--compileOnly` skips C compile/link entirely, so emit-body
+      # diagnostics never surface. Use a per-case nimcache to avoid
+      # collisions with the project nimcache.
+      &"nim c --threads:on --hints:off --warnings:off --path:src --nimcache:nimcache/should_fail/{c.file.extractFilename} {c.file}"
     else:
       &"nim c --threads:on --hints:off --warnings:off --path:src --compileOnly {c.file}"
   let (output, exitCode) = execCmdEx(baseCmd)
