@@ -23,15 +23,15 @@ emit_out="$(nim c --path:src --threads:on -d:testing --hints:off \
 emit_rc=$?
 if [ "$emit_rc" -ne 0 ]; then
   echo "FAIL [Task 18]: fixture compile failed (rc=$emit_rc):"
-  echo "$emit_out"
+  printf '%s\n' "$emit_out"
   fail=1
-elif echo "$emit_out" | grep -F -q "$warn_substr"; then
+elif printf '%s\n' "$emit_out" | grep -F -q "$warn_substr"; then
   echo "PASS [Task 18]: warning emitted on unwrapped sub-seq_cst order"
 else
   echo "FAIL [Task 18]: expected warning substring not found in stderr:"
   echo "  expected: $warn_substr"
   echo "  actual:"
-  echo "$emit_out"
+  printf '%s\n' "$emit_out"
   fail=1
 fi
 
@@ -41,11 +41,11 @@ silenced_out="$(nim c --path:src --threads:on -d:testing --hints:off \
 silenced_rc=$?
 if [ "$silenced_rc" -ne 0 ]; then
   echo "FAIL [Task 19]: fixture compile failed (rc=$silenced_rc):"
-  echo "$silenced_out"
+  printf '%s\n' "$silenced_out"
   fail=1
-elif echo "$silenced_out" | grep -F -q "$warn_substr"; then
+elif printf '%s\n' "$silenced_out" | grep -F -q "$warn_substr"; then
   echo "FAIL [Task 19]: warning leaked from dwcasOrderRelaxedCAS-wrapped site:"
-  echo "$silenced_out"
+  printf '%s\n' "$silenced_out"
   fail=1
 else
   echo "PASS [Task 19]: warning suppressed inside dwcasOrderRelaxedCAS"

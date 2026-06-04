@@ -25,7 +25,7 @@ rc=$?
 
 if [ "$rc" -ne 0 ]; then
   echo "FAIL [Task 15]: --expandArc compile failed (rc=$rc):"
-  echo "$out"
+  printf '%s\n' "$out"
   exit 1
 fi
 
@@ -34,11 +34,11 @@ fi
 #   `=destroy(...Pair_...)`  /  `=copy(...Pair_...)`
 #   `=destroy_Pair_...`       /  `=copy_Pair_...`
 # Use extended regex to cover both forms.
-hook_count=$(echo "$out" | grep -cE '=destroy.*Pair|=copy.*Pair' || true)
+hook_count=$(printf '%s\n' "$out" | grep -cE '=destroy.*Pair|=copy.*Pair' || true)
 
 if [ "$hook_count" -ne 0 ]; then
   echo "FAIL [Task 15]: $hook_count ARC hook reference(s) on Pair in expanded output:"
-  echo "$out" | grep -E '=destroy.*Pair|=copy.*Pair'
+  printf '%s\n' "$out" | grep -E '=destroy.*Pair|=copy.*Pair'
   echo ""
   echo "F2 closure broken: Pair[uint64, ptr int] must have zero =destroy/=copy hooks."
   exit 1
