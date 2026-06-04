@@ -510,20 +510,24 @@ template enforceAtomicConstraints(T: typedesc) =
 # Memory-order validation per op
 # ---------------------------------------------------------------------------
 
-template validLoadOrder(order: MemoryOrder) =
+template validLoadOrder(order: static MemoryOrder) =
+  # `static MemoryOrder` parameter + `static:` body ensures the
+  # assertion fires at compile time rather than runtime; an invalid
+  # memory order is a programmer error, not a runtime condition.
+  # (gemini cycle-41 MEDIUM)
   static:
     assert order != moRelease and order != moAcquireRelease,
       "moRelease / moAcquireRelease is not a valid memory order " &
         "for load; use moRelaxed, moConsume, moAcquire, or " & "moSequentiallyConsistent"
 
-template validStoreOrder(order: MemoryOrder) =
+template validStoreOrder(order: static MemoryOrder) =
   static:
     assert order != moAcquire and order != moAcquireRelease and order != moConsume,
       "moAcquire / moAcquireRelease / moConsume is not a valid " &
         "memory order for store; use moRelaxed, moRelease, or " &
         "moSequentiallyConsistent"
 
-template validCasFailureOrder(success, failure: MemoryOrder) =
+template validCasFailureOrder(success, failure: static MemoryOrder) =
   static:
     assert failure != moRelease and failure != moAcquireRelease,
       "compareExchange failure order moRelease / moAcquireRelease " &
