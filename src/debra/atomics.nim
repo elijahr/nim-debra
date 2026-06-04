@@ -1990,7 +1990,6 @@ when sizeof(pointer) == 8:
     ## Componentwise atomic subtract. See `fetchAdd` for transactional
     ## semantics and overflow behavior.
     enforceDwcasConstraints(A, B)
-    {.push warning[User]: off.}
     var prev = load(loc, moRelaxed)
     while true:
       let next =
@@ -2006,7 +2005,6 @@ when sizeof(pointer) == 8:
     ## Componentwise atomic bitwise AND. See `fetchAdd` for transactional
     ## semantics.
     enforceDwcasConstraints(A, B)
-    {.push warning[User]: off.}
     var prev = load(loc, moRelaxed)
     while true:
       let next = Pair[A, B](
@@ -2023,7 +2021,6 @@ when sizeof(pointer) == 8:
     ## Componentwise atomic bitwise OR. See `fetchAdd` for transactional
     ## semantics.
     enforceDwcasConstraints(A, B)
-    {.push warning[User]: off.}
     var prev = load(loc, moRelaxed)
     while true:
       let next =
@@ -2039,7 +2036,6 @@ when sizeof(pointer) == 8:
     ## Componentwise atomic bitwise XOR. See `fetchAdd` for transactional
     ## semantics.
     enforceDwcasConstraints(A, B)
-    {.push warning[User]: off.}
     var prev = load(loc, moRelaxed)
     while true:
       let next = Pair[A, B](
