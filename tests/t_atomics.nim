@@ -149,6 +149,30 @@ suite "fetch ops":
     check a64.fetchAdd(uint64(1)) == uint64(0xFF)
     check a64.load() == uint64(0x100)
 
+  test "fetchSub works with all integer widths":
+    # Exercises the MSVC 1-byte fetchSub path which negates through `int8`
+    # because `cchar` is Nim's `char` and unary `-` is undefined on it.
+    var a8: Atomic[int8]
+    a8.store(int8(10))
+    check a8.fetchSub(int8(3)) == int8(10)
+    check a8.load() == int8(7)
+    var au8: Atomic[uint8]
+    au8.store(uint8(200))
+    check au8.fetchSub(uint8(50)) == uint8(200)
+    check au8.load() == uint8(150)
+    var a16: Atomic[int16]
+    a16.store(int16(1000))
+    check a16.fetchSub(int16(250)) == int16(1000)
+    check a16.load() == int16(750)
+    var a32: Atomic[uint32]
+    a32.store(uint32(0x1_0000))
+    check a32.fetchSub(uint32(1)) == uint32(0x1_0000)
+    check a32.load() == uint32(0xFFFF)
+    var a64: Atomic[int64]
+    a64.store(int64(0x1_0000_0000))
+    check a64.fetchSub(int64(1)) == int64(0x1_0000_0000)
+    check a64.load() == int64(0xFFFF_FFFF)
+
 suite "compareExchange":
   test "compareExchangeStrong success":
     var a: Atomic[int]

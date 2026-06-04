@@ -1035,8 +1035,12 @@ proc fetchSub*[T: SomeInteger](
     # the bit-level negation behavior is identical (uint8/16/32/64 are
     # cast through the matching signed int*).
     when sizeof(T) == 1:
+      # `cchar` is Nim's `char`, not an integer type, so unary `-` is not
+      # defined on it. Negate through `int8` (the matching signed integer
+      # type for a 1-byte MSVC intrinsic) and cast the result back to
+      # `cchar` for the importc signature.
       cast[T](msvcInterlockedExchangeAdd8(
-        cast[ptr cchar](addr loc.value), -cast[cchar](v)
+        cast[ptr cchar](addr loc.value), cast[cchar](-cast[int8](v))
       ))
     elif sizeof(T) == 2:
       cast[T](msvcInterlockedExchangeAdd16(
