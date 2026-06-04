@@ -71,6 +71,14 @@ var
   # read of an Atomic).
   threadsArrayOffsetBytes: Atomic[int]
   threadStateStrideBytes: Atomic[int]
+  # Upper bound on valid slot indices, published by `setGlobalManager`
+  # alongside the layout descriptor. `neutralizeRemoteSlot` uses this to
+  # bounds-check its `slot` argument before doing raw pointer arithmetic,
+  # so an out-of-range slot cannot index past the `threads` array into
+  # arbitrary memory. Initial value 0 means "no manager published" — any
+  # bounds check against zero rejects every non-negative slot, which is
+  # the safe default before the manager is set.
+  maxThreadsBound: Atomic[int]
 
 # Offsets inside a single `ThreadState[N]` slot. These are independent
 # of MaxThreads because `pinned` and `neutralized` come before the
@@ -274,6 +282,14 @@ else:
 proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
   ## Force-unpin and mark-neutralized a remote thread's slot.
   ##
+  ## Validates `slot` is in `[0, maxThreadsBound)`; raises
+  ## `AssertionDefect` on out-of-bounds. The Windows arm performs raw
+  ## pointer arithmetic against the published manager layout, so an
+  ## out-of-range slot would otherwise read/write arbitrary memory past
+  ## the `threads` array. The bound is captured by `setGlobalManager`;
+  ## before that publish the bound is zero, which rejects every
+  ## non-negative slot — the safe default.
+  ##
   ## **POSIX arm**: sends `QuiescentSignal` (SIGUSR1) to `tid`. The
   ## handler installed by `installSignalHandler` runs asynchronously in
   ## the target's context, reads the target's `threadLocalIdx`, and
@@ -294,6 +310,19 @@ proc neutralizeRemoteSlot*(tid: ThreadId, slot: int) =
   ## scanner blocks inside `SuspendThread` only briefly (kernel
   ## suspends, returns); the slot-flip is wait-free. The risk is the
   ## target holding a lock that the scanner needs *after* this call.
+  # Bounds-check `slot` against the published maxThreadsBound BEFORE
+  # any platform-specific work. The Windows arm does raw pointer
+  # arithmetic against the manager's `threads` array; an out-of-range
+  # slot would index into arbitrary memory and corrupt unrelated state.
+  # The POSIX arm ignores `slot`, but a caller passing a bogus value is
+  # a bug worth surfacing on either platform. Use `raiseAssert` so the
+  # Defect bypasses `{.raises: [].}` effect lists.
+  let bound = maxThreadsBound.load(moAcquire)
+  if slot < 0 or slot >= bound:
+    raiseAssert(
+      "neutralizeRemoteSlot: slot " & $slot & " out of range [0, " & $bound & ")"
+    )
+
   when defined(windows):
     if not tid.isValid:
       return
@@ -396,6 +425,7 @@ proc setGlobalManager*[
   let headerOffset = cast[int](addr manager.threads) - cast[int](manager)
   threadsArrayOffsetBytes.store(headerOffset, moRelease)
   threadStateStrideBytes.store(sizeof(ThreadState[MaxThreads]), moRelease)
+  maxThreadsBound.store(MaxThreads, moRelease)
   # Pointer published LAST under release. A consumer that observes
   # this non-nil pointer (under acquire) is guaranteed to see the
   # stride/header writes above.
@@ -421,3 +451,4 @@ proc setGlobalManager*(manager: pointer) =
   globalManagerPtr.store(nil, moRelease)
   threadStateStrideBytes.store(0, moRelease)
   threadsArrayOffsetBytes.store(0, moRelease)
+  maxThreadsBound.store(0, moRelease)
