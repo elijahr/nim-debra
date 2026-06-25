@@ -33,7 +33,7 @@ proc initSignalHandler*(): HandlerUninstalled =
   ## Create uninstalled signal handler context.
   HandlerUninstalled(SignalHandlerContext(installed: false))
 
-proc install*(h: HandlerUninstalled): HandlerInstalled {.transition.} =
+proc install*(h: sink HandlerUninstalled): HandlerInstalled {.transition.} =
   ## Install SIGUSR1 handler for DEBRA+ neutralization.
   var sa: Sigaction
   sa.sa_handler = neutralizationHandler

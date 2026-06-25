@@ -54,9 +54,14 @@ proc initialize*[MaxThreads: static int](
     mgr.threads[i].limboBagTail = nil
   ManagerReady[MaxThreads](ManagerContext[MaxThreads](manager: mgr))
 
+# CFG analyzer false positive: try/except around reclaimBag wraps a sink-consumed
+# value (the limbo bag is consumed by reclaimBag, which may raise from destructors
+# during shutdown's error-tolerance contract). The pattern is verified correct;
+# see typestates 0.9.0 design doc §3.6 (skipCfgAnalysis escape hatch) and
+# nim-debra 0.8.0 design §3.5 (=wasMoved + consumed-flag CFG interaction).
 proc shutdown*[MaxThreads: static int](
     m: sink ManagerReady[MaxThreads]
-): ManagerShutdown[MaxThreads] {.transition.} =
+): ManagerShutdown[MaxThreads] {.transition, skipCfgAnalysis.} =
   ## Shutdown manager. Reclaims all remaining limbo bags.
   let ctx = ManagerContext[MaxThreads](m)
   let mgr = ctx.manager
