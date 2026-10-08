@@ -37,7 +37,8 @@ when defined(gcRefc):
   echo "  Use --mm:arc or --mm:orc for the cross-thread retain/release pattern."
 else:
   import debra
-  import std/[atomics, os]
+  import debra/atomics
+  import std/os
 
   type
     NodeObj = object
