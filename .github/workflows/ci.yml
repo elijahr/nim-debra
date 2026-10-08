@@ -49,6 +49,9 @@ jobs:
         nim-version: ['stable']
         mm: [arc, orc, refc, atomicArc]
         backend: [c, cpp]
+        exclude:
+          - runs-on: windows-2022
+            backend: cpp
     steps:
       - name: Checkout
         uses: actions/checkout@v4

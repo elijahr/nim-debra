@@ -1,7 +1,7 @@
 # nim-debra (Compatibility Facade)
 
-> ⚠️ **Package Consolidated into [`lockfree`](https://github.com/elijahr/lockfree)**  
-> As of version 0.1.0, `nim-debra` has been merged into the canonical repository: **[`lockfree`](https://github.com/elijahr/lockfree)** under the in-tree module `lockfree/smr/nebr`.  
+> ⚠️ **Package Consolidated into [`lockfree`](https://github.com/elijahr/lockfree)**
+> As of version 0.1.0, `nim-debra` has been merged into the canonical repository: **[`lockfree`](https://github.com/elijahr/lockfree)** under the in-tree module `lockfree/smr/nebr`.
 > This package is maintained as a **zero-overhead backwards-compatibility facade**. New projects should depend directly on `lockfree`.
 
 [![Docs](https://img.shields.io/badge/docs-lockfree-blue.svg)](https://elijahr.github.io/lockfree)

@@ -117,7 +117,7 @@ const cases = @[
       "(must fail-with-substring, amd64+GCC only)",
     file: "tests/should_fail/t_dwcas_no_mcx16.nim",
     outcome: eoCompileFails,
-    substring: "nim-debra DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16",
+    substring: "DWCAS requires __GCC_HAVE_SYNC_COMPARE_AND_SWAP_16",
     archGate: agAmd64Gcc,
     needsCCompile: true,
   ),
