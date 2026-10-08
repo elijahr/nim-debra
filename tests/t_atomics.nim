@@ -336,7 +336,7 @@ suite "AtomicFlag":
 
 suite "CacheLineBytes":
   test "is exported and a sensible value":
-    when defined(powerpc):
+    when defined(powerpc) or (defined(macosx) and defined(arm64)):
       check CacheLineBytes == 128
     else:
       check CacheLineBytes == 64

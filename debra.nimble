@@ -2,9 +2,9 @@
 
 # Package
 
-version = "0.10.0"
-author = "elijahr <elijahr+debra@gmail.com>"
-description = "DEBRA+ safe memory reclamation for lock-free data structures"
+version = "0.11.0"
+author = "Elijah Shaw-Rutschman"
+description = "Compatibility facade for lockfree/smr/nebr — DEBRA+ safe memory reclamation"
 license = "MIT"
 srcDir = "src"
 installExt = @["nim"]
@@ -14,6 +14,7 @@ installExt = @["nim"]
 requires "nim >= 2.2.10"
 requires "typestates >= 0.12.0"
 requires "unittest2 >= 0.2.0"
+requires "https://github.com/elijahr/lockfree >= 0.1.0"
 
 # Tasks
 
