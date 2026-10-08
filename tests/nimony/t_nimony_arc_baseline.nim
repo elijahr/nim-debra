@@ -14,6 +14,7 @@ else:
 type
   NodeObj = object
     value: int
+
   Node = ref NodeObj
 
 proc main() =
