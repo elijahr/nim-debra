@@ -428,3 +428,197 @@ jobs:
             exit 1
           fi
           echo "libatomic-fallback regression check PASSED (macOS x86_64 fixture clean)"
+
+  # ===========================================================================
+  # Multi-Nim toolchain consolidation (2.2.10, 2.2.12, devel).
+  #
+  # Consolidates testing across multiple Nim compiler versions into a single
+  # runner job using choosenim toolchain switching (cached toolchain paths) to
+  # eliminate redundant VM spin-up, checkout, and cache overhead across
+  # separate matrix jobs.
+  # ===========================================================================
+  multi-nim:
+    name: multi-nim (2.2.10, 2.2.12, devel)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Nim base
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: '2.2.10'
+
+      - name: Cache choosenim and nimble toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.choosenim
+            ~/.nimble
+          key: choosenim-${{ runner.os }}-multinim-2.2.10-2.2.12-devel-${{ hashFiles('*.nimble') }}
+          restore-keys: |
+            choosenim-${{ runner.os }}-multinim-
+            choosenim-${{ runner.os }}-
+
+      - name: Cache Nim nimcache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/nim
+          key: nimcache-${{ runner.os }}-multinim-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
+          restore-keys: |
+            nimcache-${{ runner.os }}-multinim-
+
+      - name: Install dependencies
+        run: |
+          nimble install -y
+          for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d -name "typestates-*" 2>/dev/null); do
+            [ -e "$d/src" ] || ln -s . "$d/src"
+          done
+
+      - name: Test across multiple Nim versions (2.2.10, 2.2.12, devel)
+        shell: bash
+        run: |
+          set -o pipefail
+          nimble_run() {
+            local logfile
+            logfile="$(mktemp)"
+            "$@" 2>&1 | tee "$logfile"
+            local rc=${PIPESTATUS[0]}
+            if [[ $rc -ne 0 ]]; then
+              return $rc
+            fi
+            if grep -Eq '^[[:space:]]*Error:' "$logfile"; then
+              echo "::error::nimble reported an error but exited 0; failing the step."
+              return 1
+            fi
+          }
+
+          switch_toolchain() {
+            local ver="$1"
+            echo "::group::Switching toolchain to Nim ${ver}"
+            if [[ "$ver" == "devel" ]]; then
+              choosenim --yes '#devel' || choosenim --yes devel
+            else
+              choosenim --yes "$ver"
+            fi
+            echo "Active compiler: $(nim --version | head -1)"
+            echo "Active nimble:   $(nimble --version | head -1)"
+            echo "::endgroup::"
+          }
+
+          VERSIONS=("2.2.10" "2.2.12" "devel")
+          FAILED_STABLE=0
+          FAILED_DEVEL=0
+
+          for ver in "${VERSIONS[@]}"; do
+            switch_toolchain "$ver"
+            echo "::group::Running test suite under Nim ${ver}"
+            rm -rf ~/.cache/nim
+            if nimble_run nimble test; then
+              echo "✅ Nim ${ver} test suite passed."
+            else
+              if [[ "$ver" == "devel" ]]; then
+                echo "::warning::Nim devel test suite failed (informational / upstream tracking)."
+                FAILED_DEVEL=1
+              else
+                echo "::error::Nim ${ver} test suite failed!"
+                FAILED_STABLE=1
+              fi
+            fi
+            echo "::endgroup::"
+          done
+
+          if [[ $FAILED_STABLE -ne 0 ]]; then
+            echo "::error::One or more release versions of Nim failed tests."
+            exit 1
+          fi
+
+  # ===========================================================================
+  # nimony aufbruch baseline (informational, continue-on-error: true).
+  # ===========================================================================
+  nimony:
+    name: nimony aufbruch baseline (informational)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    continue-on-error: true
+    env:
+      NIMONY_SHA: '751121f9ee0fc7584015fc03f5326fe521029d84'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Nim
+        uses: jiro4989/setup-nim-action@v2
+        with:
+          nim-version: 'stable'
+
+      - name: Cache Nim nimcache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/nim
+          key: nimcache-${{ runner.os }}-stable-nimony-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
+          restore-keys: |
+            nimcache-${{ runner.os }}-stable-nimony-
+
+      - name: Cache nimony build
+        uses: actions/cache@v4
+        id: nimony-cache
+        with:
+          path: |
+            /tmp/nimony
+            ~/.nimble/bin/nimony
+          key: nimony-${{ runner.os }}-${{ env.NIMONY_SHA }}
+
+      - name: Install dependencies
+        run: |
+          nimble install -y
+          for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d -name "typestates-*" 2>/dev/null); do
+            [ -e "$d/src" ] || ln -s . "$d/src"
+          done
+
+      - name: Build nimony from source (pinned SHA)
+        if: steps.nimony-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -o pipefail
+          git clone https://github.com/nim-lang/nimony.git /tmp/nimony
+          cd /tmp/nimony
+          git checkout "${NIMONY_SHA}"
+          nimble install -y
+          nimble build -y || nim c -o:bin/nimony src/nimony.nim
+
+      - name: Run non-nimony ARC baseline under standard Nim
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "::group::standard Nim arc baseline"
+          nim c \
+            --threads:on \
+            --mm:arc \
+            --path:src \
+            -r \
+            tests/nimony/t_nimony_arc_baseline.nim
+          echo "::endgroup::"
+
+      - name: Run aufbruch baseline under nimony
+        shell: bash
+        run: |
+          set -o pipefail
+          echo "::group::nimony aufbruch baseline"
+          export PATH="$HOME/.nimble/bin:/tmp/nimony/bin:/tmp/nimony:$PATH"
+          NIMONY_BIN=""
+          for candidate in /tmp/nimony/bin/nimony "$HOME/.nimble/bin/nimony" "$(command -v nimony 2>/dev/null)"; do
+            if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+              NIMONY_BIN="$candidate"
+              break
+            fi
+          done
+          if [ -n "$NIMONY_BIN" ]; then
+            echo "Using nimony binary at: $NIMONY_BIN"
+            "$NIMONY_BIN" c -r tests/nimony/t_nimony_arc_baseline.nim
+          else
+            echo "::error::nimony binary not found or not executable"
+            exit 1
+          fi
+          echo "::endgroup::"

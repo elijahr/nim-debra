@@ -67,6 +67,8 @@ docs/plans/
 deps/
 nimble.paths
 config.nims
+.envrc
+.vine.json
 
 # Local PR description scratch file (do not commit)
 .pr-description.md
