@@ -58,6 +58,7 @@ plugins:
             show_attribution: false
             heading_level: 3
             source_url: https://github.com/elijahr/nim-debra
+            source_ref: main
 
 markdown_extensions:
   - pymdownx.highlight:
