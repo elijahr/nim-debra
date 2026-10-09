@@ -1,16 +1,16 @@
 # Comprehensive SMR & Architectural Audit: `nim-debra`
 
-**Author**: `architect-horsetail` (Systems Architect)  
-**Date**: October 8, 2026  
-**Target Repository**: `elijahr/nim-debra` (/Users/eek/Development/nim-debra)  
-**Deliverable**: `docs/reviews/review_nim_debra.md`  
+**Author**: `architect-horsetail` (Systems Architect)
+**Date**: October 8, 2026
+**Target Repository**: `elijahr/nim-debra` (/Users/eek/Development/nim-debra)
+**Deliverable**: `docs/reviews/review_nim_debra.md`
 **Status**: APPROVED / VERIFIED (329/329 Unit Tests PASS, 10/10 Compile-Fail Negative Controls PASS)
 
 ---
 
 ## 1. Executive Summary
 
-This report delivers a deep architectural, concurrency, and memory-safety review of `nim-debra` (version 0.11.0+). 
+This report delivers a deep architectural, concurrency, and memory-safety review of `nim-debra` (version 0.11.0+).
 
 Historically an independent SMR library, `nim-debra` has evolved into a zero-overhead, production-grade backward-compatibility facade that re-exports the unified **NEBR (Neutralization-Enhanced Bounded Reclamation)** engine implemented in `lockfree/smr/nebr`. This consolidation unifies the memory reclamation engine across the Nim ecosystem while preserving 100% backward API and ABI compatibility for downstream projects (`lockfreequeues`, legacy distributed schedulers, and external bindings).
 
