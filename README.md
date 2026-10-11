@@ -4,8 +4,8 @@
 > As of version 0.1.0, `nim-debra` has been merged into the canonical repository: **[`lockfree`](https://github.com/elijahr/lockfree)** under the in-tree module `lockfree/smr/nebr`.
 > This package is maintained as a **zero-overhead backwards-compatibility facade**. New projects should depend directly on `lockfree`.
 
-[![Docs](https://img.shields.io/badge/docs-lockfree-blue.svg)](https://elijahr.github.io/lockfree)
-[![Migration Guide](https://img.shields.io/badge/guide-migration-orange.svg)](https://elijahr.github.io/lockfree/migration/)
+[![Docs](https://img.shields.io/badge/docs-lockfree-blue.svg)](https://elijahr.github.io/lockfree/latest/)
+[![Migration Guide](https://img.shields.io/badge/guide-migration-orange.svg)](https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
@@ -56,4 +56,4 @@ requires "lockfree >= 0.1.0"
 import lockfree/smr/nebr
 ```
 
-Read the full [Migration Guide](https://elijahr.github.io/lockfree/migration/) and [NEBR Documentation](https://elijahr.github.io/lockfree/api/smr/nebr/).
+Read the full [Migration Guide](https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/) and [NEBR Documentation](https://elijahr.github.io/lockfree/latest/api/smr/nebr/).

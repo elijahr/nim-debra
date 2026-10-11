@@ -12,9 +12,8 @@ installExt = @["nim"]
 # Dependencies
 
 requires "nim >= 2.2.10"
-requires "typestates >= 0.12.1"
 requires "unittest2 >= 0.2.0"
-requires "https://github.com/elijahr/lockfree >= 0.1.0"
+requires "lockfree >= 0.1.0"
 
 # Tasks
 
