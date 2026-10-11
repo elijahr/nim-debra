@@ -294,7 +294,7 @@ jobs:
           # atomicArc/orc-cpp). Skip just this one example on the affected cell
           # rather than the whole `testExamples` step. v0.10.1 follow-up will
           # investigate the orc shutdown interaction.
-          DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND: ${{ (matrix.runs-on == 'windows-2022' && matrix.mm == 'orc' && matrix.backend == 'c') && '1' || '' }}
+          DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND: ${{ (matrix.runs-on == 'windows-2022' && matrix.backend == 'c') && '1' || '' }}
         run: |
           set -o pipefail
           nimble_run() {
