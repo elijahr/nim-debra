@@ -45,15 +45,12 @@ backend (c-only — cpp upstream-blocked). Plus lint cell.
 
 ## Architecture overview (for first-time agents)
 
-- `src/debra/atomics.nim` — custom atomics layer with compile-time lock-free
-  guarantees + DWCAS specialization. Wraps `__sync_*` on GCC (16-byte),
-  `__atomic_*` on Clang, `_Interlocked*` on MSVC. See `docs/guide/atomics.md`.
-- `src/debra/signal.nim` + `src/debra/thread_id.nim` — SMR thread-neutralization
-  protocol. POSIX uses SIGUSR1 + sigaction; Windows uses
-  SuspendThread/ResumeThread. See `docs/guide/neutralization.md`.
-- `src/debra/typestates/` — typestate-tracked critical-section discipline
-  built on `nim-typestates`.
-- DEBRA+ algorithm per Brown 2017.
+`nim-debra` is a zero-overhead compatibility facade around canonical `lockfree`.
+Under the hood, `src/debra.nim` re-exports `lockfree/smr/nebr`.
+
+- Canonical development: [https://github.com/elijahr/lockfree](https://github.com/elijahr/lockfree)
+- Canonical documentation: [https://elijahr.github.io/lockfree/](https://elijahr.github.io/lockfree/)
+- Algorithm: NEBR Safe Memory Reclamation (inspired by Brown 2015 DEBRA+ with documented deviations). Legacy docs archived in `lockfree/docs/legacy/nim-debra/`.
 
 ## Gotchas for AI agents
 

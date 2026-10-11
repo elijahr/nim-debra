@@ -7,7 +7,8 @@
 > All active development, documentation, benchmarks, and SMR engine enhancements take place in **[`lockfree`](https://github.com/elijahr/lockfree)**.
 > This repository is maintained strictly as a **zero-overhead backwards-compatibility facade** for existing Nimble packages. New projects should depend directly on `lockfree`.
 >
-> - 📖 **Canonical SMR Documentation**: [https://elijahr.github.io/lockfree/latest/api/smr/nebr/](https://elijahr.github.io/lockfree/latest/api/smr/nebr/)
+> - 📖 **Canonical Documentation**: [https://elijahr.github.io/lockfree/](https://elijahr.github.io/lockfree/)
+> - 📚 **Canonical SMR Documentation**: [https://elijahr.github.io/lockfree/latest/api/smr/nebr/](https://elijahr.github.io/lockfree/latest/api/smr/nebr/)
 > - 🔄 **Migration Guide**: [https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/](https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/)
 > - 📦 **Archived Legacy Docs**: Pre-merger documentation is archived in [`lockfree/docs/legacy/nim-debra/`](https://github.com/elijahr/lockfree/tree/main/docs/legacy/nim-debra).
 

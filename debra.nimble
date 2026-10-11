@@ -4,7 +4,7 @@
 
 version = "0.11.0"
 author = "Elijah Shaw-Rutschman"
-description = "Compatibility facade for lockfree/smr/nebr — DEBRA+ safe memory reclamation"
+description = "Zero-overhead compatibility facade for lockfree/smr/nebr (Safe Memory Reclamation)"
 license = "MIT"
 srcDir = "src"
 installExt = @["nim"]
@@ -29,7 +29,7 @@ task test, "Run tests with all memory managers":
   # emitted code (in `system/exceptions`, `std/private/threadtypes`,
   # etc.) violates. Both issues are upstream Nim/MSVC compatibility
   # gaps, not nim-debra bugs; the C backend with all four MMs covers
-  # the same DEBRA+ semantics on Windows.
+  # the same SMR semantics on Windows.
   when not defined(windows):
     echo "Testing C++ backend"
     exec "nim cpp -r --threads:on --path:src -d:testing tests/test.nim"
