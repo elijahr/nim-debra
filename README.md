@@ -1,8 +1,15 @@
 # nim-debra (Compatibility Facade)
 
-> ⚠️ **Package Consolidated into [`lockfree`](https://github.com/elijahr/lockfree)**
-> As of version 0.1.0, `nim-debra` has been merged into the canonical repository: **[`lockfree`](https://github.com/elijahr/lockfree)** under the in-tree module `lockfree/smr/nebr`.
-> This package is maintained as a **zero-overhead backwards-compatibility facade**. New projects should depend directly on `lockfree`.
+> [!IMPORTANT]
+> ### ⚠️ Package Consolidated into [`lockfree`](https://github.com/elijahr/lockfree)
+> **`nim-debra` has been merged into canonical [`lockfree`](https://github.com/elijahr/lockfree) under `lockfree/smr/nebr`.**
+>
+> All active development, documentation, benchmarks, and SMR engine enhancements take place in **[`lockfree`](https://github.com/elijahr/lockfree)**.
+> This repository is maintained strictly as a **zero-overhead backwards-compatibility facade** for existing Nimble packages. New projects should depend directly on `lockfree`.
+>
+> - 📖 **Canonical SMR Documentation**: [https://elijahr.github.io/lockfree/latest/api/smr/nebr/](https://elijahr.github.io/lockfree/latest/api/smr/nebr/)
+> - 🔄 **Migration Guide**: [https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/](https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/)
+> - 📦 **Archived Legacy Docs**: Pre-merger documentation is archived in [`lockfree/docs/legacy/nim-debra/`](https://github.com/elijahr/lockfree/tree/main/docs/legacy/nim-debra).
 
 [![Docs](https://img.shields.io/badge/docs-lockfree-blue.svg)](https://elijahr.github.io/lockfree/latest/)
 [![Migration Guide](https://img.shields.io/badge/guide-migration-orange.svg)](https://elijahr.github.io/lockfree/latest/migrations/from-nim-debra/)
