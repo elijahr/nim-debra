@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.10.0] - unreleased
+## [0.11.1] - 2026-10-11
+
+### Changed
+
+- **Upstream dependency bump**: Updated `lockfree` dependency to `>= 0.2.0`.
+- **SMR citation correction**: Corrected algorithm attribution to Trevor Brown (PODC 2015) for DEBRA, and clarified distinction from Brown (PPoPP 2017) NBR.
+- **Removed placeholder files**: Removed `debra_plus.nim` and its reservation notes.
+- **Documentation alignment**: Updated README and docs to accurately reflect status as a zero-overhead compatibility facade for `lockfree/smr/nebr`.
+
+## [0.11.0] - 2026-10-08
+
+### Changed
+
+- **Compatibility facade for `lockfree`**: Converted `nim-debra` into a thin, zero-overhead compatibility facade backed by `lockfree/smr/nebr`.
+- Preserves 100% backward compatibility for existing code using `DebraManager`, `ThreadHandle`, `registerThread`, `withPin`, `retireNode`, `reclaimNow`, and typestates.
+
+## [0.10.0] - 2026-06-24
 
 ### Added
 

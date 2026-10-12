@@ -2,7 +2,7 @@
 
 # Package
 
-version = "0.11.0"
+version = "0.11.1"
 author = "Elijah Shaw-Rutschman"
 description = "Zero-overhead compatibility facade for lockfree/smr/nebr (Safe Memory Reclamation)"
 license = "MIT"
@@ -13,7 +13,7 @@ installExt = @["nim"]
 
 requires "nim >= 2.2.10"
 requires "unittest2 >= 0.2.0"
-requires "lockfree >= 0.1.0"
+requires "lockfree >= 0.2.0"
 
 # Tasks
 
