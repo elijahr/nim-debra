@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Install and run Gitleaks
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Nim
         uses: elijahr/vfox-nim@main
@@ -62,7 +62,7 @@ jobs:
             backend: cpp
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Nim ${{ matrix.nim-version }}
         uses: elijahr/vfox-nim@main
@@ -211,7 +211,7 @@ jobs:
       MACOS_X86_64_NIMFLAGS: '--cpu:amd64 --passC:-arch --passC:x86_64 --passL:-arch --passL:x86_64'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Nim ${{ matrix.nim-version }}
         uses: elijahr/vfox-nim@main
@@ -274,7 +274,7 @@ jobs:
     timeout-minutes: 35
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Cache choosenim and nimble toolchains
         uses: actions/cache@v4
@@ -388,7 +388,7 @@ jobs:
       NIMONY_SHA: '751121f9ee0fc7584015fc03f5326fe521029d84'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Nim
         uses: elijahr/vfox-nim@main
