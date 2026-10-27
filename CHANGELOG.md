@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-27
+
+### Changed
+
+- **Exact upstream dependency pinning (`lockfree == 0.6.3`)**: Pinned `lockfree` to exact version `== 0.6.3` to ensure deterministic compatibility with modern Safe Memory Reclamation (`lockfree/smr/nebr`) and typestates.
+- **Workflow dependencies**: Bumped GitHub Actions dependencies to modern releases (`actions/checkout@v7`, `actions/setup-python@v7`, `actions/cache@v6`, `softprops/action-gh-release@v3`).
+
 ## [0.11.1] - 2026-10-11
 
 ### Changed
