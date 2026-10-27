@@ -76,7 +76,7 @@ jobs:
         # then resolves against the cached clone's tag set rather than
         # re-fetching upstream — so newly-published dep versions are
         # invisible. Full miss + fresh install is the correct behavior.
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nimble
           key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
@@ -219,7 +219,7 @@ jobs:
           nim-version: ${{ matrix.nim-version }}
 
       - name: Cache Nimble packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nimble
           key: macos-15-rosetta-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
@@ -277,7 +277,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Cache choosenim and nimble toolchains
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.choosenim
@@ -296,7 +296,7 @@ jobs:
           echo "$HOME/.nimble/bin" >> "$GITHUB_PATH"
 
       - name: Cache Nim nimcache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/nim
           key: nimcache-${{ runner.os }}-multinim-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
@@ -396,7 +396,7 @@ jobs:
           nim-version: 'stable'
 
       - name: Cache Nim nimcache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/nim
           key: nimcache-${{ runner.os }}-stable-nimony-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
@@ -404,7 +404,7 @@ jobs:
             nimcache-${{ runner.os }}-stable-nimony-
 
       - name: Cache nimony build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: nimony-cache
         with:
           path: |
