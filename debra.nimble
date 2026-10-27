@@ -4,7 +4,8 @@
 
 version = "0.11.1"
 author = "Elijah Shaw-Rutschman"
-description = "Zero-overhead compatibility facade for lockfree/smr/nebr (Safe Memory Reclamation)"
+description =
+  "Zero-overhead compatibility facade for lockfree/smr/nebr (Safe Memory Reclamation)"
 license = "MIT"
 srcDir = "src"
 installExt = @["nim"]
@@ -20,8 +21,7 @@ requires "lockfree >= 0.2.0"
 task test, "Run tests with all memory managers":
   for mm in ["orc", "arc", "atomicArc", "refc"]:
     echo "Testing with --mm:" & mm
-    exec "nim c -r --mm:" & mm &
-      " --threads:on --path:src -d:testing tests/test.nim"
+    exec "nim c -r --mm:" & mm & " --threads:on --path:src -d:testing tests/test.nim"
   # The C++ backend is skipped on Windows: Nim's cpp codegen emits
   # C99-style designated initializers (`.field = value`) which MSVC's
   # C++ frontend only accepts under `/std:c++20`, and `/std:c++20`
@@ -56,13 +56,12 @@ task testExamples, "Compile and run all example files":
   # v0.10.1 follow-up; in the meantime CI sets
   # `DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND=1` on the windows-2022 / orc / c
   # cell to keep the matrix green.
-  let skipReclamationBg =
-    getEnv("DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND") == "1"
+  let skipReclamationBg = getEnv("DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND") == "1"
   for file in listFiles("examples"):
     if file.endsWith(".nim"):
       if skipReclamationBg and file.endsWith("reclamation_background.nim"):
-        echo "Skipping: ", file,
-          " (DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND=1; see KNOWN_GAP)"
+        echo "Skipping: ",
+          file, " (DEBRA_SKIP_EXAMPLE_RECLAMATION_BACKGROUND=1; see KNOWN_GAP)"
         continue
       echo "Testing: ", file
       exec "nim c -r --hints:off --threads:on --path:src " & file

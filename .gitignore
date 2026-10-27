@@ -73,3 +73,4 @@ config.nims
 # Local PR description scratch file (do not commit)
 .pr-description.md
 nimble.develop
+justfile.local
