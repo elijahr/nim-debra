@@ -21,7 +21,8 @@ jobs:
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.0/gitleaks_8.24.0_linux_x64.tar.gz" | sudo tar -xz -C /usr/local/bin gitleaks
           gitleaks detect --verbose --redact
 
-  test:
+  test-nim:
+    name: Nim (${{ matrix.nim-version }}, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -58,6 +59,5 @@ jobs:
         continue-on-error: ${{ matrix.nim-version == 'devel' }}
 
       - name: Test
-        run: |
-          nimble test
+        run: nimble test
         continue-on-error: ${{ matrix.nim-version == 'devel' }}
