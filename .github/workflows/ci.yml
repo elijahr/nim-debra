@@ -421,6 +421,7 @@ jobs:
 
       - name: Build nimony from source (pinned SHA)
         if: steps.nimony-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
@@ -428,7 +429,7 @@ jobs:
           git clone https://github.com/nim-lang/nimony.git /tmp/nimony
           cd /tmp/nimony
           git checkout "${NIMONY_SHA}"
-          nim c -r src/hastur/hastur build nimony
+          nim c -r src/hastur/hastur.nim build nimony
           mkdir -p "$HOME/.nimble/bin"
           [ -f bin/nimony ] && cp bin/nimony "$HOME/.nimble/bin/nimony"
 

@@ -1,6 +1,10 @@
 # Next Steps for debra
 
-Welcome to your newly scaffolded project! This repository was generated with **Polyform** using the `pure_nim` architectural flavor.
+Welcome to your newly scaffolded project! This repository was generated with **Polyform** configured with composable facets:
+- Nim: `True`
+- Python: `False`
+- TypeScript: `False`
+- C/C++: `False`
 
 Follow this checklist to complete project onboarding and configure CI/CD.
 
@@ -47,7 +51,8 @@ Momus provides automated, noise-filtered AI code reviews on pull requests using 
 
 ---
 
-## 4. Architectural Flavor Details: `pure_nim`
+## 4. Architectural Toolchain Details
+### Nim Core Library
 - **Core Library Source**: `src/debra.nim`
 - **Nimble Package Definition**: `debra.nimble`
 - **Tests**: `tests/` (run via `just test` or `nimble test`)
