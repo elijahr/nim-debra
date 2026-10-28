@@ -9,10 +9,16 @@ setup:
 
 # 2. Test Suite Execution
 test:
+    @just test-nim
+
+test-nim:
     nimble test
 
 # 3. Linter Execution
 lint:
+    @just lint-nim
+
+lint-nim:
     nph --check .
     nimble check
 
@@ -26,7 +32,7 @@ build:
 
 # 8. Clean Build Artifacts
 clean:
-    rm -rf nimcache htmldocs site docs/dist docs/.astro tools/docgen
+    rm -rf nimcache htmldocs site docs/dist docs/.astro tools/docgen dist .venv
     find . -name '*.exe' -delete
 
 # 9. Secret Scanning
