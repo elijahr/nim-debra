@@ -80,10 +80,10 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.nimble
-          key: ${{ matrix.runs-on }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
+          key: ${{ matrix.runs-on }}-${{ runner.arch }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
 
       - name: Install dependencies
-        run: nimble install -y
+        run: nimble refresh -y && nimble install -y
 
       - name: Select MSVC/vcc on Windows (CI-only)
         # nim.cfg deliberately leaves Windows compiler selection unset so
@@ -223,7 +223,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.nimble
-          key: macos-15-rosetta-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
+          key: macos-15-rosetta-${{ runner.arch }}-nimble-${{ matrix.nim-version }}-${{ hashFiles('*.nimble') }}
 
       - name: Verify Rosetta 2 available
         shell: bash
@@ -238,7 +238,7 @@ jobs:
           fi
 
       - name: Install dependencies
-        run: nimble install -y
+        run: nimble refresh -y && nimble install -y
 
       - name: Clear compilation cache
         shell: bash
@@ -283,10 +283,10 @@ jobs:
           path: |
             ~/.choosenim
             ~/.nimble
-          key: choosenim-${{ runner.os }}-multinim-2.2.10-2.2.12-devel-${{ hashFiles('*.nimble') }}
+          key: choosenim-${{ runner.os }}-${{ runner.arch }}-multinim-2.2.10-2.2.12-devel-${{ hashFiles('*.nimble') }}
           restore-keys: |
-            choosenim-${{ runner.os }}-multinim-
-            choosenim-${{ runner.os }}-
+            choosenim-${{ runner.os }}-${{ runner.arch }}-multinim-
+            choosenim-${{ runner.os }}-${{ runner.arch }}-
 
       - name: Setup choosenim
         shell: bash
@@ -300,16 +300,18 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/nim
-          key: nimcache-${{ runner.os }}-multinim-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
+          key: nimcache-${{ runner.os }}-${{ runner.arch }}-multinim-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
           restore-keys: |
-            nimcache-${{ runner.os }}-multinim-
+            nimcache-${{ runner.os }}-${{ runner.arch }}-multinim-
 
       - name: Install dependencies
         shell: bash
         run: |
           export PATH="$HOME/.nimble/bin:$PATH"
-          nimble install -y
-          for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d -name "typestates-*" 2>/dev/null); do
+          rm -rf ~/.nimble/pkgs2/nim-*
+          nimble refresh -y && nimble install -d -y
+          rm -rf ~/.nimble/pkgs2/nim-*
+          for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d \( -name "typestates-*" -o -name "lockfree-*" \) 2>/dev/null); do
             [ -e "$d/src" ] || ln -s . "$d/src"
           done
 
@@ -318,20 +320,6 @@ jobs:
         run: |
           set -o pipefail
           export PATH="$HOME/.nimble/bin:$PATH"
-
-          nimble_run() {
-            local logfile
-            logfile="$(mktemp)"
-            "$@" 2>&1 | tee "$logfile"
-            local rc=${PIPESTATUS[0]}
-            if [[ $rc -ne 0 ]]; then
-              return $rc
-            fi
-            if grep -Eq '^[[:space:]]*Error:' "$logfile"; then
-              echo "::error::nimble reported an error but exited 0; failing the step."
-              return 1
-            fi
-          }
 
           switch_toolchain() {
             local ver="$1"
@@ -347,6 +335,19 @@ jobs:
             echo "::endgroup::"
           }
 
+          run_suite() {
+            for mm in orc arc atomicArc refc; do
+              echo "Testing with --mm:${mm}"
+              nim c -r --mm:"${mm}" --threads:on --path:src -d:testing tests/test.nim || return 1
+            done
+            echo "Testing C++ backend"
+            nim cpp -r --threads:on --path:src -d:testing tests/test.nim || return 1
+            echo "[nim check] verifying tests/t_atomics_dsl_negative.nim - DSL must NOT leak into debra/atomics core"
+            nim check --threads:on --hints:off --warnings:off --path:src tests/t_atomics_dsl_negative.nim || return 1
+            echo "[should_fail] verifying compile-fail tests for PinnedScope + CFG analyzer"
+            nim c -r --hints:off --warnings:off --path:src tests/should_fail/runner.nim || return 1
+          }
+
           VERSIONS=("2.2.10" "2.2.12" "devel")
           FAILED_STABLE=0
           FAILED_DEVEL=0
@@ -354,11 +355,16 @@ jobs:
           for ver in "${VERSIONS[@]}"; do
             switch_toolchain "$ver"
             echo "::group::Running test suite under Nim ${ver}"
-            rm -rf ~/.cache/nim
-            for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d -name "typestates-*" 2>/dev/null); do
+            rm -rf ~/.cache/nim ~/.nimble/pkgs2/nim-*
+            for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d \( -name "typestates-*" -o -name "lockfree-*" \) 2>/dev/null); do
               [ -e "$d/src" ] || ln -s . "$d/src"
             done
-            if nimble_run nimble test; then
+            nimble setup || true
+            for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d \( -name "typestates-*" -o -name "lockfree-*" \) 2>/dev/null); do
+              [ -e "$d/src" ] || ln -s . "$d/src"
+            done
+            echo "Active compiler after nimble setup: $(nim --version | head -1)"
+            if run_suite; then
               echo "✅ Nim ${ver} test suite passed."
             else
               if [[ "$ver" == "devel" ]]; then
@@ -400,9 +406,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/nim
-          key: nimcache-${{ runner.os }}-stable-nimony-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
+          key: nimcache-${{ runner.os }}-${{ runner.arch }}-stable-nimony-${{ hashFiles('src/**/*.nim', 'tests/**/*.nim', 'nim.cfg', '*.nimble') }}
           restore-keys: |
-            nimcache-${{ runner.os }}-stable-nimony-
+            nimcache-${{ runner.os }}-${{ runner.arch }}-stable-nimony-
 
       - name: Cache nimony build
         uses: actions/cache@v6
@@ -411,12 +417,13 @@ jobs:
           path: |
             /tmp/nimony/bin
             ~/.nimble/bin/nimony
-          key: nimony-${{ runner.os }}-${{ env.NIMONY_SHA }}
+          key: nimony-${{ runner.os }}-${{ runner.arch }}-${{ env.NIMONY_SHA }}
 
       - name: Install dependencies
         run: |
+          nimble refresh -y
           nimble install -y
-          for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d -name "typestates-*" 2>/dev/null); do
+          for d in $(find ~/.nimble/pkgs2 -maxdepth 1 -type d \( -name "typestates-*" -o -name "lockfree-*" \) 2>/dev/null); do
             [ -e "$d/src" ] || ln -s . "$d/src"
           done
 

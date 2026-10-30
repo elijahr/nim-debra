@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-04-19
+
+### Changed
+
+- **Upstream dependency bump (`lockfree >= 0.6.6 & < 0.7.0`)**: Updated `debra.nimble` to `requires "lockfree >= 0.6.6 & < 0.7.0"`.
+- **Multi-Nim CI toolchain isolation, `lockfree-*`/`typestates-*` `src` symlinks, and `tests/should_fail/config.nims` (`.github/workflows/ci.yml`, `tests/should_fail/config.nims`)**: Added `tests/should_fail/config.nims` so compile-fail test cases invoked via bare `nim c` resolve `../../nimble.paths` and `../../src`. Hardened the `multi-nim` CI job to refresh the Nimble package index and install dependencies once, create `src -> .` symlinks in `~/.nimble/pkgs2` for both `lockfree-*` and `typestates-*` before `nimble setup` (handling flat `pkgs2` extractions under `nimble v0.22.2`), purge Nimble-downloaded compiler binaries (`~/.nimble/pkgs2/nim-*`), and invoke the test suite directly via the active `choosenim` compiler rather than `nimble test`, with `actions/cache@v6` keys scoped by `${{ runner.arch }}`.
+
 ## [0.11.4] - 2026-10-30
 
 ### Changed
