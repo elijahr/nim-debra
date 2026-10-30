@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-10-30
+
+### Changed
+
+- **Bounded `lockfree` and `typestates` dependency ranges (`debra.nimble`)**: Updated `requires "lockfree >= 0.6.5 & < 0.7.0"` and added `requires "typestates >= 0.14.0 & < 0.15.0"` so `nim-debra` receives compatible `0.6.x` and `0.14.x` patch updates while remaining bounded below breaking minor bumps.
+
 ## [0.11.3] - 2026-10-30
 
 ### Changed
