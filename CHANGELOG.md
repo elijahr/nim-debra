@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-30
+
+### Changed
+
+- **Compatible range dependency pinning (`lockfree >= 0.6.4 & < 0.7.0`)**: Updated `debra.nimble` to `requires "lockfree >= 0.6.4 & < 0.7.0"` so `nim-debra` automatically receives `0.6.x` patch updates while remaining bounded below `0.7.0`.
+
 ## [0.11.2] - 2026-10-27
 
 ### Changed
