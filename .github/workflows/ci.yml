@@ -271,7 +271,7 @@ jobs:
   # ===========================================================================
   multi-nim:
     name: multi-nim (2.2.10, 2.2.12, devel)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 35
     steps:
       - name: Checkout
@@ -388,7 +388,7 @@ jobs:
   # ===========================================================================
   nimony:
     name: nimony aufbruch baseline (informational)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     continue-on-error: true
     env:
