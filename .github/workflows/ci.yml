@@ -197,7 +197,7 @@ jobs:
     # matrix. Folding into the existing matrix would either explode it to
     # 64 cells or require skip-conditionals on every step.
     name: test (macos-15-rosetta / x86_64 / ${{ matrix.mm }} / ${{ matrix.backend }})
-    runs-on: macos-15
+    runs-on: macos-26
     strategy:
       fail-fast: false
       matrix:
